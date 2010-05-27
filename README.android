@@ -1,0 +1,14 @@
+URL: http://code.google.com/p/protobuf/downloads/list
+Version: 2.2.0a
+License: Google BSD like
+Description: "Protobuf: The Google protobuf compiler and runtimes for various languages"
+
+Local Modifications: Initial changes include support for the javamicro
+runtime, see java/README.txt for more details.
+
+Protocol Buffers are a way of encoding structured data in an efficient
+yet extensible format. Google uses Protocol Buffers for almost all
+of its internal RPC protocols and file formats.
+
+Initially the protoc compiler is not integrated into the Android build system
+and the Android.mk will simply build the javamicro runtime static library.
