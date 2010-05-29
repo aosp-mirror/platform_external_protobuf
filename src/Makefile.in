@@ -106,7 +106,11 @@ am_libprotoc_la_OBJECTS = code_generator.lo command_line_interface.lo \
 	cpp_string_field.lo java_enum.lo java_enum_field.lo \
 	java_extension.lo java_field.lo java_file.lo java_generator.lo \
 	java_helpers.lo java_message.lo java_message_field.lo \
-	java_primitive_field.lo java_service.lo python_generator.lo
+	java_primitive_field.lo java_service.lo javamicro_enum.lo \
+	javamicro_enum_field.lo javamicro_field.lo javamicro_file.lo \
+	javamicro_generator.lo javamicro_helpers.lo \
+	javamicro_message.lo javamicro_message_field.lo \
+	javamicro_primitive_field.lo python_generator.lo
 libprotoc_la_OBJECTS = $(am_libprotoc_la_OBJECTS)
 libprotoc_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
@@ -298,6 +302,7 @@ am__nobase_include_HEADERS_DIST = google/protobuf/stubs/common.h \
 	google/protobuf/compiler/plugin.pb.h \
 	google/protobuf/compiler/cpp/cpp_generator.h \
 	google/protobuf/compiler/java/java_generator.h \
+	google/protobuf/compiler/javamicro/javamicro_generator.h \
 	google/protobuf/compiler/python/python_generator.h
 nobase_includeHEADERS_INSTALL = $(install_sh_DATA)
 HEADERS = $(nobase_include_HEADERS)
@@ -491,6 +496,7 @@ nobase_include_HEADERS = \
   google/protobuf/compiler/plugin.pb.h                         \
   google/protobuf/compiler/cpp/cpp_generator.h                 \
   google/protobuf/compiler/java/java_generator.h               \
+  google/protobuf/compiler/javamicro/javamicro_generator.h     \
   google/protobuf/compiler/python/python_generator.h
 
 lib_LTLIBRARIES = libprotobuf-lite.la libprotobuf.la libprotoc.la
@@ -596,6 +602,23 @@ libprotoc_la_SOURCES = \
   google/protobuf/compiler/java/java_primitive_field.h         \
   google/protobuf/compiler/java/java_service.cc                \
   google/protobuf/compiler/java/java_service.h                 \
+  google/protobuf/compiler/javamicro/javamicro_enum.cc         \
+  google/protobuf/compiler/javamicro/javamicro_enum.h          \
+  google/protobuf/compiler/javamicro/javamicro_enum_field.cc   \
+  google/protobuf/compiler/javamicro/javamicro_enum_field.h    \
+  google/protobuf/compiler/javamicro/javamicro_field.cc        \
+  google/protobuf/compiler/javamicro/javamicro_field.h         \
+  google/protobuf/compiler/javamicro/javamicro_file.cc         \
+  google/protobuf/compiler/javamicro/javamicro_file.h          \
+  google/protobuf/compiler/javamicro/javamicro_generator.cc    \
+  google/protobuf/compiler/javamicro/javamicro_helpers.cc      \
+  google/protobuf/compiler/javamicro/javamicro_helpers.h       \
+  google/protobuf/compiler/javamicro/javamicro_message.cc      \
+  google/protobuf/compiler/javamicro/javamicro_message.h       \
+  google/protobuf/compiler/javamicro/javamicro_message_field.cc\
+  google/protobuf/compiler/javamicro/javamicro_message_field.h \
+  google/protobuf/compiler/javamicro/javamicro_primitive_field.cc\
+  google/protobuf/compiler/javamicro/javamicro_primitive_field.h\
   google/protobuf/compiler/python/python_generator.cc
 
 protoc_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la
@@ -925,6 +948,15 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/java_message_field.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/java_primitive_field.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/java_service.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_enum.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_enum_field.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_field.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_file.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_generator.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_helpers.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_message.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_message_field.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_primitive_field.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/message.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/message_lite.Plo@am__quote@
@@ -1466,6 +1498,69 @@ java_service.lo: google/protobuf/compiler/java/java_service.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/java/java_service.cc' object='java_service.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o java_service.lo `test -f 'google/protobuf/compiler/java/java_service.cc' || echo '$(srcdir)/'`google/protobuf/compiler/java/java_service.cc
+
+javamicro_enum.lo: google/protobuf/compiler/javamicro/javamicro_enum.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_enum.lo -MD -MP -MF $(DEPDIR)/javamicro_enum.Tpo -c -o javamicro_enum.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_enum.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_enum.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_enum.Tpo $(DEPDIR)/javamicro_enum.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_enum.cc' object='javamicro_enum.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_enum.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_enum.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_enum.cc
+
+javamicro_enum_field.lo: google/protobuf/compiler/javamicro/javamicro_enum_field.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_enum_field.lo -MD -MP -MF $(DEPDIR)/javamicro_enum_field.Tpo -c -o javamicro_enum_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_enum_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_enum_field.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_enum_field.Tpo $(DEPDIR)/javamicro_enum_field.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_enum_field.cc' object='javamicro_enum_field.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_enum_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_enum_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_enum_field.cc
+
+javamicro_field.lo: google/protobuf/compiler/javamicro/javamicro_field.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_field.lo -MD -MP -MF $(DEPDIR)/javamicro_field.Tpo -c -o javamicro_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_field.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_field.Tpo $(DEPDIR)/javamicro_field.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_field.cc' object='javamicro_field.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_field.cc
+
+javamicro_file.lo: google/protobuf/compiler/javamicro/javamicro_file.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_file.lo -MD -MP -MF $(DEPDIR)/javamicro_file.Tpo -c -o javamicro_file.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_file.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_file.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_file.Tpo $(DEPDIR)/javamicro_file.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_file.cc' object='javamicro_file.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_file.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_file.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_file.cc
+
+javamicro_generator.lo: google/protobuf/compiler/javamicro/javamicro_generator.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_generator.lo -MD -MP -MF $(DEPDIR)/javamicro_generator.Tpo -c -o javamicro_generator.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_generator.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_generator.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_generator.Tpo $(DEPDIR)/javamicro_generator.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_generator.cc' object='javamicro_generator.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_generator.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_generator.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_generator.cc
+
+javamicro_helpers.lo: google/protobuf/compiler/javamicro/javamicro_helpers.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_helpers.lo -MD -MP -MF $(DEPDIR)/javamicro_helpers.Tpo -c -o javamicro_helpers.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_helpers.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_helpers.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_helpers.Tpo $(DEPDIR)/javamicro_helpers.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_helpers.cc' object='javamicro_helpers.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_helpers.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_helpers.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_helpers.cc
+
+javamicro_message.lo: google/protobuf/compiler/javamicro/javamicro_message.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_message.lo -MD -MP -MF $(DEPDIR)/javamicro_message.Tpo -c -o javamicro_message.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_message.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_message.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_message.Tpo $(DEPDIR)/javamicro_message.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_message.cc' object='javamicro_message.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_message.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_message.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_message.cc
+
+javamicro_message_field.lo: google/protobuf/compiler/javamicro/javamicro_message_field.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_message_field.lo -MD -MP -MF $(DEPDIR)/javamicro_message_field.Tpo -c -o javamicro_message_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_message_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_message_field.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_message_field.Tpo $(DEPDIR)/javamicro_message_field.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_message_field.cc' object='javamicro_message_field.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_message_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_message_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_message_field.cc
+
+javamicro_primitive_field.lo: google/protobuf/compiler/javamicro/javamicro_primitive_field.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javamicro_primitive_field.lo -MD -MP -MF $(DEPDIR)/javamicro_primitive_field.Tpo -c -o javamicro_primitive_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_primitive_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_primitive_field.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/javamicro_primitive_field.Tpo $(DEPDIR)/javamicro_primitive_field.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javamicro/javamicro_primitive_field.cc' object='javamicro_primitive_field.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javamicro_primitive_field.lo `test -f 'google/protobuf/compiler/javamicro/javamicro_primitive_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javamicro/javamicro_primitive_field.cc
 
 python_generator.lo: google/protobuf/compiler/python/python_generator.cc
 @am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT python_generator.lo -MD -MP -MF $(DEPDIR)/python_generator.Tpo -c -o python_generator.lo `test -f 'google/protobuf/compiler/python/python_generator.cc' || echo '$(srcdir)/'`google/protobuf/compiler/python/python_generator.cc

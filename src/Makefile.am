@@ -72,6 +72,7 @@ nobase_include_HEADERS =                                       \
   google/protobuf/compiler/plugin.pb.h                         \
   google/protobuf/compiler/cpp/cpp_generator.h                 \
   google/protobuf/compiler/java/java_generator.h               \
+  google/protobuf/compiler/javamicro/javamicro_generator.h     \
   google/protobuf/compiler/python/python_generator.h
 
 lib_LTLIBRARIES = libprotobuf-lite.la libprotobuf.la libprotoc.la
@@ -178,6 +179,23 @@ libprotoc_la_SOURCES =                                         \
   google/protobuf/compiler/java/java_primitive_field.h         \
   google/protobuf/compiler/java/java_service.cc                \
   google/protobuf/compiler/java/java_service.h                 \
+  google/protobuf/compiler/javamicro/javamicro_enum.cc         \
+  google/protobuf/compiler/javamicro/javamicro_enum.h          \
+  google/protobuf/compiler/javamicro/javamicro_enum_field.cc   \
+  google/protobuf/compiler/javamicro/javamicro_enum_field.h    \
+  google/protobuf/compiler/javamicro/javamicro_field.cc        \
+  google/protobuf/compiler/javamicro/javamicro_field.h         \
+  google/protobuf/compiler/javamicro/javamicro_file.cc         \
+  google/protobuf/compiler/javamicro/javamicro_file.h          \
+  google/protobuf/compiler/javamicro/javamicro_generator.cc    \
+  google/protobuf/compiler/javamicro/javamicro_helpers.cc      \
+  google/protobuf/compiler/javamicro/javamicro_helpers.h       \
+  google/protobuf/compiler/javamicro/javamicro_message.cc      \
+  google/protobuf/compiler/javamicro/javamicro_message.h       \
+  google/protobuf/compiler/javamicro/javamicro_message_field.cc\
+  google/protobuf/compiler/javamicro/javamicro_message_field.h \
+  google/protobuf/compiler/javamicro/javamicro_primitive_field.cc\
+  google/protobuf/compiler/javamicro/javamicro_primitive_field.h\
   google/protobuf/compiler/python/python_generator.cc
 
 bin_PROGRAMS = protoc

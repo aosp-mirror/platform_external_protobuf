@@ -29,39 +29,21 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Author: kenton@google.com (Kenton Varda)
+//
+// This is like unittest_import.proto but with optimize_for = MICRO_RUNTIME.
 
-#include <google/protobuf/compiler/command_line_interface.h>
-#include <google/protobuf/compiler/cpp/cpp_generator.h>
-#include <google/protobuf/compiler/python/python_generator.h>
-#include <google/protobuf/compiler/java/java_generator.h>
-#include <google/protobuf/compiler/javamicro/javamicro_generator.h>
+package protobuf_unittest_import;
 
+// java_package and java_outer_classname are specified on the command line.
+//option java_package = "com.google.protobuf.micro";
+//option java_outer_classname = "UnittestImportMicro";
 
-int main(int argc, char* argv[]) {
+message ImportMessageMicro {
+  optional int32 d = 1;
+}
 
-  google::protobuf::compiler::CommandLineInterface cli;
-  cli.AllowPlugins("protoc-");
-
-  // Proto2 C++
-  google::protobuf::compiler::cpp::CppGenerator cpp_generator;
-  cli.RegisterGenerator("--cpp_out", &cpp_generator,
-                        "Generate C++ header and source.");
-
-  // Proto2 Java
-  google::protobuf::compiler::java::JavaGenerator java_generator;
-  cli.RegisterGenerator("--java_out", &java_generator,
-                        "Generate Java source file.");
-
-
-  // Proto2 Python
-  google::protobuf::compiler::python::Generator py_generator;
-  cli.RegisterGenerator("--python_out", &py_generator,
-                        "Generate Python source file.");
-
-  // Proto2 JavaMicro
-  google::protobuf::compiler::javamicro::JavaMicroGenerator javamicro_generator;
-  cli.RegisterGenerator("--javamicro_out", &javamicro_generator,
-                        "Generate Java source file micro runtime.");
-
-  return cli.Run(argc, argv);
+enum ImportEnumMicro {
+  IMPORT_MICRO_FOO = 7;
+  IMPORT_MICRO_BAR = 8;
+  IMPORT_MICRO_BAZ = 9;
 }

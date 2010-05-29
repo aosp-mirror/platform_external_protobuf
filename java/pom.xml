@@ -96,6 +96,8 @@
             <configuration>
               <tasks>
                 <mkdir dir="target/generated-test-sources" />
+                <!--mkdir dir="target/generated-test-sources/opt-space" /-->
+                <!--mkdir dir="target/generated-test-sources/opt-speed" /-->
                 <exec executable="../src/protoc">
                   <arg value="--java_out=target/generated-test-sources" />
                   <arg value="--proto_path=../src" />
@@ -115,8 +117,20 @@
                   <arg value="../src/google/protobuf/unittest_enormous_descriptor.proto" />
                   <arg value="../src/google/protobuf/unittest_no_generic_services.proto" />
                 </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javamicro_out=opt=speed,java_use_vector=false,java_package=google/protobuf/unittest_import_micro.proto|com.google.protobuf.micro,java_outer_classname=google/protobuf/unittest_import_micro.proto|UnittestImportMicro:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_micro.proto" />
+                  <arg value="../src/google/protobuf/unittest_simple_micro.proto" />
+                  <arg value="../src/google/protobuf/unittest_stringutf8_micro.proto" />
+                  <arg value="../src/google/protobuf/unittest_recursive_micro.proto" />
+                  <arg value="../src/google/protobuf/unittest_import_micro.proto" />
+                </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
+              <!--testSourceRoot>target/generated-test-sources/opt-space</testSourceRoot-->
+              <!--testSourceRoot>target/generated-test-sources/opt-speed</testSourceRoot-->
             </configuration>
             <goals>
               <goal>run</goal>
@@ -166,6 +180,49 @@
             <artifactId>maven-jar-plugin</artifactId>
             <configuration>
               <classifier>lite</classifier>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>micro</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/MessageMicro.java</include>
+                <include>**/ByteStringMicro.java</include>
+                <include>**/CodedInputStreamMicro.java</include>
+                <include>**/CodedOutputStreamMicro.java</include>
+                <include>**/InvalidProtocolBufferMicroException.java</include>
+                <include>**/StringUtf8Micro.java</include>
+                <include>**/WireFormatMicro.java</include>
+              </includes>
+              <testIncludes>
+                <testInclude>**/MicroTest.java</testInclude>
+                <testInclude>**/MicroOuterClass.java</testInclude>
+                <testInclude>**/SimpleMessageMicro.java</testInclude>
+                <testInclude>**/StringUtf8.java</testInclude>
+                <testInclude>**/RecursiveMessageMicro.java</testInclude>
+                <testInclude>**/UnittestImportMicro.java</testInclude>
+              </testIncludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/MicroTest.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-jar-plugin</artifactId>
+            <configuration>
+              <classifier>micro</classifier>
             </configuration>
           </plugin>
         </plugins>
