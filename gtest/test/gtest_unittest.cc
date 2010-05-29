@@ -80,23 +80,37 @@ TEST(CommandLineFlagsTest, CanBeAccessedInCodeOnceGTestHIsIncluded) {
 
 namespace testing {
 namespace internal {
-const char* FormatTimeInMillisAsSeconds(TimeInMillis ms);
 
+bool ShouldUseColor(bool stdout_is_tty);
+const char* FormatTimeInMillisAsSeconds(TimeInMillis ms);
 bool ParseInt32Flag(const char* str, const char* flag, Int32* value);
 
-}  // namespace internal
-}  // namespace testing
+// Provides access to otherwise private parts of the TestEventListeners class
+// that are needed to test it.
+class TestEventListenersAccessor {
+ public:
+  static TestEventListener* GetRepeater(TestEventListeners* listeners) {
+    return listeners->repeater();
+  }
 
-using testing::internal::FormatTimeInMillisAsSeconds;
-using testing::internal::ParseInt32Flag;
+  static void SetDefaultResultPrinter(TestEventListeners* listeners,
+                                      TestEventListener* listener) {
+    listeners->SetDefaultResultPrinter(listener);
+  }
+  static void SetDefaultXmlGenerator(TestEventListeners* listeners,
+                                     TestEventListener* listener) {
+    listeners->SetDefaultXmlGenerator(listener);
+  }
 
-namespace testing {
+  static bool EventForwardingEnabled(const TestEventListeners& listeners) {
+    return listeners.EventForwardingEnabled();
+  }
 
-GTEST_DECLARE_string_(output);
-GTEST_DECLARE_string_(color);
+  static void SuppressEventForwarding(TestEventListeners* listeners) {
+    listeners->SuppressEventForwarding();
+  }
+};
 
-namespace internal {
-bool ShouldUseColor(bool stdout_is_tty);
 }  // namespace internal
 }  // namespace testing
 
@@ -104,6 +118,7 @@ using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
 using testing::DoubleLE;
+using testing::EmptyTestEventListener;
 using testing::FloatLE;
 using testing::GTEST_FLAG(also_run_disabled_tests);
 using testing::GTEST_FLAG(break_on_failure);
@@ -125,19 +140,21 @@ using testing::IsSubstring;
 using testing::Message;
 using testing::ScopedFakeTestPartResultReporter;
 using testing::StaticAssertTypeEq;
-using testing::TPRT_FATAL_FAILURE;
-using testing::TPRT_NONFATAL_FAILURE;
-using testing::TPRT_SUCCESS;
 using testing::Test;
+using testing::TestEventListeners;
+using testing::TestCase;
 using testing::TestPartResult;
 using testing::TestPartResultArray;
+using testing::TestProperty;
+using testing::TestResult;
 using testing::UnitTest;
-using testing::internal::kMaxRandomSeed;
-using testing::internal::kTestTypeIdInGoogleTest;
+using testing::internal::AlwaysFalse;
+using testing::internal::AlwaysTrue;
 using testing::internal::AppendUserMessage;
 using testing::internal::CodePointToUtf8;
 using testing::internal::EqFailure;
 using testing::internal::FloatingPoint;
+using testing::internal::FormatTimeInMillisAsSeconds;
 using testing::internal::GTestFlagSaver;
 using testing::internal::GetCurrentOsStackTraceExceptTop;
 using testing::internal::GetNextRandomSeed;
@@ -147,19 +164,34 @@ using testing::internal::GetTypeId;
 using testing::internal::GetUnitTestImpl;
 using testing::internal::Int32;
 using testing::internal::Int32FromEnvOrDie;
+using testing::internal::ParseInt32Flag;
 using testing::internal::ShouldRunTestOnShard;
 using testing::internal::ShouldShard;
 using testing::internal::ShouldUseColor;
 using testing::internal::StreamableToString;
 using testing::internal::String;
-using testing::internal::TestCase;
-using testing::internal::TestProperty;
-using testing::internal::TestResult;
+using testing::internal::TestEventListenersAccessor;
 using testing::internal::TestResultAccessor;
 using testing::internal::ThreadLocal;
+using testing::internal::UInt32;
 using testing::internal::Vector;
 using testing::internal::WideStringToUtf8;
+using testing::internal::kMaxRandomSeed;
 using testing::internal::kTestTypeIdInGoogleTest;
+using testing::internal::scoped_ptr;
+
+class TestingVector : public Vector<int> {
+};
+
+::std::ostream& operator<<(::std::ostream& os,
+                           const TestingVector& vector) {
+  os << "{ ";
+  for (int i = 0; i < vector.size(); i++) {
+    os << vector.GetElement(i) << " ";
+  }
+  os << "}";
+  return os;
+}
 
 // This line tests that we can define tests in an unnamed namespace.
 namespace {
@@ -472,6 +504,49 @@ TEST(WideStringToUtf8Test, ConcatenatesCodepointsCorrectly) {
 }
 #endif  // !GTEST_WIDE_STRING_USES_UTF16_
 
+// Tests the Random class.
+
+TEST(RandomDeathTest, GeneratesCrashesOnInvalidRange) {
+  testing::internal::Random random(42);
+  EXPECT_DEATH_IF_SUPPORTED(
+      random.Generate(0),
+      "Cannot generate a number in the range \\[0, 0\\)");
+  EXPECT_DEATH_IF_SUPPORTED(
+      random.Generate(testing::internal::Random::kMaxRange + 1),
+      "Generation of a number in \\[0, 2147483649\\) was requested, "
+      "but this can only generate numbers in \\[0, 2147483648\\)");
+}
+
+TEST(RandomTest, GeneratesNumbersWithinRange) {
+  const UInt32 kRange = 10000;
+  testing::internal::Random random(12345);
+  for (int i = 0; i < 10; i++) {
+    EXPECT_LT(random.Generate(kRange), kRange) << " for iteration " << i;
+  }
+
+  testing::internal::Random random2(testing::internal::Random::kMaxRange);
+  for (int i = 0; i < 10; i++) {
+    EXPECT_LT(random2.Generate(kRange), kRange) << " for iteration " << i;
+  }
+}
+
+TEST(RandomTest, RepeatsWhenReseeded) {
+  const int kSeed = 123;
+  const int kArraySize = 10;
+  const UInt32 kRange = 10000;
+  UInt32 values[kArraySize];
+
+  testing::internal::Random random(kSeed);
+  for (int i = 0; i < kArraySize; i++) {
+    values[i] = random.Generate(kRange);
+  }
+
+  random.Reseed(kSeed);
+  for (int i = 0; i < kArraySize; i++) {
+    EXPECT_EQ(values[i], random.Generate(kRange)) << " for iteration " << i;
+  }
+}
+
 // Tests the Vector class template.
 
 // Tests Vector::Clear().
@@ -615,6 +690,53 @@ TEST(VectorTest, GetElementOr) {
   EXPECT_EQ('x', a.GetElementOr(2, 'x'));
 }
 
+TEST(VectorTest, Swap) {
+  Vector<int> a;
+  a.PushBack(0);
+  a.PushBack(1);
+  a.PushBack(2);
+
+  // Swaps an element with itself.
+  a.Swap(0, 0);
+  ASSERT_EQ(0, a.GetElement(0));
+  ASSERT_EQ(1, a.GetElement(1));
+  ASSERT_EQ(2, a.GetElement(2));
+
+  // Swaps two different elements where the indices go up.
+  a.Swap(0, 1);
+  ASSERT_EQ(1, a.GetElement(0));
+  ASSERT_EQ(0, a.GetElement(1));
+  ASSERT_EQ(2, a.GetElement(2));
+
+  // Swaps two different elements where the indices go down.
+  a.Swap(2, 0);
+  ASSERT_EQ(2, a.GetElement(0));
+  ASSERT_EQ(0, a.GetElement(1));
+  ASSERT_EQ(1, a.GetElement(2));
+}
+
+TEST(VectorTest, Clone) {
+  // Clones an empty Vector.
+  Vector<int> a;
+  scoped_ptr<Vector<int> > empty(a.Clone());
+  EXPECT_EQ(0, empty->size());
+
+  // Clones a singleton.
+  a.PushBack(42);
+  scoped_ptr<Vector<int> > singleton(a.Clone());
+  ASSERT_EQ(1, singleton->size());
+  EXPECT_EQ(42, singleton->GetElement(0));
+
+  // Clones a Vector with more elements.
+  a.PushBack(43);
+  a.PushBack(44);
+  scoped_ptr<Vector<int> > big(a.Clone());
+  ASSERT_EQ(3, big->size());
+  EXPECT_EQ(42, big->GetElement(0));
+  EXPECT_EQ(43, big->GetElement(1));
+  EXPECT_EQ(44, big->GetElement(2));
+}
+
 // Tests Vector::Erase().
 TEST(VectorDeathTest, Erase) {
   Vector<int> a;
@@ -678,21 +800,258 @@ TEST(VectorDeathTest, Erase) {
 }
 
 // Tests the GetElement accessor.
-TEST(ListDeathTest, GetElement) {
+TEST(VectorDeathTest, GetElement) {
+  Vector<int> a;
+  a.PushBack(0);
+  a.PushBack(1);
+  a.PushBack(2);
+  const Vector<int>& b = a;
+
+  EXPECT_EQ(0, b.GetElement(0));
+  EXPECT_EQ(1, b.GetElement(1));
+  EXPECT_EQ(2, b.GetElement(2));
+  EXPECT_DEATH_IF_SUPPORTED(
+      b.GetElement(3),
+      "Invalid Vector index 3: must be in range \\[0, 2\\]\\.");
+  EXPECT_DEATH_IF_SUPPORTED(
+      b.GetElement(-1),
+      "Invalid Vector index -1: must be in range \\[0, 2\\]\\.");
+}
+
+// Tests the GetMutableElement accessor.
+TEST(VectorDeathTest, GetMutableElement) {
   Vector<int> a;
   a.PushBack(0);
   a.PushBack(1);
   a.PushBack(2);
 
-  EXPECT_EQ(0, a.GetElement(0));
-  EXPECT_EQ(1, a.GetElement(1));
-  EXPECT_EQ(2, a.GetElement(2));
+  EXPECT_EQ(0, a.GetMutableElement(0));
+  EXPECT_EQ(1, a.GetMutableElement(1));
+  EXPECT_EQ(2, a.GetMutableElement(2));
+
+  a.GetMutableElement(0) = 42;
+  EXPECT_EQ(42, a.GetMutableElement(0));
+  EXPECT_EQ(1, a.GetMutableElement(1));
+  EXPECT_EQ(2, a.GetMutableElement(2));
+
   EXPECT_DEATH_IF_SUPPORTED(
-      a.GetElement(3),
+      a.GetMutableElement(3),
       "Invalid Vector index 3: must be in range \\[0, 2\\]\\.");
   EXPECT_DEATH_IF_SUPPORTED(
-      a.GetElement(-1),
+      a.GetMutableElement(-1),
       "Invalid Vector index -1: must be in range \\[0, 2\\]\\.");
+}
+
+TEST(VectorDeathTest, Swap) {
+  Vector<int> a;
+  a.PushBack(0);
+  a.PushBack(1);
+  a.PushBack(2);
+
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.Swap(-1, 1),
+      "Invalid first swap element -1: must be in range \\[0, 2\\]");
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.Swap(3, 1),
+      "Invalid first swap element 3: must be in range \\[0, 2\\]");
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.Swap(1, -1),
+      "Invalid second swap element -1: must be in range \\[0, 2\\]");
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.Swap(1, 3),
+      "Invalid second swap element 3: must be in range \\[0, 2\\]");
+}
+
+TEST(VectorDeathTest, ShuffleRange) {
+  Vector<int> a;
+  a.PushBack(0);
+  a.PushBack(1);
+  a.PushBack(2);
+  testing::internal::Random random(1);
+
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.ShuffleRange(&random, -1, 1),
+      "Invalid shuffle range start -1: must be in range \\[0, 3\\]");
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.ShuffleRange(&random, 4, 4),
+      "Invalid shuffle range start 4: must be in range \\[0, 3\\]");
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.ShuffleRange(&random, 3, 2),
+      "Invalid shuffle range finish 2: must be in range \\[3, 3\\]");
+  EXPECT_DEATH_IF_SUPPORTED(
+      a.ShuffleRange(&random, 3, 4),
+      "Invalid shuffle range finish 4: must be in range \\[3, 3\\]");
+}
+
+class VectorShuffleTest : public Test {
+ protected:
+  static const int kVectorSize = 20;
+
+  VectorShuffleTest() : random_(1) {
+    for (int i = 0; i < kVectorSize; i++) {
+      vector_.PushBack(i);
+    }
+  }
+
+  static bool VectorIsCorrupt(const TestingVector& vector) {
+    if (kVectorSize != vector.size()) {
+      return true;
+    }
+
+    bool found_in_vector[kVectorSize] = { false };
+    for (int i = 0; i < vector.size(); i++) {
+      const int e = vector.GetElement(i);
+      if (e < 0 || e >= kVectorSize || found_in_vector[e]) {
+        return true;
+      }
+      found_in_vector[e] = true;
+    }
+
+    // Vector size is correct, elements' range is correct, no
+    // duplicate elements.  Therefore no corruption has occurred.
+    return false;
+  }
+
+  static bool VectorIsNotCorrupt(const TestingVector& vector) {
+    return !VectorIsCorrupt(vector);
+  }
+
+  static bool RangeIsShuffled(const TestingVector& vector, int begin, int end) {
+    for (int i = begin; i < end; i++) {
+      if (i != vector.GetElement(i)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static bool RangeIsUnshuffled(
+      const TestingVector& vector, int begin, int end) {
+    return !RangeIsShuffled(vector, begin, end);
+  }
+
+  static bool VectorIsShuffled(const TestingVector& vector) {
+    return RangeIsShuffled(vector, 0, vector.size());
+  }
+
+  static bool VectorIsUnshuffled(const TestingVector& vector) {
+    return !VectorIsShuffled(vector);
+  }
+
+  testing::internal::Random random_;
+  TestingVector vector_;
+};  // class VectorShuffleTest
+
+const int VectorShuffleTest::kVectorSize;
+
+TEST_F(VectorShuffleTest, HandlesEmptyRange) {
+  // Tests an empty range at the beginning...
+  vector_.ShuffleRange(&random_, 0, 0);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsUnshuffled, vector_);
+
+  // ...in the middle...
+  vector_.ShuffleRange(&random_, kVectorSize/2, kVectorSize/2);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsUnshuffled, vector_);
+
+  // ...at the end...
+  vector_.ShuffleRange(&random_, kVectorSize - 1, kVectorSize - 1);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsUnshuffled, vector_);
+
+  // ...and past the end.
+  vector_.ShuffleRange(&random_, kVectorSize, kVectorSize);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsUnshuffled, vector_);
+}
+
+TEST_F(VectorShuffleTest, HandlesRangeOfSizeOne) {
+  // Tests a size one range at the beginning...
+  vector_.ShuffleRange(&random_, 0, 1);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsUnshuffled, vector_);
+
+  // ...in the middle...
+  vector_.ShuffleRange(&random_, kVectorSize/2, kVectorSize/2 + 1);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsUnshuffled, vector_);
+
+  // ...and at the end.
+  vector_.ShuffleRange(&random_, kVectorSize - 1, kVectorSize);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsUnshuffled, vector_);
+}
+
+// Because we use our own random number generator and a fixed seed,
+// we can guarantee that the following "random" tests will succeed.
+
+TEST_F(VectorShuffleTest, ShufflesEntireVector) {
+  vector_.Shuffle(&random_);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  EXPECT_FALSE(VectorIsUnshuffled(vector_)) << vector_;
+
+  // Tests the first and last elements in particular to ensure that
+  // there are no off-by-one problems in our shuffle algorithm.
+  EXPECT_NE(0, vector_.GetElement(0));
+  EXPECT_NE(kVectorSize - 1, vector_.GetElement(kVectorSize - 1));
+}
+
+TEST_F(VectorShuffleTest, ShufflesStartOfVector) {
+  const int kRangeSize = kVectorSize/2;
+
+  vector_.ShuffleRange(&random_, 0, kRangeSize);
+
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  EXPECT_PRED3(RangeIsShuffled, vector_, 0, kRangeSize);
+  EXPECT_PRED3(RangeIsUnshuffled, vector_, kRangeSize, kVectorSize);
+}
+
+TEST_F(VectorShuffleTest, ShufflesEndOfVector) {
+  const int kRangeSize = kVectorSize / 2;
+  vector_.ShuffleRange(&random_, kRangeSize, kVectorSize);
+
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  EXPECT_PRED3(RangeIsUnshuffled, vector_, 0, kRangeSize);
+  EXPECT_PRED3(RangeIsShuffled, vector_, kRangeSize, kVectorSize);
+}
+
+TEST_F(VectorShuffleTest, ShufflesMiddleOfVector) {
+  int kRangeSize = kVectorSize/3;
+  vector_.ShuffleRange(&random_, kRangeSize, 2*kRangeSize);
+
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  EXPECT_PRED3(RangeIsUnshuffled, vector_, 0, kRangeSize);
+  EXPECT_PRED3(RangeIsShuffled, vector_, kRangeSize, 2*kRangeSize);
+  EXPECT_PRED3(RangeIsUnshuffled, vector_, 2*kRangeSize, kVectorSize);
+}
+
+TEST_F(VectorShuffleTest, ShufflesRepeatably) {
+  TestingVector vector2;
+  for (int i = 0; i < kVectorSize; i++) {
+    vector2.PushBack(i);
+  }
+
+  random_.Reseed(1234);
+  vector_.Shuffle(&random_);
+  random_.Reseed(1234);
+  vector2.Shuffle(&random_);
+
+  ASSERT_PRED1(VectorIsNotCorrupt, vector_);
+  ASSERT_PRED1(VectorIsNotCorrupt, vector2);
+
+  for (int i = 0; i < kVectorSize; i++) {
+    EXPECT_EQ(vector_.GetElement(i), vector2.GetElement(i))
+        << " where i is " << i;
+  }
+}
+
+// Tests the size of the AssertHelper class.
+
+TEST(AssertHelperTest, AssertHelperIsSmall) {
+  // To avoid breaking clients that use lots of assertions in one
+  // function, we cannot grow the size of AssertHelper.
+  EXPECT_LE(sizeof(testing::internal::AssertHelper), sizeof(void*));
 }
 
 // Tests the String class.
@@ -703,19 +1062,49 @@ TEST(StringTest, Constructors) {
   String s1;
   // We aren't using EXPECT_EQ(NULL, s1.c_str()) because comparing
   // pointers with NULL isn't supported on all platforms.
+  EXPECT_EQ(0U, s1.length());
   EXPECT_TRUE(NULL == s1.c_str());
 
   // Implicitly constructs from a C-string.
   String s2 = "Hi";
+  EXPECT_EQ(2U, s2.length());
   EXPECT_STREQ("Hi", s2.c_str());
 
   // Constructs from a C-string and a length.
   String s3("hello", 3);
+  EXPECT_EQ(3U, s3.length());
   EXPECT_STREQ("hel", s3.c_str());
 
-  // Copy ctor.
-  String s4 = s3;
-  EXPECT_STREQ("hel", s4.c_str());
+  // The empty String should be created when String is constructed with
+  // a NULL pointer and length 0.
+  EXPECT_EQ(0U, String(NULL, 0).length());
+  EXPECT_FALSE(String(NULL, 0).c_str() == NULL);
+
+  // Constructs a String that contains '\0'.
+  String s4("a\0bcd", 4);
+  EXPECT_EQ(4U, s4.length());
+  EXPECT_EQ('a', s4.c_str()[0]);
+  EXPECT_EQ('\0', s4.c_str()[1]);
+  EXPECT_EQ('b', s4.c_str()[2]);
+  EXPECT_EQ('c', s4.c_str()[3]);
+
+  // Copy ctor where the source is NULL.
+  const String null_str;
+  String s5 = null_str;
+  EXPECT_TRUE(s5.c_str() == NULL);
+
+  // Copy ctor where the source isn't NULL.
+  String s6 = s3;
+  EXPECT_EQ(3U, s6.length());
+  EXPECT_STREQ("hel", s6.c_str());
+
+  // Copy ctor where the source contains '\0'.
+  String s7 = s4;
+  EXPECT_EQ(4U, s7.length());
+  EXPECT_EQ('a', s7.c_str()[0]);
+  EXPECT_EQ('\0', s7.c_str()[1]);
+  EXPECT_EQ('b', s7.c_str()[2]);
+  EXPECT_EQ('c', s7.c_str()[3]);
 }
 
 #if GTEST_HAS_STD_STRING
@@ -724,17 +1113,22 @@ TEST(StringTest, ConvertsFromStdString) {
   // An empty std::string.
   const std::string src1("");
   const String dest1 = src1;
+  EXPECT_EQ(0U, dest1.length());
   EXPECT_STREQ("", dest1.c_str());
 
   // A normal std::string.
   const std::string src2("Hi");
   const String dest2 = src2;
+  EXPECT_EQ(2U, dest2.length());
   EXPECT_STREQ("Hi", dest2.c_str());
 
   // An std::string with an embedded NUL character.
-  const char src3[] = "Hello\0world.";
+  const char src3[] = "a\0b";
   const String dest3 = std::string(src3, sizeof(src3));
-  EXPECT_STREQ("Hello", dest3.c_str());
+  EXPECT_EQ(sizeof(src3), dest3.length());
+  EXPECT_EQ('a', dest3.c_str()[0]);
+  EXPECT_EQ('\0', dest3.c_str()[1]);
+  EXPECT_EQ('b', dest3.c_str()[2]);
 }
 
 TEST(StringTest, ConvertsToStdString) {
@@ -747,6 +1141,11 @@ TEST(StringTest, ConvertsToStdString) {
   const String src2("Hi");
   const std::string dest2 = src2;
   EXPECT_EQ("Hi", dest2);
+
+  // A String containing a '\0'.
+  const String src3("x\0y", 3);
+  const std::string dest3 = src3;
+  EXPECT_EQ(std::string("x\0y", 3), dest3);
 }
 
 #endif  // GTEST_HAS_STD_STRING
@@ -757,17 +1156,22 @@ TEST(StringTest, ConvertsFromGlobalString) {
   // An empty ::string.
   const ::string src1("");
   const String dest1 = src1;
+  EXPECT_EQ(0U, dest1.length());
   EXPECT_STREQ("", dest1.c_str());
 
   // A normal ::string.
   const ::string src2("Hi");
   const String dest2 = src2;
+  EXPECT_EQ(2U, dest2.length());
   EXPECT_STREQ("Hi", dest2.c_str());
 
   // An ::string with an embedded NUL character.
-  const char src3[] = "Hello\0world.";
+  const char src3[] = "x\0y";
   const String dest3 = ::string(src3, sizeof(src3));
-  EXPECT_STREQ("Hello", dest3.c_str());
+  EXPECT_EQ(sizeof(src3), dest3.length());
+  EXPECT_EQ('x', dest3.c_str()[0]);
+  EXPECT_EQ('\0', dest3.c_str()[1]);
+  EXPECT_EQ('y', dest3.c_str()[2]);
 }
 
 TEST(StringTest, ConvertsToGlobalString) {
@@ -780,16 +1184,13 @@ TEST(StringTest, ConvertsToGlobalString) {
   const String src2("Hi");
   const ::string dest2 = src2;
   EXPECT_EQ("Hi", dest2);
+
+  const String src3("x\0y", 3);
+  const ::string dest3 = src3;
+  EXPECT_EQ(::string("x\0y", 3), dest3);
 }
 
 #endif  // GTEST_HAS_GLOBAL_STRING
-
-// Tests String::ShowCString().
-TEST(StringTest, ShowCString) {
-  EXPECT_STREQ("(null)", String::ShowCString(NULL));
-  EXPECT_STREQ("", String::ShowCString(""));
-  EXPECT_STREQ("foo", String::ShowCString("foo"));
-}
 
 // Tests String::ShowCStringQuoted().
 TEST(StringTest, ShowCStringQuoted) {
@@ -799,6 +1200,53 @@ TEST(StringTest, ShowCStringQuoted) {
                String::ShowCStringQuoted("").c_str());
   EXPECT_STREQ("\"foo\"",
                String::ShowCStringQuoted("foo").c_str());
+}
+
+// Tests String::empty().
+TEST(StringTest, Empty) {
+  EXPECT_TRUE(String("").empty());
+  EXPECT_FALSE(String().empty());
+  EXPECT_FALSE(String(NULL).empty());
+  EXPECT_FALSE(String("a").empty());
+  EXPECT_FALSE(String("\0", 1).empty());
+}
+
+// Tests String::Compare().
+TEST(StringTest, Compare) {
+  // NULL vs NULL.
+  EXPECT_EQ(0, String().Compare(String()));
+
+  // NULL vs non-NULL.
+  EXPECT_EQ(-1, String().Compare(String("")));
+
+  // Non-NULL vs NULL.
+  EXPECT_EQ(1, String("").Compare(String()));
+
+  // The following covers non-NULL vs non-NULL.
+
+  // "" vs "".
+  EXPECT_EQ(0, String("").Compare(String("")));
+
+  // "" vs non-"".
+  EXPECT_EQ(-1, String("").Compare(String("\0", 1)));
+  EXPECT_EQ(-1, String("").Compare(" "));
+
+  // Non-"" vs "".
+  EXPECT_EQ(1, String("a").Compare(String("")));
+
+  // The following covers non-"" vs non-"".
+
+  // Same length and equal.
+  EXPECT_EQ(0, String("a").Compare(String("a")));
+
+  // Same length and different.
+  EXPECT_EQ(-1, String("a\0b", 3).Compare(String("a\0c", 3)));
+  EXPECT_EQ(1, String("b").Compare(String("a")));
+
+  // Different lengths.
+  EXPECT_EQ(-1, String("a").Compare(String("ab")));
+  EXPECT_EQ(-1, String("a").Compare(String("a\0", 2)));
+  EXPECT_EQ(1, String("abc").Compare(String("aacd")));
 }
 
 // Tests String::operator==().
@@ -818,6 +1266,9 @@ TEST(StringTest, Equals) {
   EXPECT_FALSE(foo == "");  // NOLINT
   EXPECT_FALSE(foo == "bar");  // NOLINT
   EXPECT_TRUE(foo == "foo");  // NOLINT
+
+  const String bar("x\0y", 3);
+  EXPECT_FALSE(bar == "x");
 }
 
 // Tests String::operator!=().
@@ -837,6 +1288,17 @@ TEST(StringTest, NotEquals) {
   EXPECT_TRUE(foo != "");  // NOLINT
   EXPECT_TRUE(foo != "bar");  // NOLINT
   EXPECT_FALSE(foo != "foo");  // NOLINT
+
+  const String bar("x\0y", 3);
+  EXPECT_TRUE(bar != "x");
+}
+
+// Tests String::length().
+TEST(StringTest, Length) {
+  EXPECT_EQ(0U, String().length());
+  EXPECT_EQ(0U, String("").length());
+  EXPECT_EQ(2U, String("ab").length());
+  EXPECT_EQ(3U, String("a\0b", 3).length());
 }
 
 // Tests String::EndsWith().
@@ -900,9 +1362,17 @@ TEST(StringTest, CanBeAssignedEmpty) {
 TEST(StringTest, CanBeAssignedNonEmpty) {
   const String src("hello");
   String dest;
-
   dest = src;
+  EXPECT_EQ(5U, dest.length());
   EXPECT_STREQ("hello", dest.c_str());
+
+  const String src2("x\0y", 3);
+  String dest2;
+  dest2 = src2;
+  EXPECT_EQ(3U, dest2.length());
+  EXPECT_EQ('x', dest2.c_str()[0]);
+  EXPECT_EQ('\0', dest2.c_str()[1]);
+  EXPECT_EQ('y', dest2.c_str()[2]);
 }
 
 // Tests that a String can be assigned to itself.
@@ -911,6 +1381,40 @@ TEST(StringTest, CanBeAssignedSelf) {
 
   dest = dest;
   EXPECT_STREQ("hello", dest.c_str());
+}
+
+// Tests streaming a String.
+TEST(StringTest, Streams) {
+  EXPECT_EQ(StreamableToString(String()), "(null)");
+  EXPECT_EQ(StreamableToString(String("")), "");
+  EXPECT_EQ(StreamableToString(String("a\0b", 3)), "a\\0b");
+}
+
+// Tests that String::Format() works.
+TEST(StringTest, FormatWorks) {
+  // Normal case: the format spec is valid, the arguments match the
+  // spec, and the result is < 4095 characters.
+  EXPECT_STREQ("Hello, 42", String::Format("%s, %d", "Hello", 42).c_str());
+
+  // Edge case: the result is 4095 characters.
+  char buffer[4096];
+  const size_t kSize = sizeof(buffer);
+  memset(buffer, 'a', kSize - 1);
+  buffer[kSize - 1] = '\0';
+  EXPECT_STREQ(buffer, String::Format("%s", buffer).c_str());
+
+  // The result needs to be 4096 characters, exceeding Format()'s limit.
+  EXPECT_STREQ("<formatting error or buffer exceeded>",
+               String::Format("x%s", buffer).c_str());
+
+#if GTEST_OS_LINUX
+  // On Linux, invalid format spec should lead to an error message.
+  // In other environment (e.g. MSVC on Windows), String::Format() may
+  // simply ignore a bad format spec, so this assertion is run on
+  // Linux only.
+  EXPECT_STREQ("<formatting error or buffer exceeded>",
+               String::Format("%").c_str());
+#endif
 }
 
 #if GTEST_OS_WINDOWS
@@ -933,7 +1437,7 @@ TEST(StringTest, ShowWideCStringQuoted) {
                String::ShowWideCStringQuoted(L"foo").c_str());
 }
 
-#ifdef _WIN32_WCE
+#if GTEST_OS_WINDOWS_MOBILE
 TEST(StringTest, AnsiAndUtf16Null) {
   EXPECT_EQ(NULL, String::AnsiToUtf16(NULL));
   EXPECT_EQ(NULL, String::Utf16ToAnsi(NULL));
@@ -956,7 +1460,7 @@ TEST(StringTest, AnsiAndUtf16ConvertPathChars) {
   EXPECT_EQ(0, wcsncmp(L".:\\ \"*?", utf16, 3));
   delete [] utf16;
 }
-#endif  // _WIN32_WCE
+#endif  // GTEST_OS_WINDOWS_MOBILE
 
 #endif  // GTEST_OS_WINDOWS
 
@@ -1221,12 +1725,12 @@ TEST(TestPartResultTest, ConstructorWorks) {
   message << static_cast<const char*>(testing::internal::kStackTraceMarker);
   message << "some unimportant stack trace";
 
-  const TestPartResult result(TPRT_NONFATAL_FAILURE,
+  const TestPartResult result(TestPartResult::kNonFatalFailure,
                               "some_file.cc",
                               42,
                               message.GetString().c_str());
 
-  EXPECT_EQ(TPRT_NONFATAL_FAILURE, result.type());
+  EXPECT_EQ(TestPartResult::kNonFatalFailure, result.type());
   EXPECT_STREQ("some_file.cc", result.file_name());
   EXPECT_EQ(42, result.line_number());
   EXPECT_STREQ(message.GetString().c_str(), result.message());
@@ -1234,13 +1738,16 @@ TEST(TestPartResultTest, ConstructorWorks) {
 }
 
 TEST(TestPartResultTest, ResultAccessorsWork) {
-  const TestPartResult success(TPRT_SUCCESS, "file.cc", 42, "message");
+  const TestPartResult success(TestPartResult::kSuccess,
+                               "file.cc",
+                               42,
+                               "message");
   EXPECT_TRUE(success.passed());
   EXPECT_FALSE(success.failed());
   EXPECT_FALSE(success.nonfatally_failed());
   EXPECT_FALSE(success.fatally_failed());
 
-  const TestPartResult nonfatal_failure(TPRT_NONFATAL_FAILURE,
+  const TestPartResult nonfatal_failure(TestPartResult::kNonFatalFailure,
                                         "file.cc",
                                         42,
                                         "message");
@@ -1249,7 +1756,7 @@ TEST(TestPartResultTest, ResultAccessorsWork) {
   EXPECT_TRUE(nonfatal_failure.nonfatally_failed());
   EXPECT_FALSE(nonfatal_failure.fatally_failed());
 
-  const TestPartResult fatal_failure(TPRT_FATAL_FAILURE,
+  const TestPartResult fatal_failure(TestPartResult::kFatalFailure,
                                      "file.cc",
                                      42,
                                      "message");
@@ -1274,10 +1781,14 @@ class TestResultTest : public Test {
 
   virtual void SetUp() {
     // pr1 is for success.
-    pr1 = new TestPartResult(TPRT_SUCCESS, "foo/bar.cc", 10, "Success!");
+    pr1 = new TestPartResult(TestPartResult::kSuccess,
+                             "foo/bar.cc",
+                             10,
+                             "Success!");
 
     // pr2 is for fatal failure.
-    pr2 = new TestPartResult(TPRT_FATAL_FAILURE, "foo/bar.cc",
+    pr2 = new TestPartResult(TestPartResult::kFatalFailure,
+                             "foo/bar.cc",
                              -1,  // This line number means "unknown"
                              "Failure!");
 
@@ -1577,7 +2088,7 @@ TEST_F(GTestFlagSaverTest, VerifyGTestFlags) {
 // value.  If the value argument is "", unsets the environment
 // variable.  The caller must ensure that both arguments are not NULL.
 static void SetEnv(const char* name, const char* value) {
-#ifdef _WIN32_WCE
+#if GTEST_OS_WINDOWS_MOBILE
   // Environment variables are not supported on Windows CE.
   return;
 #elif defined(__BORLANDC__)
@@ -1595,7 +2106,6 @@ static void SetEnv(const char* name, const char* value) {
   added_env[name] = new String((Message() << name << "=" << value).GetString());
   putenv(added_env[name]->c_str());
   delete prev_env;
-
 #elif GTEST_OS_WINDOWS  // If we are on Windows proper.
   _putenv((Message() << name << "=" << value).GetString().c_str());
 #else
@@ -1604,10 +2114,10 @@ static void SetEnv(const char* name, const char* value) {
   } else {
     setenv(name, value, 1);
   }
-#endif
+#endif  // GTEST_OS_WINDOWS_MOBILE
 }
 
-#ifndef _WIN32_WCE
+#if !GTEST_OS_WINDOWS_MOBILE
 // Environment variables are not supported on Windows CE.
 
 using testing::internal::Int32FromGTestEnv;
@@ -1655,7 +2165,7 @@ TEST(Int32FromGTestEnvTest, ParsesAndReturnsValidValue) {
   SetEnv(GTEST_FLAG_PREFIX_UPPER_ "TEMP", "-321");
   EXPECT_EQ(-321, Int32FromGTestEnv("temp", 0));
 }
-#endif  // !defined(_WIN32_WCE)
+#endif  // !GTEST_OS_WINDOWS_MOBILE
 
 // Tests ParseInt32Flag().
 
@@ -1713,7 +2223,7 @@ TEST(ParseInt32FlagTest, ParsesAndReturnsValidValue) {
 // Tests that Int32FromEnvOrDie() parses the value of the var or
 // returns the correct default.
 // Environment variables are not supported on Windows CE.
-#ifndef _WIN32_WCE
+#if !GTEST_OS_WINDOWS_MOBILE
 TEST(Int32FromEnvOrDieTest, ParsesAndReturnsValidValue) {
   EXPECT_EQ(333, Int32FromEnvOrDie(GTEST_FLAG_PREFIX_UPPER_ "UnsetVar", 333));
   SetEnv(GTEST_FLAG_PREFIX_UPPER_ "UnsetVar", "123");
@@ -1721,7 +2231,7 @@ TEST(Int32FromEnvOrDieTest, ParsesAndReturnsValidValue) {
   SetEnv(GTEST_FLAG_PREFIX_UPPER_ "UnsetVar", "-123");
   EXPECT_EQ(-123, Int32FromEnvOrDie(GTEST_FLAG_PREFIX_UPPER_ "UnsetVar", 333));
 }
-#endif  // _WIN32_WCE
+#endif  // !GTEST_OS_WINDOWS_MOBILE
 
 // Tests that Int32FromEnvOrDie() aborts with an error message
 // if the variable is not an Int32.
@@ -1788,7 +2298,7 @@ TEST_F(ShouldShardTest, ReturnsFalseWhenTotalShardIsOne) {
 // Tests that sharding is enabled if total_shards > 1 and
 // we are not in a death test subprocess.
 // Environment variables are not supported on Windows CE.
-#ifndef _WIN32_WCE
+#if !GTEST_OS_WINDOWS_MOBILE
 TEST_F(ShouldShardTest, WorksWhenShardEnvVarsAreValid) {
   SetEnv(index_var_, "4");
   SetEnv(total_var_, "22");
@@ -1805,7 +2315,7 @@ TEST_F(ShouldShardTest, WorksWhenShardEnvVarsAreValid) {
   EXPECT_TRUE(ShouldShard(total_var_, index_var_, false));
   EXPECT_FALSE(ShouldShard(total_var_, index_var_, true));
 }
-#endif  // _WIN32_WCE
+#endif  // !GTEST_OS_WINDOWS_MOBILE
 
 // Tests that we exit in error if the sharding values are not valid.
 
@@ -3151,9 +3661,9 @@ TEST_F(NoFatalFailureTest, AssertNoFatalFailureOnFatalFailure) {
     DoAssertNoFatalFailureOnFails();
   }
   ASSERT_EQ(2, gtest_failures.size());
-  EXPECT_EQ(testing::TPRT_FATAL_FAILURE,
+  EXPECT_EQ(TestPartResult::kFatalFailure,
             gtest_failures.GetTestPartResult(0).type());
-  EXPECT_EQ(testing::TPRT_FATAL_FAILURE,
+  EXPECT_EQ(TestPartResult::kFatalFailure,
             gtest_failures.GetTestPartResult(1).type());
   EXPECT_PRED_FORMAT2(testing::IsSubstring, "some fatal failure",
                       gtest_failures.GetTestPartResult(0).message());
@@ -3168,11 +3678,11 @@ TEST_F(NoFatalFailureTest, ExpectNoFatalFailureOnFatalFailure) {
     DoExpectNoFatalFailureOnFails();
   }
   ASSERT_EQ(3, gtest_failures.size());
-  EXPECT_EQ(testing::TPRT_FATAL_FAILURE,
+  EXPECT_EQ(TestPartResult::kFatalFailure,
             gtest_failures.GetTestPartResult(0).type());
-  EXPECT_EQ(testing::TPRT_NONFATAL_FAILURE,
+  EXPECT_EQ(TestPartResult::kNonFatalFailure,
             gtest_failures.GetTestPartResult(1).type());
-  EXPECT_EQ(testing::TPRT_NONFATAL_FAILURE,
+  EXPECT_EQ(TestPartResult::kNonFatalFailure,
             gtest_failures.GetTestPartResult(2).type());
   EXPECT_PRED_FORMAT2(testing::IsSubstring, "some fatal failure",
                       gtest_failures.GetTestPartResult(0).message());
@@ -3189,9 +3699,9 @@ TEST_F(NoFatalFailureTest, MessageIsStreamable) {
     EXPECT_NO_FATAL_FAILURE(FAIL() << "foo") << "my message";
   }
   ASSERT_EQ(2, gtest_failures.size());
-  EXPECT_EQ(testing::TPRT_NONFATAL_FAILURE,
+  EXPECT_EQ(TestPartResult::kNonFatalFailure,
             gtest_failures.GetTestPartResult(0).type());
-  EXPECT_EQ(testing::TPRT_NONFATAL_FAILURE,
+  EXPECT_EQ(TestPartResult::kNonFatalFailure,
             gtest_failures.GetTestPartResult(1).type());
   EXPECT_PRED_FORMAT2(testing::IsSubstring, "foo",
                       gtest_failures.GetTestPartResult(0).message());
@@ -3651,19 +4161,19 @@ TEST(HRESULTAssertionTest, Streaming) {
 
 // Tests that the assertion macros behave like single statements.
 TEST(AssertionSyntaxTest, BasicAssertionsBehavesLikeSingleStatement) {
-  if (false)
+  if (AlwaysFalse())
     ASSERT_TRUE(false) << "This should never be executed; "
                           "It's a compilation test only.";
 
-  if (true)
+  if (AlwaysTrue())
     EXPECT_FALSE(false);
   else
     ;  // NOLINT
 
-  if (false)
+  if (AlwaysFalse())
     ASSERT_LT(1, 3);
 
-  if (false)
+  if (AlwaysFalse())
     ;  // NOLINT
   else
     EXPECT_GT(3, 2) << "";
@@ -3685,26 +4195,26 @@ TEST(ExpectThrowTest, DoesNotGenerateUnreachableCodeWarning) {
 }
 
 TEST(AssertionSyntaxTest, ExceptionAssertionsBehavesLikeSingleStatement) {
-  if (false)
+  if (AlwaysFalse())
     EXPECT_THROW(ThrowNothing(), bool);
 
-  if (true)
+  if (AlwaysTrue())
     EXPECT_THROW(ThrowAnInteger(), int);
   else
     ;  // NOLINT
 
-  if (false)
+  if (AlwaysFalse())
     EXPECT_NO_THROW(ThrowAnInteger());
 
-  if (true)
+  if (AlwaysTrue())
     EXPECT_NO_THROW(ThrowNothing());
   else
     ;  // NOLINT
 
-  if (false)
+  if (AlwaysFalse())
     EXPECT_ANY_THROW(ThrowNothing());
 
-  if (true)
+  if (AlwaysTrue())
     EXPECT_ANY_THROW(ThrowAnInteger());
   else
     ;  // NOLINT
@@ -3712,23 +4222,23 @@ TEST(AssertionSyntaxTest, ExceptionAssertionsBehavesLikeSingleStatement) {
 #endif  // GTEST_HAS_EXCEPTIONS
 
 TEST(AssertionSyntaxTest, NoFatalFailureAssertionsBehavesLikeSingleStatement) {
-  if (false)
+  if (AlwaysFalse())
     EXPECT_NO_FATAL_FAILURE(FAIL()) << "This should never be executed. "
                                     << "It's a compilation test only.";
   else
     ;  // NOLINT
 
-  if (false)
+  if (AlwaysFalse())
     ASSERT_NO_FATAL_FAILURE(FAIL()) << "";
   else
     ;  // NOLINT
 
-  if (true)
+  if (AlwaysTrue())
     EXPECT_NO_FATAL_FAILURE(SUCCEED());
   else
     ;  // NOLINT
 
-  if (false)
+  if (AlwaysFalse())
     ;  // NOLINT
   else
     ASSERT_NO_FATAL_FAILURE(SUCCEED());
@@ -6017,4 +6527,321 @@ TEST(HasFailureTest, WorksOutsideOfTestBody2) {
   const bool has_failure = HasFailureHelper();
   ClearCurrentTestPartResults();
   EXPECT_TRUE(has_failure);
+}
+
+class TestListener : public EmptyTestEventListener {
+ public:
+  TestListener() : on_start_counter_(NULL), is_destroyed_(NULL) {}
+  TestListener(int* on_start_counter, bool* is_destroyed)
+      : on_start_counter_(on_start_counter),
+        is_destroyed_(is_destroyed) {}
+
+  virtual ~TestListener() {
+    if (is_destroyed_)
+      *is_destroyed_ = true;
+  }
+
+ protected:
+  virtual void OnTestProgramStart(const UnitTest& /*unit_test*/) {
+    if (on_start_counter_ != NULL)
+      (*on_start_counter_)++;
+  }
+
+ private:
+  int* on_start_counter_;
+  bool* is_destroyed_;
+};
+
+// Tests the constructor.
+TEST(TestEventListenersTest, ConstructionWorks) {
+  TestEventListeners listeners;
+
+  EXPECT_TRUE(TestEventListenersAccessor::GetRepeater(&listeners) != NULL);
+  EXPECT_TRUE(listeners.default_result_printer() == NULL);
+  EXPECT_TRUE(listeners.default_xml_generator() == NULL);
+}
+
+// Tests that the TestEventListeners destructor deletes all the listeners it
+// owns.
+TEST(TestEventListenersTest, DestructionWorks) {
+  bool default_result_printer_is_destroyed = false;
+  bool default_xml_printer_is_destroyed = false;
+  bool extra_listener_is_destroyed = false;
+  TestListener* default_result_printer = new TestListener(
+      NULL, &default_result_printer_is_destroyed);
+  TestListener* default_xml_printer = new TestListener(
+      NULL, &default_xml_printer_is_destroyed);
+  TestListener* extra_listener = new TestListener(
+      NULL, &extra_listener_is_destroyed);
+
+  {
+    TestEventListeners listeners;
+    TestEventListenersAccessor::SetDefaultResultPrinter(&listeners,
+                                                        default_result_printer);
+    TestEventListenersAccessor::SetDefaultXmlGenerator(&listeners,
+                                                       default_xml_printer);
+    listeners.Append(extra_listener);
+  }
+  EXPECT_TRUE(default_result_printer_is_destroyed);
+  EXPECT_TRUE(default_xml_printer_is_destroyed);
+  EXPECT_TRUE(extra_listener_is_destroyed);
+}
+
+// Tests that a listener Append'ed to a TestEventListeners list starts
+// receiving events.
+TEST(TestEventListenersTest, Append) {
+  int on_start_counter = 0;
+  bool is_destroyed = false;
+  TestListener* listener = new TestListener(&on_start_counter, &is_destroyed);
+  {
+    TestEventListeners listeners;
+    listeners.Append(listener);
+    TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+        *UnitTest::GetInstance());
+    EXPECT_EQ(1, on_start_counter);
+  }
+  EXPECT_TRUE(is_destroyed);
+}
+
+// Tests that listeners receive events in the order they were appended to
+// the list, except for *End requests, which must be received in the reverse
+// order.
+class SequenceTestingListener : public EmptyTestEventListener {
+ public:
+  SequenceTestingListener(Vector<String>* vector, const char* id)
+      : vector_(vector), id_(id) {}
+
+ protected:
+  virtual void OnTestProgramStart(const UnitTest& /*unit_test*/) {
+    vector_->PushBack(GetEventDescription("OnTestProgramStart"));
+  }
+
+  virtual void OnTestProgramEnd(const UnitTest& /*unit_test*/) {
+    vector_->PushBack(GetEventDescription("OnTestProgramEnd"));
+  }
+
+  virtual void OnTestIterationStart(const UnitTest& /*unit_test*/,
+                                    int /*iteration*/) {
+    vector_->PushBack(GetEventDescription("OnTestIterationStart"));
+  }
+
+  virtual void OnTestIterationEnd(const UnitTest& /*unit_test*/,
+                                  int /*iteration*/) {
+    vector_->PushBack(GetEventDescription("OnTestIterationEnd"));
+  }
+
+ private:
+  String GetEventDescription(const char* method) {
+    Message message;
+    message << id_ << "." << method;
+    return message.GetString();
+  }
+
+  Vector<String>* vector_;
+  const char* const id_;
+
+  GTEST_DISALLOW_COPY_AND_ASSIGN_(SequenceTestingListener);
+};
+
+TEST(EventListenerTest, AppendKeepsOrder) {
+  Vector<String> vec;
+  TestEventListeners listeners;
+  listeners.Append(new SequenceTestingListener(&vec, "1st"));
+  listeners.Append(new SequenceTestingListener(&vec, "2nd"));
+  listeners.Append(new SequenceTestingListener(&vec, "3rd"));
+
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+      *UnitTest::GetInstance());
+  ASSERT_EQ(3, vec.size());
+  EXPECT_STREQ("1st.OnTestProgramStart", vec.GetElement(0).c_str());
+  EXPECT_STREQ("2nd.OnTestProgramStart", vec.GetElement(1).c_str());
+  EXPECT_STREQ("3rd.OnTestProgramStart", vec.GetElement(2).c_str());
+
+  vec.Clear();
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramEnd(
+      *UnitTest::GetInstance());
+  ASSERT_EQ(3, vec.size());
+  EXPECT_STREQ("3rd.OnTestProgramEnd", vec.GetElement(0).c_str());
+  EXPECT_STREQ("2nd.OnTestProgramEnd", vec.GetElement(1).c_str());
+  EXPECT_STREQ("1st.OnTestProgramEnd", vec.GetElement(2).c_str());
+
+  vec.Clear();
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestIterationStart(
+      *UnitTest::GetInstance(), 0);
+  ASSERT_EQ(3, vec.size());
+  EXPECT_STREQ("1st.OnTestIterationStart", vec.GetElement(0).c_str());
+  EXPECT_STREQ("2nd.OnTestIterationStart", vec.GetElement(1).c_str());
+  EXPECT_STREQ("3rd.OnTestIterationStart", vec.GetElement(2).c_str());
+
+  vec.Clear();
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestIterationEnd(
+      *UnitTest::GetInstance(), 0);
+  ASSERT_EQ(3, vec.size());
+  EXPECT_STREQ("3rd.OnTestIterationEnd", vec.GetElement(0).c_str());
+  EXPECT_STREQ("2nd.OnTestIterationEnd", vec.GetElement(1).c_str());
+  EXPECT_STREQ("1st.OnTestIterationEnd", vec.GetElement(2).c_str());
+}
+
+// Tests that a listener removed from a TestEventListeners list stops receiving
+// events and is not deleted when the list is destroyed.
+TEST(TestEventListenersTest, Release) {
+  int on_start_counter = 0;
+  bool is_destroyed = false;
+  // Although Append passes the ownership of this object to the list,
+  // the following calls release it, and we need to delete it before the
+  // test ends.
+  TestListener* listener = new TestListener(&on_start_counter, &is_destroyed);
+  {
+    TestEventListeners listeners;
+    listeners.Append(listener);
+    EXPECT_EQ(listener, listeners.Release(listener));
+    TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+        *UnitTest::GetInstance());
+    EXPECT_TRUE(listeners.Release(listener) == NULL);
+  }
+  EXPECT_EQ(0, on_start_counter);
+  EXPECT_FALSE(is_destroyed);
+  delete listener;
+}
+
+// Tests that no events are forwarded when event forwarding is disabled.
+TEST(EventListenerTest, SuppressEventForwarding) {
+  int on_start_counter = 0;
+  TestListener* listener = new TestListener(&on_start_counter, NULL);
+
+  TestEventListeners listeners;
+  listeners.Append(listener);
+  ASSERT_TRUE(TestEventListenersAccessor::EventForwardingEnabled(listeners));
+  TestEventListenersAccessor::SuppressEventForwarding(&listeners);
+  ASSERT_FALSE(TestEventListenersAccessor::EventForwardingEnabled(listeners));
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+      *UnitTest::GetInstance());
+  EXPECT_EQ(0, on_start_counter);
+}
+
+// Tests that events generated by Google Test are not forwarded in
+// death test subprocesses.
+TEST(EventListenerDeathTest, EventsNotForwardedInDeathTestSubprecesses) {
+  EXPECT_DEATH_IF_SUPPORTED({
+      GTEST_CHECK_(TestEventListenersAccessor::EventForwardingEnabled(
+          *GetUnitTestImpl()->listeners())) << "expected failure";},
+      "expected failure");
+}
+
+// Tests that a listener installed via SetDefaultResultPrinter() starts
+// receiving events and is returned via default_result_printer() and that
+// the previous default_result_printer is removed from the list and deleted.
+TEST(EventListenerTest, default_result_printer) {
+  int on_start_counter = 0;
+  bool is_destroyed = false;
+  TestListener* listener = new TestListener(&on_start_counter, &is_destroyed);
+
+  TestEventListeners listeners;
+  TestEventListenersAccessor::SetDefaultResultPrinter(&listeners, listener);
+
+  EXPECT_EQ(listener, listeners.default_result_printer());
+
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+      *UnitTest::GetInstance());
+
+  EXPECT_EQ(1, on_start_counter);
+
+  // Replacing default_result_printer with something else should remove it
+  // from the list and destroy it.
+  TestEventListenersAccessor::SetDefaultResultPrinter(&listeners, NULL);
+
+  EXPECT_TRUE(listeners.default_result_printer() == NULL);
+  EXPECT_TRUE(is_destroyed);
+
+  // After broadcasting an event the counter is still the same, indicating
+  // the listener is not in the list anymore.
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+      *UnitTest::GetInstance());
+  EXPECT_EQ(1, on_start_counter);
+}
+
+// Tests that the default_result_printer listener stops receiving events
+// when removed via Release and that is not owned by the list anymore.
+TEST(EventListenerTest, RemovingDefaultResultPrinterWorks) {
+  int on_start_counter = 0;
+  bool is_destroyed = false;
+  // Although Append passes the ownership of this object to the list,
+  // the following calls release it, and we need to delete it before the
+  // test ends.
+  TestListener* listener = new TestListener(&on_start_counter, &is_destroyed);
+  {
+    TestEventListeners listeners;
+    TestEventListenersAccessor::SetDefaultResultPrinter(&listeners, listener);
+
+    EXPECT_EQ(listener, listeners.Release(listener));
+    EXPECT_TRUE(listeners.default_result_printer() == NULL);
+    EXPECT_FALSE(is_destroyed);
+
+    // Broadcasting events now should not affect default_result_printer.
+    TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+        *UnitTest::GetInstance());
+    EXPECT_EQ(0, on_start_counter);
+  }
+  // Destroying the list should not affect the listener now, too.
+  EXPECT_FALSE(is_destroyed);
+  delete listener;
+}
+
+// Tests that a listener installed via SetDefaultXmlGenerator() starts
+// receiving events and is returned via default_xml_generator() and that
+// the previous default_xml_generator is removed from the list and deleted.
+TEST(EventListenerTest, default_xml_generator) {
+  int on_start_counter = 0;
+  bool is_destroyed = false;
+  TestListener* listener = new TestListener(&on_start_counter, &is_destroyed);
+
+  TestEventListeners listeners;
+  TestEventListenersAccessor::SetDefaultXmlGenerator(&listeners, listener);
+
+  EXPECT_EQ(listener, listeners.default_xml_generator());
+
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+      *UnitTest::GetInstance());
+
+  EXPECT_EQ(1, on_start_counter);
+
+  // Replacing default_xml_generator with something else should remove it
+  // from the list and destroy it.
+  TestEventListenersAccessor::SetDefaultXmlGenerator(&listeners, NULL);
+
+  EXPECT_TRUE(listeners.default_xml_generator() == NULL);
+  EXPECT_TRUE(is_destroyed);
+
+  // After broadcasting an event the counter is still the same, indicating
+  // the listener is not in the list anymore.
+  TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+      *UnitTest::GetInstance());
+  EXPECT_EQ(1, on_start_counter);
+}
+
+// Tests that the default_xml_generator listener stops receiving events
+// when removed via Release and that is not owned by the list anymore.
+TEST(EventListenerTest, RemovingDefaultXmlGeneratorWorks) {
+  int on_start_counter = 0;
+  bool is_destroyed = false;
+  // Although Append passes the ownership of this object to the list,
+  // the following calls release it, and we need to delete it before the
+  // test ends.
+  TestListener* listener = new TestListener(&on_start_counter, &is_destroyed);
+  {
+    TestEventListeners listeners;
+    TestEventListenersAccessor::SetDefaultXmlGenerator(&listeners, listener);
+
+    EXPECT_EQ(listener, listeners.Release(listener));
+    EXPECT_TRUE(listeners.default_xml_generator() == NULL);
+    EXPECT_FALSE(is_destroyed);
+
+    // Broadcasting events now should not affect default_xml_generator.
+    TestEventListenersAccessor::GetRepeater(&listeners)->OnTestProgramStart(
+        *UnitTest::GetInstance());
+    EXPECT_EQ(0, on_start_counter);
+  }
+  // Destroying the list should not affect the listener now, too.
+  EXPECT_FALSE(is_destroyed);
+  delete listener;
 }

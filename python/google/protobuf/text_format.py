@@ -43,6 +43,12 @@ __all__ = [ 'MessageToString', 'PrintMessage', 'PrintField',
             'PrintFieldValue', 'Merge' ]
 
 
+# Infinity and NaN are not explicitly supported by Python pre-2.6, and
+# float('inf') does not work on Windows (pre-2.6).
+_INFINITY = 1e10000    # overflows, thus will actually be infinity.
+_NAN = _INFINITY * 0
+
+
 class ParseError(Exception):
   """Thrown in case of ASCII parsing error."""
 
@@ -149,6 +155,10 @@ def _MergeField(tokenizer, message):
       name.append(tokenizer.ConsumeIdentifier())
     name = '.'.join(name)
 
+    if not message_descriptor.is_extendable:
+      raise tokenizer.ParseErrorPreviousToken(
+          'Message type "%s" does not have extensions.' %
+          message_descriptor.full_name)
     field = message.Extensions._FindExtensionByName(name)
     if not field:
       raise tokenizer.ParseErrorPreviousToken(
@@ -198,6 +208,7 @@ def _MergeField(tokenizer, message):
         sub_message = message.Extensions[field]
       else:
         sub_message = getattr(message, field.name)
+        sub_message.SetInParent()
 
     while not tokenizer.TryConsume(end_token):
       if tokenizer.AtEnd():
@@ -293,7 +304,7 @@ class _Tokenizer(object):
       '[a-zA-Z_][0-9a-zA-Z_+-]*|'           # an identifier
       '[0-9+-][0-9a-zA-Z_.+-]*|'            # a number
       '\"([^\"\n\\\\]|\\\\.)*(\"|\\\\?$)|'  # a double-quoted string
-      '\'([^\"\n\\\\]|\\\\.)*(\'|\\\\?$)')  # a single-quoted string
+      '\'([^\'\n\\\\]|\\\\.)*(\'|\\\\?$)')  # a single-quoted string
   _IDENTIFIER = re.compile('\w+')
   _INTEGER_CHECKERS = [type_checkers.Uint32ValueChecker(),
                        type_checkers.Int32ValueChecker(),
@@ -473,12 +484,12 @@ class _Tokenizer(object):
     if re.match(self._FLOAT_INFINITY, text):
       self.NextToken()
       if text.startswith('-'):
-        return float('-inf')
-      return float('inf')
+        return -_INFINITY
+      return _INFINITY
 
     if re.match(self._FLOAT_NAN, text):
       self.NextToken()
-      return float('nan')
+      return _NAN
 
     try:
       result = float(text)
@@ -524,6 +535,18 @@ class _Tokenizer(object):
 
     Raises:
       ParseError: If a byte array value couldn't be consumed.
+    """
+    list = [self._ConsumeSingleByteString()]
+    while len(self.token) > 0 and self.token[0] in ('\'', '"'):
+      list.append(self._ConsumeSingleByteString())
+    return "".join(list)
+
+  def _ConsumeSingleByteString(self):
+    """Consume one token of a string literal.
+
+    String literals (whether bytes or text) can come in multiple adjacent
+    tokens which are automatically concatenated, like in C or Python.  This
+    method only consumes one token.
     """
     text = self.token
     if len(text) < 1 or text[0] not in ('\'', '"'):

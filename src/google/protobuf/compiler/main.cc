@@ -34,12 +34,12 @@
 #include <google/protobuf/compiler/cpp/cpp_generator.h>
 #include <google/protobuf/compiler/python/python_generator.h>
 #include <google/protobuf/compiler/java/java_generator.h>
-#include <google/protobuf/compiler/javamicro/javamicro_generator.h>
 
 
 int main(int argc, char* argv[]) {
 
   google::protobuf::compiler::CommandLineInterface cli;
+  cli.AllowPlugins("protoc-");
 
   // Proto2 C++
   google::protobuf::compiler::cpp::CppGenerator cpp_generator;
@@ -56,11 +56,6 @@ int main(int argc, char* argv[]) {
   google::protobuf::compiler::python::Generator py_generator;
   cli.RegisterGenerator("--python_out", &py_generator,
                         "Generate Python source file.");
-
-  // Proto2 JavaMicro
-  google::protobuf::compiler::javamicro::JavaMicroGenerator javamicro_generator;
-  cli.RegisterGenerator("--javamicro_out", &javamicro_generator,
-                        "Generate Java source file micro runtime.");
 
   return cli.Run(argc, argv);
 }

@@ -36,4 +36,9 @@ src/zcgunzip
 src/zcgzip
 src/.libs
 src/protoc
+src/test_plugin
+src/testzip.jar
+src/testzip.list
+src/testzip.proto
+src/testzip.zip
 java/target/

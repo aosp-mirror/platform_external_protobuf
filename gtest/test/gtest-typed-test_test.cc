@@ -29,8 +29,8 @@
 //
 // Author: wan@google.com (Zhanyong Wan)
 
-#include <list>
 #include <set>
+#include <vector>
 
 #include "test/gtest-typed-test_test.h"
 #include <gtest/gtest.h>
@@ -57,7 +57,9 @@ class CommonTest : public Test {
   // This 'protected:' is optional.  There's no harm in making all
   // members of this fixture class template public.
  protected:
-  typedef std::list<T> List;
+  // We used to use std::list here, but switched to std::vector since
+  // MSVC's <list> doesn't compile cleanly with /W4.
+  typedef std::vector<T> Vector;
   typedef std::set<int> IntSet;
 
   CommonTest() : value_(1) {}
@@ -99,7 +101,7 @@ TYPED_TEST(CommonTest, ValuesAreCorrect) {
 
   // Typedefs in the fixture class template can be visited via the
   // "typename TestFixture::" prefix.
-  typename TestFixture::List empty;
+  typename TestFixture::Vector empty;
   EXPECT_EQ(0U, empty.size());
 
   typename TestFixture::IntSet empty2;
@@ -198,24 +200,22 @@ TEST_F(TypedTestCasePStateTest, IgnoresOrderAndSpaces) {
             state_.VerifyRegisteredTestNames("foo.cc", 1, tests));
 }
 
-#if GTEST_HAS_DEATH_TEST
-
 typedef TypedTestCasePStateTest TypedTestCasePStateDeathTest;
 
 TEST_F(TypedTestCasePStateDeathTest, DetectsDuplicates) {
-  EXPECT_DEATH(
+  EXPECT_DEATH_IF_SUPPORTED(
       state_.VerifyRegisteredTestNames("foo.cc", 1, "A, B, A, C"),
       "foo\\.cc.1.?: Test A is listed more than once\\.");
 }
 
 TEST_F(TypedTestCasePStateDeathTest, DetectsExtraTest) {
-  EXPECT_DEATH(
+  EXPECT_DEATH_IF_SUPPORTED(
       state_.VerifyRegisteredTestNames("foo.cc", 1, "A, B, C, D"),
       "foo\\.cc.1.?: No test named D can be found in this test case\\.");
 }
 
 TEST_F(TypedTestCasePStateDeathTest, DetectsMissedTest) {
-  EXPECT_DEATH(
+  EXPECT_DEATH_IF_SUPPORTED(
       state_.VerifyRegisteredTestNames("foo.cc", 1, "A, C"),
       "foo\\.cc.1.?: You forgot to list test B\\.");
 }
@@ -224,13 +224,11 @@ TEST_F(TypedTestCasePStateDeathTest, DetectsMissedTest) {
 // a run-time error if the test case has been registered.
 TEST_F(TypedTestCasePStateDeathTest, DetectsTestAfterRegistration) {
   state_.VerifyRegisteredTestNames("foo.cc", 1, "A, B, C");
-  EXPECT_DEATH(
+  EXPECT_DEATH_IF_SUPPORTED(
       state_.AddTestName("foo.cc", 2, "FooTest", "D"),
       "foo\\.cc.2.?: Test D must be defined before REGISTER_TYPED_TEST_CASE_P"
       "\\(FooTest, \\.\\.\\.\\)\\.");
 }
-
-#endif  // GTEST_HAS_DEATH_TEST
 
 // Tests that SetUpTestCase()/TearDownTestCase(), fixture ctor/dtor,
 // and SetUp()/TearDown() work correctly in type-parameterized tests.
@@ -318,7 +316,7 @@ INSTANTIATE_TYPED_TEST_CASE_P(Double, TypedTestP2, Types<double>);
 // Tests that the same type-parameterized test case can be
 // instantiated in different translation units linked together.
 // (ContainerTest is also instantiated in gtest-typed-test_test.cc.)
-typedef Types<std::list<double>, std::set<char> > MyContainers;
+typedef Types<std::vector<double>, std::set<char> > MyContainers;
 INSTANTIATE_TYPED_TEST_CASE_P(My, ContainerTest, MyContainers);
 
 // Tests that a type-parameterized test case can be defined and

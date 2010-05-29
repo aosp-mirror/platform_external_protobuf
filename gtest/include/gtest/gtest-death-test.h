@@ -181,6 +181,9 @@ class ExitedWithCode {
   explicit ExitedWithCode(int exit_code);
   bool operator()(int exit_status) const;
  private:
+  // No implementation - assignment is unsupported.
+  void operator=(const ExitedWithCode& other);
+
   const int exit_code_;
 };
 
@@ -242,10 +245,10 @@ class KilledBySignal {
 #ifdef NDEBUG
 
 #define EXPECT_DEBUG_DEATH(statement, regex) \
-  do { statement; } while (false)
+  do { statement; } while (::testing::internal::AlwaysFalse())
 
 #define ASSERT_DEBUG_DEATH(statement, regex) \
-  do { statement; } while (false)
+  do { statement; } while (::testing::internal::AlwaysFalse())
 
 #else
 
@@ -260,7 +263,7 @@ class KilledBySignal {
 
 // EXPECT_DEATH_IF_SUPPORTED(statement, regex) and
 // ASSERT_DEATH_IF_SUPPORTED(statement, regex) expand to real death tests if
-// death tests are supported; otherwise they expand to empty.  This is
+// death tests are supported; otherwise they just issue a warning.  This is
 // useful when you are combining death test assertions with normal test
 // assertions in one test.
 #if GTEST_HAS_DEATH_TEST
@@ -270,13 +273,9 @@ class KilledBySignal {
     ASSERT_DEATH(statement, regex)
 #else
 #define EXPECT_DEATH_IF_SUPPORTED(statement, regex) \
-    GTEST_LOG_(WARNING, \
-               "Death tests are not supported on this platform. The statement" \
-               " '" #statement "' can not be verified")
+    GTEST_UNSUPPORTED_DEATH_TEST_(statement, regex, )
 #define ASSERT_DEATH_IF_SUPPORTED(statement, regex) \
-    GTEST_LOG_(WARNING, \
-               "Death tests are not supported on this platform. The statement" \
-               " '" #statement "' can not be verified")
+    GTEST_UNSUPPORTED_DEATH_TEST_(statement, regex, return)
 #endif
 
 }  // namespace testing

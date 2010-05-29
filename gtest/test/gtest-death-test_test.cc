@@ -35,6 +35,9 @@
 #include <gtest/gtest.h>
 #include <gtest/internal/gtest-filepath.h>
 
+using testing::internal::AlwaysFalse;
+using testing::internal::AlwaysTrue;
+
 #if GTEST_HAS_DEATH_TEST
 
 #if GTEST_OS_WINDOWS
@@ -143,7 +146,7 @@ class MayDie {
   // A member function that may die.
   void MemberFunction() const {
     if (should_die_) {
-      GTEST_LOG_(FATAL, "death inside MayDie::MemberFunction().");
+      GTEST_LOG_(FATAL) << "death inside MayDie::MemberFunction().";
     }
   }
 
@@ -154,26 +157,26 @@ class MayDie {
 
 // A global function that's expected to die.
 void GlobalFunction() {
-  GTEST_LOG_(FATAL, "death inside GlobalFunction().");
+  GTEST_LOG_(FATAL) << "death inside GlobalFunction().";
 }
 
 // A non-void function that's expected to die.
 int NonVoidFunction() {
-  GTEST_LOG_(FATAL, "death inside NonVoidFunction().");
+  GTEST_LOG_(FATAL) << "death inside NonVoidFunction().";
   return 1;
 }
 
 // A unary function that may die.
 void DieIf(bool should_die) {
   if (should_die) {
-    GTEST_LOG_(FATAL, "death inside DieIf().");
+    GTEST_LOG_(FATAL) << "death inside DieIf().";
   }
 }
 
 // A binary function that may die.
 bool DieIfLessThan(int x, int y) {
   if (x < y) {
-    GTEST_LOG_(FATAL, "death inside DieIfLessThan().");
+    GTEST_LOG_(FATAL) << "death inside DieIfLessThan().";
   }
   return true;
 }
@@ -188,7 +191,7 @@ void DeathTestSubroutine() {
 int DieInDebugElse12(int* sideeffect) {
   if (sideeffect) *sideeffect = 12;
 #ifndef NDEBUG
-  GTEST_LOG_(FATAL, "debug death inside DieInDebugElse12()");
+  GTEST_LOG_(FATAL) << "debug death inside DieInDebugElse12()";
 #endif  // NDEBUG
   return 12;
 }
@@ -271,28 +274,28 @@ TEST(ExitStatusPredicateTest, KilledBySignal) {
 // be followed by operator<<, and that in either case the complete text
 // comprises only a single C++ statement.
 TEST_F(TestForDeathTest, SingleStatement) {
-  if (false)
+  if (AlwaysFalse())
     // This would fail if executed; this is a compilation test only
     ASSERT_DEATH(return, "");
 
-  if (true)
+  if (AlwaysTrue())
     EXPECT_DEATH(_exit(1), "");
   else
     // This empty "else" branch is meant to ensure that EXPECT_DEATH
     // doesn't expand into an "if" statement without an "else"
     ;
 
-  if (false)
+  if (AlwaysFalse())
     ASSERT_DEATH(return, "") << "did not die";
 
-  if (false)
+  if (AlwaysFalse())
     ;
   else
     EXPECT_DEATH(_exit(1), "") << 1 << 2 << 3;
 }
 
 void DieWithEmbeddedNul() {
-  fprintf(stderr, "Hello%cworld.\n", '\0');
+  fprintf(stderr, "Hello%cmy null world.\n", '\0');
   fflush(stderr);
   _exit(1);
 }
@@ -303,8 +306,8 @@ void DieWithEmbeddedNul() {
 TEST_F(TestForDeathTest, EmbeddedNulInMessage) {
   // TODO(wan@google.com): <regex.h> doesn't support matching strings
   // with embedded NUL characters - find a way to workaround it.
-  EXPECT_DEATH(DieWithEmbeddedNul(), "w.*ld");
-  ASSERT_DEATH(DieWithEmbeddedNul(), "w.*ld");
+  EXPECT_DEATH(DieWithEmbeddedNul(), "my null world");
+  ASSERT_DEATH(DieWithEmbeddedNul(), "my null world");
 }
 #endif  // GTEST_USES_PCRE
 
@@ -656,7 +659,11 @@ static void TestExitMacros() {
   EXPECT_EXIT(_exit(1),  testing::ExitedWithCode(1),  "");
   ASSERT_EXIT(_exit(42), testing::ExitedWithCode(42), "");
 
-#if GTEST_OS_WINDOWS
+#if GTEST_OS_WINDOWS && !GTEST_OS_WINDOWS_MINGW
+  // MinGW (as of MinGW 5.1.6 and MSYS 1.0.11) does not tag crashed
+  // processes with non-zero exit code and does not honor calls to
+  // SetErrorMode(SEM_NOGPFAULTERRORBOX) that are supposed to suppress
+  // error pop-ups.
   EXPECT_EXIT({
     testing::GTEST_FLAG(catch_exceptions) = false;
     *static_cast<int*>(NULL) = 1;
@@ -668,7 +675,9 @@ static void TestExitMacros() {
       *static_cast<int*>(NULL) = 1;
     }, testing::ExitedWithCode(0), "") << "This failure is expected.";
   }, "This failure is expected.");
+#endif  // GTEST_OS_WINDOWS && !GTEST_OS_WINDOWS_MINGW
 
+#if GTEST_OS_WINDOWS
   // Of all signals effects on the process exit code, only those of SIGABRT
   // are documented on Windows.
   // See http://msdn.microsoft.com/en-us/library/dwwzkt4c(VS.71).aspx.
@@ -824,9 +833,10 @@ void MockDeathTestFactory::SetParameters(bool create,
 // Sets test to NULL (if create_ is false) or to the address of a new
 // MockDeathTest object with parameters taken from the last call
 // to SetParameters (if create_ is true).  Always returns true.
-bool MockDeathTestFactory::Create(const char* statement,
-                                  const ::testing::internal::RE* regex,
-                                  const char* file, int line,
+bool MockDeathTestFactory::Create(const char* /*statement*/,
+                                  const ::testing::internal::RE* /*regex*/,
+                                  const char* /*file*/,
+                                  int /*line*/,
                                   DeathTest** test) {
   test_deleted_ = false;
   if (create_) {
@@ -1136,7 +1146,7 @@ using testing::internal::GetCapturedStderr;
 using testing::internal::String;
 
 // Tests that EXPECT_DEATH_IF_SUPPORTED/ASSERT_DEATH_IF_SUPPORTED are still
-// defined but do not rigger failures when death tests are not available on
+// defined but do not trigger failures when death tests are not available on
 // the system.
 TEST(ConditionalDeathMacrosTest, WarnsWhenDeathTestsNotAvailable) {
   // Empty statement will not crash, but that should not trigger a failure
@@ -1148,15 +1158,88 @@ TEST(ConditionalDeathMacrosTest, WarnsWhenDeathTestsNotAvailable) {
                              "Death tests are not supported on this platform"));
   ASSERT_TRUE(NULL != strstr(output.c_str(), ";"));
 
+  // The streamed message should not be printed as there is no test failure.
   CaptureStderr();
-  ASSERT_DEATH_IF_SUPPORTED(;, "");
+  EXPECT_DEATH_IF_SUPPORTED(;, "") << "streamed message";
+  output = GetCapturedStderr();
+  ASSERT_TRUE(NULL == strstr(output.c_str(), "streamed message"));
+
+  CaptureStderr();
+  ASSERT_DEATH_IF_SUPPORTED(;, "");  // NOLINT
   output = GetCapturedStderr();
   ASSERT_TRUE(NULL != strstr(output.c_str(),
                              "Death tests are not supported on this platform"));
   ASSERT_TRUE(NULL != strstr(output.c_str(), ";"));
+
+  CaptureStderr();
+  ASSERT_DEATH_IF_SUPPORTED(;, "") << "streamed message";  // NOLINT
+  output = GetCapturedStderr();
+  ASSERT_TRUE(NULL == strstr(output.c_str(), "streamed message"));
 }
 
+void FuncWithAssert(int* n) {
+  ASSERT_DEATH_IF_SUPPORTED(return;, "");
+  (*n)++;
+}
+
+// Tests that ASSERT_DEATH_IF_SUPPORTED does not return from the current
+// function (as ASSERT_DEATH does) if death tests are not supported.
+TEST(ConditionalDeathMacrosTest, AssertDeatDoesNotReturnhIfUnsupported) {
+  int n = 0;
+  FuncWithAssert(&n);
+  EXPECT_EQ(1, n);
+}
 #endif  // GTEST_HAS_DEATH_TEST
+
+// Tests that the death test macros expand to code which may or may not
+// be followed by operator<<, and that in either case the complete text
+// comprises only a single C++ statement.
+//
+// The syntax should work whether death tests are available or not.
+TEST(ConditionalDeathMacrosSyntaxDeathTest, SingleStatement) {
+  if (AlwaysFalse())
+    // This would fail if executed; this is a compilation test only
+    ASSERT_DEATH_IF_SUPPORTED(return, "");
+
+  if (AlwaysTrue())
+    EXPECT_DEATH_IF_SUPPORTED(_exit(1), "");
+  else
+    // This empty "else" branch is meant to ensure that EXPECT_DEATH
+    // doesn't expand into an "if" statement without an "else"
+    ;  // NOLINT
+
+  if (AlwaysFalse())
+    ASSERT_DEATH_IF_SUPPORTED(return, "") << "did not die";
+
+  if (AlwaysFalse())
+    ;  // NOLINT
+  else
+    EXPECT_DEATH_IF_SUPPORTED(_exit(1), "") << 1 << 2 << 3;
+}
+
+// Tests that conditional death test macros expand to code which interacts
+// well with switch statements.
+TEST(ConditionalDeathMacrosSyntaxDeathTest, SwitchStatement) {
+// Microsoft compiler usually complains about switch statements without
+// case labels. We suppress that warning for this test.
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4065)
+#endif  // _MSC_VER
+
+  switch (0)
+    default:
+      ASSERT_DEATH_IF_SUPPORTED(_exit(1), "")
+          << "exit in default switch handler";
+
+  switch (0)
+    case 0:
+      EXPECT_DEATH_IF_SUPPORTED(_exit(1), "") << "exit in switch case";
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif  // _MSC_VER
+}
 
 // Tests that a test case whose name ends with "DeathTest" works fine
 // on Windows.

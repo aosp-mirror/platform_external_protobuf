@@ -51,9 +51,6 @@
 #ifndef GTEST_INCLUDE_GTEST_GTEST_H_
 #define GTEST_INCLUDE_GTEST_GTEST_H_
 
-// The following platform macro is used throughout Google Test:
-//   _WIN32_WCE      Windows CE     (set in project files)
-
 #include <limits>
 #include <gtest/internal/gtest-internal.h>
 #include <gtest/internal/gtest-string.h>
@@ -130,7 +127,7 @@ GTEST_DECLARE_int32_(repeat);
 // stack frames in failure stack traces.
 GTEST_DECLARE_bool_(show_internal_stack_frames);
 
-// When this flag is specified, tests' order is randomized on every run.
+// When this flag is specified, tests' order is randomized on every iteration.
 GTEST_DECLARE_bool_(shuffle);
 
 // This flag specifies the maximum number of stack frames to be
@@ -150,16 +147,19 @@ namespace internal {
 class AssertHelper;
 class DefaultGlobalTestPartResultReporter;
 class ExecDeathTest;
+class NoExecDeathTest;
 class FinalSuccessChecker;
 class GTestFlagSaver;
-class TestCase;
 class TestInfoImpl;
 class TestResultAccessor;
-class UnitTestAccessor;
+class TestEventListenersAccessor;
+class TestEventRepeater;
 class WindowsDeathTest;
 class UnitTestImpl* GetUnitTestImpl();
-void ReportFailureInUnknownLocation(TestPartResultType result_type,
+void ReportFailureInUnknownLocation(TestPartResult::Type result_type,
                                     const String& message);
+class PrettyUnitTestResultPrinter;
+class XmlUnitTestResultPrinter;
 
 // Converts a streamable value to a String.  A NULL pointer is
 // converted to "(null)".  When the input value is a ::string,
@@ -366,8 +366,6 @@ class Test {
 
 typedef internal::TimeInMillis TimeInMillis;
 
-namespace internal {
-
 // A copyable object representing a user specified test property which can be
 // output as a key/value string pair.
 //
@@ -450,14 +448,14 @@ class TestResult {
   const TestProperty& GetTestProperty(int i) const;
 
  private:
+  friend class TestInfo;
+  friend class UnitTest;
   friend class internal::DefaultGlobalTestPartResultReporter;
   friend class internal::ExecDeathTest;
   friend class internal::TestInfoImpl;
   friend class internal::TestResultAccessor;
   friend class internal::UnitTestImpl;
   friend class internal::WindowsDeathTest;
-  friend class testing::TestInfo;
-  friend class testing::UnitTest;
 
   // Gets the vector of TestPartResults.
   const internal::Vector<TestPartResult>& test_part_results() const {
@@ -516,8 +514,6 @@ class TestResult {
   GTEST_DISALLOW_COPY_AND_ASSIGN_(TestResult);
 };  // class TestResult
 
-}  // namespace internal
-
 // A TestInfo object stores the following information about a test:
 //
 //   Test case name
@@ -566,16 +562,16 @@ class TestInfo {
   bool should_run() const;
 
   // Returns the result of the test.
-  const internal::TestResult* result() const;
+  const TestResult* result() const;
 
  private:
 #if GTEST_HAS_DEATH_TEST
   friend class internal::DefaultDeathTestFactory;
 #endif  // GTEST_HAS_DEATH_TEST
+  friend class Test;
+  friend class TestCase;
   friend class internal::TestInfoImpl;
   friend class internal::UnitTestImpl;
-  friend class Test;
-  friend class internal::TestCase;
   friend TestInfo* internal::MakeAndRegisterTestInfo(
       const char* test_case_name, const char* name,
       const char* test_case_comment, const char* comment,
@@ -607,8 +603,6 @@ class TestInfo {
 
   GTEST_DISALLOW_COPY_AND_ASSIGN_(TestInfo);
 };
-
-namespace internal {
 
 // A test case, which consists of a vector of TestInfos.
 //
@@ -670,7 +664,7 @@ class TestCase {
   const TestInfo* GetTestInfo(int i) const;
 
  private:
-  friend class testing::Test;
+  friend class Test;
   friend class internal::UnitTestImpl;
 
   // Gets the (mutable) vector of TestInfos in this TestCase.
@@ -680,6 +674,10 @@ class TestCase {
   const internal::Vector<TestInfo *> & test_info_list() const {
     return *test_info_list_;
   }
+
+  // Returns the i-th test among all the tests. i can range from 0 to
+  // total_test_count() - 1. If i is not in that range, returns NULL.
+  TestInfo* GetMutableTestInfo(int i);
 
   // Sets the should_run member.
   void set_should_run(bool should) { should_run_ = should; }
@@ -699,9 +697,6 @@ class TestCase {
   // Runs every test in this TestCase.
   void Run();
 
-  // Runs every test in the given TestCase.
-  static void RunTestCase(TestCase * test_case) { test_case->Run(); }
-
   // Returns true iff test passed.
   static bool TestPassed(const TestInfo * test_info);
 
@@ -714,12 +709,23 @@ class TestCase {
   // Returns true if the given test should run.
   static bool ShouldRunTest(const TestInfo *test_info);
 
+  // Shuffles the tests in this test case.
+  void ShuffleTests(internal::Random* random);
+
+  // Restores the test order to before the first shuffle.
+  void UnshuffleTests();
+
   // Name of the test case.
   internal::String name_;
   // Comment on the test case.
   internal::String comment_;
-  // Vector of TestInfos.
-  internal::Vector<TestInfo*>* test_info_list_;
+  // The vector of TestInfos in their original order.  It owns the
+  // elements in the vector.
+  const internal::scoped_ptr<internal::Vector<TestInfo*> > test_info_list_;
+  // Provides a level of indirection for the test list to allow easy
+  // shuffling and restoring the test order.  The i-th element in this
+  // vector is the index of the i-th test in the shuffled test list.
+  const internal::scoped_ptr<internal::Vector<int> > test_indices_;
   // Pointer to the function that sets up the test case.
   Test::SetUpTestCaseFunc set_up_tc_;
   // Pointer to the function that tears down the test case.
@@ -732,8 +738,6 @@ class TestCase {
   // We disallow copying TestCases.
   GTEST_DISALLOW_COPY_AND_ASSIGN_(TestCase);
 };
-
-}  // namespace internal
 
 // An Environment object is capable of setting up and tearing down an
 // environment.  The user should subclass this to define his own
@@ -764,6 +768,158 @@ class Environment {
   // about it being private, you have mis-spelled SetUp() as Setup().
   struct Setup_should_be_spelled_SetUp {};
   virtual Setup_should_be_spelled_SetUp* Setup() { return NULL; }
+};
+
+// The interface for tracing execution of tests. The methods are organized in
+// the order the corresponding events are fired.
+class TestEventListener {
+ public:
+  virtual ~TestEventListener() {}
+
+  // Fired before any test activity starts.
+  virtual void OnTestProgramStart(const UnitTest& unit_test) = 0;
+
+  // Fired before each iteration of tests starts.  There may be more than
+  // one iteration if GTEST_FLAG(repeat) is set. iteration is the iteration
+  // index, starting from 0.
+  virtual void OnTestIterationStart(const UnitTest& unit_test,
+                                    int iteration) = 0;
+
+  // Fired before environment set-up for each iteration of tests starts.
+  virtual void OnEnvironmentsSetUpStart(const UnitTest& unit_test) = 0;
+
+  // Fired after environment set-up for each iteration of tests ends.
+  virtual void OnEnvironmentsSetUpEnd(const UnitTest& unit_test) = 0;
+
+  // Fired before the test case starts.
+  virtual void OnTestCaseStart(const TestCase& test_case) = 0;
+
+  // Fired before the test starts.
+  virtual void OnTestStart(const TestInfo& test_info) = 0;
+
+  // Fired after a failed assertion or a SUCCESS().
+  virtual void OnTestPartResult(const TestPartResult& test_part_result) = 0;
+
+  // Fired after the test ends.
+  virtual void OnTestEnd(const TestInfo& test_info) = 0;
+
+  // Fired after the test case ends.
+  virtual void OnTestCaseEnd(const TestCase& test_case) = 0;
+
+  // Fired before environment tear-down for each iteration of tests starts.
+  virtual void OnEnvironmentsTearDownStart(const UnitTest& unit_test) = 0;
+
+  // Fired after environment tear-down for each iteration of tests ends.
+  virtual void OnEnvironmentsTearDownEnd(const UnitTest& unit_test) = 0;
+
+  // Fired after each iteration of tests finishes.
+  virtual void OnTestIterationEnd(const UnitTest& unit_test,
+                                  int iteration) = 0;
+
+  // Fired after all test activities have ended.
+  virtual void OnTestProgramEnd(const UnitTest& unit_test) = 0;
+};
+
+// The convenience class for users who need to override just one or two
+// methods and are not concerned that a possible change to a signature of
+// the methods they override will not be caught during the build.  For
+// comments about each method please see the definition of TestEventListener
+// above.
+class EmptyTestEventListener : public TestEventListener {
+ public:
+  virtual void OnTestProgramStart(const UnitTest& /*unit_test*/) {}
+  virtual void OnTestIterationStart(const UnitTest& /*unit_test*/,
+                                    int /*iteration*/) {}
+  virtual void OnEnvironmentsSetUpStart(const UnitTest& /*unit_test*/) {}
+  virtual void OnEnvironmentsSetUpEnd(const UnitTest& /*unit_test*/) {}
+  virtual void OnTestCaseStart(const TestCase& /*test_case*/) {}
+  virtual void OnTestStart(const TestInfo& /*test_info*/) {}
+  virtual void OnTestPartResult(const TestPartResult& /*test_part_result*/) {}
+  virtual void OnTestEnd(const TestInfo& /*test_info*/) {}
+  virtual void OnTestCaseEnd(const TestCase& /*test_case*/) {}
+  virtual void OnEnvironmentsTearDownStart(const UnitTest& /*unit_test*/) {}
+  virtual void OnEnvironmentsTearDownEnd(const UnitTest& /*unit_test*/) {}
+  virtual void OnTestIterationEnd(const UnitTest& /*unit_test*/,
+                                  int /*iteration*/) {}
+  virtual void OnTestProgramEnd(const UnitTest& /*unit_test*/) {}
+};
+
+// TestEventListeners lets users add listeners to track events in Google Test.
+class TestEventListeners {
+ public:
+  TestEventListeners();
+  ~TestEventListeners();
+
+  // Appends an event listener to the end of the list. Google Test assumes
+  // the ownership of the listener (i.e. it will delete the listener when
+  // the test program finishes).
+  void Append(TestEventListener* listener);
+
+  // Removes the given event listener from the list and returns it.  It then
+  // becomes the caller's responsibility to delete the listener. Returns
+  // NULL if the listener is not found in the list.
+  TestEventListener* Release(TestEventListener* listener);
+
+  // Returns the standard listener responsible for the default console
+  // output.  Can be removed from the listeners list to shut down default
+  // console output.  Note that removing this object from the listener list
+  // with Release transfers its ownership to the caller and makes this
+  // function return NULL the next time.
+  TestEventListener* default_result_printer() const {
+    return default_result_printer_;
+  }
+
+  // Returns the standard listener responsible for the default XML output
+  // controlled by the --gtest_output=xml flag.  Can be removed from the
+  // listeners list by users who want to shut down the default XML output
+  // controlled by this flag and substitute it with custom one.  Note that
+  // removing this object from the listener list with Release transfers its
+  // ownership to the caller and makes this function return NULL the next
+  // time.
+  TestEventListener* default_xml_generator() const {
+    return default_xml_generator_;
+  }
+
+ private:
+  friend class TestCase;
+  friend class internal::DefaultGlobalTestPartResultReporter;
+  friend class internal::NoExecDeathTest;
+  friend class internal::TestEventListenersAccessor;
+  friend class internal::TestInfoImpl;
+  friend class internal::UnitTestImpl;
+
+  // Returns repeater that broadcasts the TestEventListener events to all
+  // subscribers.
+  TestEventListener* repeater();
+
+  // Sets the default_result_printer attribute to the provided listener.
+  // The listener is also added to the listener list and previous
+  // default_result_printer is removed from it and deleted. The listener can
+  // also be NULL in which case it will not be added to the list. Does
+  // nothing if the previous and the current listener objects are the same.
+  void SetDefaultResultPrinter(TestEventListener* listener);
+
+  // Sets the default_xml_generator attribute to the provided listener.  The
+  // listener is also added to the listener list and previous
+  // default_xml_generator is removed from it and deleted. The listener can
+  // also be NULL in which case it will not be added to the list. Does
+  // nothing if the previous and the current listener objects are the same.
+  void SetDefaultXmlGenerator(TestEventListener* listener);
+
+  // Controls whether events will be forwarded by the repeater to the
+  // listeners in the list.
+  bool EventForwardingEnabled() const;
+  void SuppressEventForwarding();
+
+  // The actual list of listeners.
+  internal::TestEventRepeater* repeater_;
+  // Listener responsible for the standard result output.
+  TestEventListener* default_result_printer_;
+  // Listener responsible for the creation of the XML output file.
+  TestEventListener* default_xml_generator_;
+
+  // We disallow copying TestEventListeners.
+  GTEST_DISALLOW_COPY_AND_ASSIGN_(TestEventListeners);
 };
 
 // A UnitTest consists of a vector of TestCases.
@@ -797,7 +953,7 @@ class UnitTest {
 
   // Returns the TestCase object for the test that's currently running,
   // or NULL if no test is running.
-  const internal::TestCase* current_test_case() const;
+  const TestCase* current_test_case() const;
 
   // Returns the TestInfo object for the test that's currently running,
   // or NULL if no test is running.
@@ -813,36 +969,6 @@ class UnitTest {
   // INTERNAL IMPLEMENTATION - DO NOT USE IN A USER PROGRAM.
   internal::ParameterizedTestCaseRegistry& parameterized_test_registry();
 #endif  // GTEST_HAS_PARAM_TEST
-
- private:
-  // Registers and returns a global test environment.  When a test
-  // program is run, all global test environments will be set-up in
-  // the order they were registered.  After all tests in the program
-  // have finished, all global test environments will be torn-down in
-  // the *reverse* order they were registered.
-  //
-  // The UnitTest object takes ownership of the given environment.
-  //
-  // This method can only be called from the main thread.
-  Environment* AddEnvironment(Environment* env);
-
-  // Adds a TestPartResult to the current TestResult object.  All
-  // Google Test assertion macros (e.g. ASSERT_TRUE, EXPECT_EQ, etc)
-  // eventually call this to report their results.  The user code
-  // should use the assertion macros instead of calling this directly.
-  void AddTestPartResult(TestPartResultType result_type,
-                         const char* file_name,
-                         int line_number,
-                         const internal::String& message,
-                         const internal::String& os_stack_trace);
-
-  // Adds a TestProperty to the current TestResult object. If the result already
-  // contains a property with the same key, the value will be updated.
-  void RecordPropertyForCurrentTest(const char* key, const char* value);
-
-  // Accessors for the implementation object.
-  internal::UnitTestImpl* impl() { return impl_; }
-  const internal::UnitTestImpl* impl() const { return impl_; }
 
   // Gets the number of successful test cases.
   int successful_test_case_count() const;
@@ -884,29 +1010,56 @@ class UnitTest {
 
   // Gets the i-th test case among all the test cases. i can range from 0 to
   // total_test_case_count() - 1. If i is not in that range, returns NULL.
-  const internal::TestCase* GetTestCase(int i) const;
+  const TestCase* GetTestCase(int i) const;
 
-  // ScopedTrace is a friend as it needs to modify the per-thread
-  // trace stack, which is a private member of UnitTest.
-  // TODO(vladl@google.com): Order all declarations according to the style
-  // guide after publishing of the above methods is done.
+  // Returns the list of event listeners that can be used to track events
+  // inside Google Test.
+  TestEventListeners& listeners();
+
+ private:
+  // Registers and returns a global test environment.  When a test
+  // program is run, all global test environments will be set-up in
+  // the order they were registered.  After all tests in the program
+  // have finished, all global test environments will be torn-down in
+  // the *reverse* order they were registered.
+  //
+  // The UnitTest object takes ownership of the given environment.
+  //
+  // This method can only be called from the main thread.
+  Environment* AddEnvironment(Environment* env);
+
+  // Adds a TestPartResult to the current TestResult object.  All
+  // Google Test assertion macros (e.g. ASSERT_TRUE, EXPECT_EQ, etc)
+  // eventually call this to report their results.  The user code
+  // should use the assertion macros instead of calling this directly.
+  void AddTestPartResult(TestPartResult::Type result_type,
+                         const char* file_name,
+                         int line_number,
+                         const internal::String& message,
+                         const internal::String& os_stack_trace);
+
+  // Adds a TestProperty to the current TestResult object. If the result already
+  // contains a property with the same key, the value will be updated.
+  void RecordPropertyForCurrentTest(const char* key, const char* value);
+
+  // Gets the i-th test case among all the test cases. i can range from 0 to
+  // total_test_case_count() - 1. If i is not in that range, returns NULL.
+  TestCase* GetMutableTestCase(int i);
+
+  // Accessors for the implementation object.
+  internal::UnitTestImpl* impl() { return impl_; }
+  const internal::UnitTestImpl* impl() const { return impl_; }
+
+  // These classes and funcions are friends as they need to access private
+  // members of UnitTest.
+  friend class Test;
+  friend class internal::AssertHelper;
   friend class internal::ScopedTrace;
   friend Environment* AddGlobalTestEnvironment(Environment* env);
   friend internal::UnitTestImpl* internal::GetUnitTestImpl();
-  friend class internal::AssertHelper;
-  friend class Test;
   friend void internal::ReportFailureInUnknownLocation(
-      TestPartResultType result_type,
+      TestPartResult::Type result_type,
       const internal::String& message);
-  // TODO(vladl@google.com): Remove these when publishing the new accessors.
-  friend class PrettyUnitTestResultPrinter;
-  friend class XmlUnitTestResultPrinter;
-  friend class internal::UnitTestAccessor;
-  friend class FinalSuccessChecker;
-  FRIEND_TEST(ApiTest, UnitTestImmutableAccessorsWork);
-  FRIEND_TEST(ApiTest, TestCaseImmutableAccessorsWork);
-  FRIEND_TEST(ApiTest, DisabledTestCaseAccessorsWork);
-
 
   // Creates an empty UnitTest.
   UnitTest();
@@ -1297,16 +1450,38 @@ AssertionResult DoubleNearPredFormat(const char* expr1,
 class AssertHelper {
  public:
   // Constructor.
-  AssertHelper(TestPartResultType type, const char* file, int line,
+  AssertHelper(TestPartResult::Type type,
+               const char* file,
+               int line,
                const char* message);
+  ~AssertHelper();
+
   // Message assignment is a semantic trick to enable assertion
   // streaming; see the GTEST_MESSAGE_ macro below.
   void operator=(const Message& message) const;
+
  private:
-  TestPartResultType const type_;
-  const char*        const file_;
-  int                const line_;
-  String             const message_;
+  // We put our data in a struct so that the size of the AssertHelper class can
+  // be as small as possible.  This is important because gcc is incapable of
+  // re-using stack space even for temporary variables, so every EXPECT_EQ
+  // reserves stack space for another AssertHelper.
+  struct AssertHelperData {
+    AssertHelperData(TestPartResult::Type t,
+                     const char* srcfile,
+                     int line_num,
+                     const char* msg)
+        : type(t), file(srcfile), line(line_num), message(msg) { }
+
+    TestPartResult::Type const type;
+    const char*        const file;
+    int                const line;
+    String             const message;
+
+   private:
+    GTEST_DISALLOW_COPY_AND_ASSIGN_(AssertHelperData);
+  };
+
+  AssertHelperData* const data_;
 
   GTEST_DISALLOW_COPY_AND_ASSIGN_(AssertHelper);
 };

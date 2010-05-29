@@ -397,6 +397,19 @@ MultiTokenCase kMultiTokenCases[] = {
     { Tokenizer::TYPE_IDENTIFIER, "baz", 1,  0 },
     { Tokenizer::TYPE_END       , ""   , 1, 3 },
   }},
+
+  // Bytes with the high-order bit set should not be seen as control characters.
+  { "\300", {
+    { Tokenizer::TYPE_SYMBOL, "\300", 0, 0 },
+    { Tokenizer::TYPE_END   , ""    , 0, 1 },
+  }},
+
+  // Test all whitespace chars
+  { "foo\n\t\r\v\fbar", {
+    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0 },
+    { Tokenizer::TYPE_IDENTIFIER, "bar", 1, 11 },
+    { Tokenizer::TYPE_END       , ""   , 1, 14 },
+  }},
 };
 
 TEST_2D(TokenizerTest, MultipleTokens, kMultiTokenCases, kBlockSizes) {

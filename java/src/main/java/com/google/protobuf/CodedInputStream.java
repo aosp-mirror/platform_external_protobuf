@@ -84,8 +84,9 @@ public final class CodedInputStream {
     }
 
     lastTag = readRawVarint32();
-    if (lastTag == 0) {
-      // If we actually read zero, that's not a valid tag.
+    if (WireFormat.getTagFieldNumber(lastTag) == 0) {
+      // If we actually read zero (or any tag number corresponding to field
+      // number zero), that's not a valid tag.
       throw InvalidProtocolBufferException.invalidTag();
     }
     return lastTag;
@@ -355,8 +356,26 @@ public final class CodedInputStream {
    * CodedInputStream buffers its input.
    */
   static int readRawVarint32(final InputStream input) throws IOException {
-    int result = 0;
-    int offset = 0;
+    final int firstByte = input.read();
+    if (firstByte == -1) {
+      throw InvalidProtocolBufferException.truncatedMessage();
+    }
+    return readRawVarint32(firstByte, input);
+  }
+
+  /**
+   * Like {@link #readRawVarint32(InputStream)}, but expects that the caller
+   * has already read one byte.  This allows the caller to determine if EOF
+   * has been reached before attempting to read.
+   */
+  static int readRawVarint32(final int firstByte,
+                             final InputStream input) throws IOException {
+    if ((firstByte & 0x80) == 0) {
+      return firstByte;
+    }
+
+    int result = firstByte & 0x7f;
+    int offset = 7;
     for (; offset < 32; offset += 7) {
       final int b = input.read();
       if (b == -1) {
@@ -467,7 +486,9 @@ public final class CodedInputStream {
   /**
    * The total number of bytes read before the current buffer.  The total
    * bytes read up to the current position can be computed as
-   * {@code totalBytesRetired + bufferPos}.
+   * {@code totalBytesRetired + bufferPos}.  This value may be negative if
+   * reading started in the middle of the current buffer (e.g. if the
+   * constructor that takes a byte array and an offset was used).
    */
   private int totalBytesRetired;
 
@@ -489,6 +510,7 @@ public final class CodedInputStream {
     this.buffer = buffer;
     bufferSize = off + len;
     bufferPos = off;
+    totalBytesRetired = -off;
     input = null;
   }
 
@@ -496,6 +518,7 @@ public final class CodedInputStream {
     buffer = new byte[BUFFER_SIZE];
     bufferSize = 0;
     bufferPos = 0;
+    totalBytesRetired = 0;
     this.input = input;
   }
 
@@ -546,12 +569,20 @@ public final class CodedInputStream {
    * Resets the current size counter to zero (see {@link #setSizeLimit(int)}).
    */
   public void resetSizeCounter() {
-    totalBytesRetired = 0;
+    totalBytesRetired = -bufferPos;
   }
 
   /**
    * Sets {@code currentLimit} to (current position) + {@code byteLimit}.  This
    * is called when descending into a length-delimited embedded message.
+   *
+   * <p>Note that {@code pushLimit()} does NOT affect how many bytes the
+   * {@code CodedInputStream} reads from an underlying {@code InputStream} when
+   * refreshing its buffer.  If you need to prevent reading past a certain
+   * point in the underlying {@code InputStream} (e.g. because you expect it to
+   * contain more data after the end of the message which you need to handle
+   * differently) then you must place a wrapper around you {@code InputStream}
+   * which limits the amount of data that can be read from it.
    *
    * @return the old limit.
    */
@@ -613,6 +644,14 @@ public final class CodedInputStream {
    */
   public boolean isAtEnd() throws IOException {
     return bufferPos == bufferSize && !refillBuffer(false);
+  }
+
+  /**
+   * The total bytes read up to the current position. Calling
+   * {@link #resetSizeCounter()} resets this value to zero.
+   */
+  public int getTotalBytesRead() {
+      return totalBytesRetired + bufferPos;
   }
 
   /**

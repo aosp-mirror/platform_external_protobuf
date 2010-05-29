@@ -1,5 +1,4 @@
-#!/usr/bin/python2.4
-#
+# -*- Python -*-
 # Copyright 2008 Google Inc. All Rights Reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -96,29 +95,9 @@ import os
 ############################################################
 # Environments for building the targets, sorted by name.
 
-def NewEnvironment(env, type):
-  """Copies environment and gives it suffix for names of targets built in it."""
+Import('env', 'EnvCreator')
 
-  if type:
-    suffix = '_' + type
-  else:
-    suffix = ''
-
-  new_env = env.Clone()
-  new_env['OBJ_SUFFIX'] = suffix
-  return new_env;
-
-
-def Remove(env, attribute, value):
-  """Removes the given attribute value from the environment."""
-
-  attribute_values = env[attribute]
-  if value in attribute_values:
-    attribute_values.remove(value)
-
-
-Import('env')
-env = NewEnvironment(env, '')
+env = EnvCreator.Create(env)
 
 # Note: The relative paths in SConscript files are relative to the location
 # of the SConscript file itself. To make a path relative to the location of
@@ -133,51 +112,16 @@ env = NewEnvironment(env, '')
 # file is one directory deeper than the gtest directory.
 env.Prepend(CPPPATH = ['..', '../include'])
 
-env_use_own_tuple = NewEnvironment(env, 'use_own_tuple')
-env_use_own_tuple.Append(CPPDEFINES = 'GTEST_USE_OWN_TR1_TUPLE=1')
-
-# Needed to allow gtest_unittest.cc, which triggers a gcc warning when
-# testing EXPECT_EQ(NULL, ptr), to compile.
-env_warning_ok = NewEnvironment(env, 'warning_ok')
-if env_warning_ok['PLATFORM'] == 'win32':
-  Remove(env_warning_ok, 'CCFLAGS', '-WX')
-else:
-  Remove(env_warning_ok, 'CCFLAGS', '-Werror')
-
-env_with_exceptions = NewEnvironment(env_warning_ok, 'ex')
-if env_with_exceptions['PLATFORM'] == 'win32':
-  env_with_exceptions.Append(CCFLAGS=['/EHsc'])
-  env_with_exceptions.Append(CPPDEFINES='_HAS_EXCEPTIONS=1')
-  # Undoes the _TYPEINFO_ hack, which is unnecessary and only creates
-  # trouble when exceptions are enabled.
-  Remove(env_with_exceptions, 'CPPDEFINES', '_TYPEINFO_')
-  Remove(env_with_exceptions, 'CPPDEFINES', '_HAS_EXCEPTIONS=0')
-else:
-  env_with_exceptions.Append(CCFLAGS='-fexceptions')
-  Remove(env_with_exceptions, 'CCFLAGS', '-fno-exceptions')
-
-# We need to disable some optimization flags for some tests on
-# Windows; otherwise the redirection of stdout does not work
-# (apparently because of a compiler bug).
-env_less_optimized = NewEnvironment(env, 'less_optimized')
-if env_less_optimized['PLATFORM'] == 'win32':
-  for flag in ['/O1', '/Os', '/Og', '/Oy']:
-    Remove(env_less_optimized, 'LINKFLAGS', flag)
-
-# Assuming POSIX-like environment with GCC.
-# TODO(vladl@google.com): sniff presence of pthread_atfork instead of
-# selecting on a platform.
-env_with_threads = NewEnvironment(env, 'with_threads')
-if env_with_threads['PLATFORM'] != 'win32':
-  env_with_threads.Append(CCFLAGS=['-pthread'])
-  env_with_threads.Append(LINKFLAGS=['-pthread'])
-
-env_without_rtti = NewEnvironment(env_warning_ok, 'no_rtti')
-if env_without_rtti['PLATFORM'] == 'win32':
-  env_without_rtti.Append(CCFLAGS=['/GR-'])
-else:
-  env_without_rtti.Append(CCFLAGS=['-fno-rtti'])
-  env_without_rtti.Append(CPPDEFINES='GTEST_HAS_RTTI=0')
+env_use_own_tuple = EnvCreator.Create(env, EnvCreator.UseOwnTuple)
+env_less_optimized = EnvCreator.Create(env, EnvCreator.LessOptimized)
+env_with_threads = EnvCreator.Create(env, EnvCreator.WithThreads)
+# The following environments are used to compile gtest_unittest.cc, which
+# triggers a warning  in all but the most recent GCC versions when compiling
+# the EXPECT_EQ(NULL, ptr) statement.
+env_warning_ok = EnvCreator.Create(env, EnvCreator.WarningOk)
+env_with_exceptions = EnvCreator.Create(env_warning_ok,
+                                        EnvCreator.WithExceptions)
+env_without_rtti = EnvCreator.Create(env_warning_ok, EnvCreator.NoRtti)
 
 ############################################################
 # Helpers for creating build targets.
@@ -318,8 +262,10 @@ GtestTest(env, 'gtest_list_tests_unittest_', gtest)
 GtestTest(env, 'gtest_throw_on_failure_test_', gtest)
 GtestTest(env, 'gtest_xml_outfile1_test_', gtest_main)
 GtestTest(env, 'gtest_xml_outfile2_test_', gtest_main)
-GtestTest(env, 'gtest_xml_output_unittest_', gtest_main)
+GtestTest(env, 'gtest_xml_output_unittest_', gtest)
 GtestTest(env, 'gtest-unittest-api_test', gtest)
+GtestTest(env, 'gtest-listener_test', gtest)
+GtestTest(env, 'gtest_shuffle_test_', gtest)
 
 ############################################################
 # Tests targets using custom environments.
@@ -363,13 +309,15 @@ if env.get('GTEST_BUILD_SAMPLES', False):
   GtestSample(env, 'sample6_unittest')
   GtestSample(env, 'sample7_unittest')
   GtestSample(env, 'sample8_unittest')
+  GtestSample(env, 'sample9_unittest')
+  GtestSample(env, 'sample10_unittest')
 
 # These exports are used by Google Mock.
 gtest_exports = {'gtest': gtest,
                  'gtest_ex': gtest_ex,
                  'gtest_no_rtti': gtest_no_rtti,
                  'gtest_use_own_tuple': gtest_use_own_tuple,
-                 'NewEnvironment': NewEnvironment,
+                 'EnvCreator': EnvCreator,
                  'GtestObject': GtestObject,
                  'GtestBinary': GtestBinary,
                  'GtestTest': GtestTest}

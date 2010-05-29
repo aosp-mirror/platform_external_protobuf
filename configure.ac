@@ -12,7 +12,7 @@ AC_PREREQ(2.59)
 # In the SVN trunk, the version should always be the next anticipated release
 # version with the "-pre" suffix.  (We used to use "-SNAPSHOT" but this pushed
 # the size of one file name in the dist tarfile over the 99-char limit.)
-AC_INIT([Protocol Buffers],[2.2.0a],[protobuf@googlegroups.com],[protobuf])
+AC_INIT([Protocol Buffers],[2.3.0],[protobuf@googlegroups.com],[protobuf])
 
 
 AC_CONFIG_SRCDIR(src/google/protobuf/message.cc)
@@ -82,14 +82,38 @@ AC_FUNC_MEMCMP
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([ftruncate memset mkdir strchr strerror strtol])
 
+# Check for zlib.
 HAVE_ZLIB=0
-AS_IF([test "$with_zlib" != no],
-  [AC_SEARCH_LIBS([zlibVersion], [z],
-    [AC_DEFINE([HAVE_ZLIB], [1], [Enable classes using zlib compression.])
-     HAVE_ZLIB=1],
-    [if test "$with_zlib" != check; then
-      AC_MSG_FAILURE([--with-zlib was given, but test for zlib failed])
-     fi])])
+AS_IF([test "$with_zlib" != no], [
+  AC_MSG_CHECKING([zlib version])
+
+  # First check the zlib header version.
+  AC_COMPILE_IFELSE(
+    AC_LANG_PROGRAM([[
+        #include <zlib.h>
+        #if !defined(ZLIB_VERNUM) || (ZLIB_VERNUM < 0x1204)
+        # error zlib version too old
+        #endif
+        ]], []), [
+    AC_MSG_RESULT([ok (1.2.0.4 or later)])
+
+    # Also need to add -lz to the linker flags and make sure this succeeds.
+    AC_SEARCH_LIBS([zlibVersion], [z], [
+      AC_DEFINE([HAVE_ZLIB], [1], [Enable classes using zlib compression.])
+      HAVE_ZLIB=1
+    ], [
+      AS_IF([test "$with_zlib" != check], [
+        AC_MSG_FAILURE([--with-zlib was given, but no working zlib library was found])
+      ])
+    ])
+  ], [
+    AS_IF([test "$with_zlib" = check], [
+      AC_MSG_RESULT([headers missing or too old (requires 1.2.0.4)])
+    ], [
+      AC_MSG_FAILURE([--with-zlib was given, but zlib headers were not present or were too old (requires 1.2.0.4)])
+    ])
+  ])
+])
 AM_CONDITIONAL([HAVE_ZLIB], [test $HAVE_ZLIB = 1])
 
 AS_IF([test "$with_protoc" != "no"], [
@@ -114,8 +138,10 @@ AM_CONDITIONAL([USE_EXTERNAL_PROTOC], [test "$with_protoc" != "no"])
 ACX_PTHREAD
 AC_CXX_STL_HASH
 
-# HACK:  Make gtest's configure script pick up our copy of CXXFLAGS, since the
-#   flags added by ACX_CHECK_SUNCC must be used when compiling gtest too.
+# HACK:  Make gtest's configure script pick up our copy of CFLAGS and CXXFLAGS,
+#   since the flags added by ACX_CHECK_SUNCC must be used when compiling gtest
+#   too.
+export CFLAGS
 export CXXFLAGS
 AC_CONFIG_SUBDIRS([gtest])
 

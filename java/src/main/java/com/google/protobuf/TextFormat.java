@@ -38,6 +38,7 @@ import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import java.io.IOException;
 import java.nio.CharBuffer;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -115,7 +116,7 @@ public final class TextFormat {
     }
     printUnknownFields(message.getUnknownFields(), generator);
   }
-  
+
   public static void printField(final FieldDescriptor field,
                                 final Object value,
                                 final Appendable output)
@@ -133,10 +134,10 @@ public final class TextFormat {
     } catch (IOException e) {
       throw new RuntimeException(
         "Writing to a StringBuilder threw an IOException (should never " +
-        "happen).", e);  
+        "happen).", e);
     }
   }
-  
+
   private static void printField(final FieldDescriptor field,
                                 final Object value,
                                 final TextGenerator generator)
@@ -426,9 +427,9 @@ public final class TextFormat {
       Pattern.compile("(\\s|(#.*$))++", Pattern.MULTILINE);
     private static final Pattern TOKEN = Pattern.compile(
       "[a-zA-Z_][0-9a-zA-Z_+-]*+|" +                // an identifier
-      "[0-9+-][0-9a-zA-Z_.+-]*+|" +                 // a number
+      "[.]?[0-9+-][0-9a-zA-Z_.+-]*+|" +             // a number
       "\"([^\"\n\\\\]|\\\\.)*+(\"|\\\\?$)|" +       // a double-quoted string
-      "\'([^\"\n\\\\]|\\\\.)*+(\'|\\\\?$)",         // a single-quoted string
+      "\'([^\'\n\\\\]|\\\\.)*+(\'|\\\\?$)",         // a single-quoted string
       Pattern.MULTILINE);
 
     private static final Pattern DOUBLE_INFINITY = Pattern.compile(
@@ -695,6 +696,21 @@ public final class TextFormat {
      * {@link ParseException}.
      */
     public ByteString consumeByteString() throws ParseException {
+      List<ByteString> list = new ArrayList<ByteString>();
+      consumeByteString(list);
+      while (currentToken.startsWith("'") || currentToken.startsWith("\"")) {
+        consumeByteString(list);
+      }
+      return ByteString.copyFrom(list);
+    }
+
+    /**
+     * Like {@link #consumeByteString()} but adds each token of the string to
+     * the given list.  String literals (whether bytes or text) may come in
+     * multiple adjacent tokens which are automatically concatenated, like in
+     * C or Python.
+     */
+    private void consumeByteString(List<ByteString> list) throws ParseException {
       final char quote = currentToken.length() > 0 ? currentToken.charAt(0)
                                                    : '\0';
       if (quote != '\"' && quote != '\'') {
@@ -711,7 +727,7 @@ public final class TextFormat {
             currentToken.substring(1, currentToken.length() - 1);
         final ByteString result = unescapeBytes(escaped);
         nextToken();
-        return result;
+        list.add(result);
       } catch (InvalidEscapeSequenceException e) {
         throw parseException(e.getMessage());
       }

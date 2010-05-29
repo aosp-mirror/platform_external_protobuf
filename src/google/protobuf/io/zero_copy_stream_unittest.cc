@@ -403,7 +403,8 @@ TEST_F(IoTest, CompressionOptions) {
 
   string golden;
   File::ReadFileToStringOrDie(
-      TestSourceDir() + "/google/protobuf/testdata/golden_message", &golden);
+    TestSourceDir() + "/google/protobuf/testdata/golden_message",
+    &golden);
 
   GzipOutputStream::Options options;
   string gzip_compressed = Compress(golden, options);
@@ -520,7 +521,7 @@ TEST_F(IoTest, GzipFileIo) {
 // these debug assertions while in scope.
 class MsvcDebugDisabler {
  public:
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER >= 1400
   MsvcDebugDisabler() {
     old_handler_ = _set_invalid_parameter_handler(MyHandler);
     old_mode_ = _CrtSetReportMode(_CRT_ASSERT, 0);

@@ -43,7 +43,7 @@ from google.protobuf import unittest_pb2
 from google.protobuf import unittest_mset_pb2
 
 
-class TextFormatTest(test_util.GoldenMessageTestCase):
+class TextFormatTest(unittest.TestCase):
   def ReadGolden(self, golden_filename):
     f = test_util.GoldenFile(golden_filename)
     golden_lines = f.readlines()
@@ -149,7 +149,7 @@ class TextFormatTest(test_util.GoldenMessageTestCase):
     parsed_message = unittest_pb2.TestAllTypes()
     text_format.Merge(ascii_text, parsed_message)
     self.assertEqual(message, parsed_message)
-    self.ExpectAllFieldsSet(message)
+    test_util.ExpectAllFieldsSet(self, message)
 
   def testMergeAllExtensions(self):
     message = unittest_pb2.TestAllExtensions()
@@ -191,7 +191,8 @@ class TextFormatTest(test_util.GoldenMessageTestCase):
             'repeated_double: 1.23e+22\n'
             'repeated_double: 1.23e-18\n'
             'repeated_string: \n'
-            '\"\\000\\001\\007\\010\\014\\n\\r\\t\\013\\\\\\\'\\\"\"\n')
+            '\"\\000\\001\\007\\010\\014\\n\\r\\t\\013\\\\\\\'\\\"\"\n'
+            'repeated_string: "foo" \'corge\' "grault"')
     text_format.Merge(text, message)
 
     self.assertEqual(-9223372036854775808, message.repeated_int64[0])
@@ -201,6 +202,7 @@ class TextFormatTest(test_util.GoldenMessageTestCase):
     self.assertEqual(1.23e-18, message.repeated_double[2])
     self.assertEqual(
         '\000\001\a\b\f\n\r\t\v\\\'\"', message.repeated_string[0])
+    self.assertEqual('foocorgegrault', message.repeated_string[1])
 
   def testMergeUnknownField(self):
     message = unittest_pb2.TestAllTypes()
@@ -212,11 +214,17 @@ class TextFormatTest(test_util.GoldenMessageTestCase):
         text_format.Merge, text, message)
 
   def testMergeBadExtension(self):
-    message = unittest_pb2.TestAllTypes()
+    message = unittest_pb2.TestAllExtensions()
     text = '[unknown_extension]: 8\n'
     self.assertRaisesWithMessage(
         text_format.ParseError,
         '1:2 : Extension "unknown_extension" not registered.',
+        text_format.Merge, text, message)
+    message = unittest_pb2.TestAllTypes()
+    self.assertRaisesWithMessage(
+        text_format.ParseError,
+        ('1:2 : Message type "protobuf_unittest.TestAllTypes" does not have '
+         'extensions.'),
         text_format.Merge, text, message)
 
   def testMergeGroupNotClosed(self):
@@ -230,6 +238,19 @@ class TextFormatTest(test_util.GoldenMessageTestCase):
     self.assertRaisesWithMessage(
         text_format.ParseError, '1:16 : Expected "}".',
         text_format.Merge, text, message)
+
+  def testMergeEmptyGroup(self):
+    message = unittest_pb2.TestAllTypes()
+    text = 'OptionalGroup: {}'
+    text_format.Merge(text, message)
+    self.assertTrue(message.HasField('optionalgroup'))
+
+    message.Clear()
+
+    message = unittest_pb2.TestAllTypes()
+    text = 'OptionalGroup: <>'
+    text_format.Merge(text, message)
+    self.assertTrue(message.HasField('optionalgroup'))
 
   def testMergeBadEnumValue(self):
     message = unittest_pb2.TestAllTypes()
@@ -304,10 +325,10 @@ class TokenizerTest(unittest.TestCase):
                '{',
                (tokenizer.ConsumeIdentifier, 'A'),
                ':',
-               (tokenizer.ConsumeFloat, float('inf')),
+               (tokenizer.ConsumeFloat, text_format._INFINITY),
                (tokenizer.ConsumeIdentifier, 'B'),
                ':',
-               (tokenizer.ConsumeFloat, float('-inf')),
+               (tokenizer.ConsumeFloat, -text_format._INFINITY),
                (tokenizer.ConsumeIdentifier, 'C'),
                ':',
                (tokenizer.ConsumeBool, True),
@@ -391,6 +412,16 @@ class TokenizerTest(unittest.TestCase):
     text = 'not-a-bool'
     tokenizer = text_format._Tokenizer(text)
     self.assertRaises(text_format.ParseError, tokenizer.ConsumeBool)
+
+  def testInfNan(self):
+    # Make sure our infinity and NaN definitions are sound.
+    self.assertEquals(float, type(text_format._INFINITY))
+    self.assertEquals(float, type(text_format._NAN))
+    self.assertTrue(text_format._NAN != text_format._NAN)
+
+    inf_times_zero = text_format._INFINITY * 0
+    self.assertTrue(inf_times_zero != inf_times_zero)
+    self.assertTrue(text_format._INFINITY > 0)
 
 
 if __name__ == '__main__':

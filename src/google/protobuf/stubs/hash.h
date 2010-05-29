@@ -98,7 +98,7 @@ template <typename Key,
 class hash_set : public std::set<Key, HashFcn> {
 };
 
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && !defined(_STLPORT_VERSION)
 
 template <typename Key>
 struct hash : public HASH_NAMESPACE::hash_compare<Key> {
@@ -145,21 +145,30 @@ struct hash<const Key*> {
   }
 };
 
+// Unlike the old SGI version, the TR1 "hash" does not special-case char*.  So,
+// we go ahead and provide our own implementation.
 template <>
-struct hash<const char*> : public HASH_NAMESPACE::hash<const char*> {
+struct hash<const char*> {
+  inline size_t operator()(const char* str) const {
+    size_t result = 0;
+    for (; *str != '\0'; str++) {
+      result = 5 * result + *str;
+    }
+    return result;
+  }
 };
 
 template <typename Key, typename Data,
           typename HashFcn = hash<Key>,
           typename EqualKey = std::equal_to<Key> >
-class hash_map : public HASH_NAMESPACE::hash_map<
+class hash_map : public HASH_NAMESPACE::HASH_MAP_CLASS<
     Key, Data, HashFcn, EqualKey> {
 };
 
 template <typename Key,
           typename HashFcn = hash<Key>,
           typename EqualKey = std::equal_to<Key> >
-class hash_set : public HASH_NAMESPACE::hash_set<
+class hash_set : public HASH_NAMESPACE::HASH_SET_CLASS<
     Key, HashFcn, EqualKey> {
 };
 

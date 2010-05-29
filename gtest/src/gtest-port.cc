@@ -35,24 +35,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if GTEST_OS_WINDOWS
-#ifndef _WIN32_WCE
+#if GTEST_OS_WINDOWS_MOBILE
+#include <windows.h>  // For TerminateProcess()
+#elif GTEST_OS_WINDOWS
 #include <io.h>
 #include <sys/stat.h>
-#endif  // _WIN32_WCE
 #else
 #include <unistd.h>
-#endif  // GTEST_OS_WINDOWS
+#endif  // GTEST_OS_WINDOWS_MOBILE
 
 #if GTEST_OS_MAC
 #include <mach/mach_init.h>
 #include <mach/task.h>
 #include <mach/vm_map.h>
 #endif  // GTEST_OS_MAC
-
-#ifdef _WIN32_WCE
-#include <windows.h>  // For TerminateProcess()
-#endif  // _WIN32_WCE
 
 #include <gtest/gtest-spi.h>
 #include <gtest/gtest-message.h>
@@ -417,20 +413,25 @@ void RE::Init(const char* regex) {
 
 #endif  // GTEST_USES_POSIX_RE
 
-// Logs a message at the given severity level.
-void GTestLog(GTestLogSeverity severity, const char* file,
-              int line, const char* msg) {
+
+GTestLog::GTestLog(GTestLogSeverity severity, const char* file, int line)
+    : severity_(severity) {
   const char* const marker =
       severity == GTEST_INFO ?    "[  INFO ]" :
       severity == GTEST_WARNING ? "[WARNING]" :
       severity == GTEST_ERROR ?   "[ ERROR ]" : "[ FATAL ]";
-  fprintf(stderr, "\n%s %s:%d: %s\n", marker, file, line, msg);
-  if (severity == GTEST_FATAL) {
-    fflush(NULL);  // abort() is not guaranteed to flush open file streams.
+  GetStream() << ::std::endl << marker << " "
+              << FormatFileLocation(file, line).c_str() << ": ";
+}
+
+// Flushes the buffers and, if severity is GTEST_FATAL, aborts the program.
+GTestLog::~GTestLog() {
+  GetStream() << ::std::endl;
+  if (severity_ == GTEST_FATAL) {
+    fflush(stderr);
     posix::Abort();
   }
 }
-
 // Disable Microsoft deprecation warnings for POSIX functions called from
 // this class (creat, dup, dup2, and close)
 #ifdef _MSC_VER
@@ -444,7 +445,7 @@ class CapturedStderr {
  public:
   // The ctor redirects stderr to a temporary file.
   CapturedStderr() {
-#ifdef _WIN32_WCE
+#if GTEST_OS_WINDOWS_MOBILE
     // Not supported on Windows CE.
     posix::Abort();
 #else
@@ -469,24 +470,24 @@ class CapturedStderr {
     fflush(NULL);
     dup2(captured_fd, kStdErrFileno);
     close(captured_fd);
-#endif  // _WIN32_WCE
+#endif  // GTEST_OS_WINDOWS_MOBILE
   }
 
   ~CapturedStderr() {
-#ifndef _WIN32_WCE
+#if !GTEST_OS_WINDOWS_MOBILE
     remove(filename_.c_str());
-#endif  // _WIN32_WCE
+#endif  // !GTEST_OS_WINDOWS_MOBILE
   }
 
   // Stops redirecting stderr.
   void StopCapture() {
-#ifndef _WIN32_WCE
+#if !GTEST_OS_WINDOWS_MOBILE
     // Restores the original stream.
     fflush(NULL);
     dup2(uncaptured_fd_, kStdErrFileno);
     close(uncaptured_fd_);
     uncaptured_fd_ = -1;
-#endif  // !_WIN32_WCE
+#endif  // !GTEST_OS_WINDOWS_MOBILE
   }
 
   // Returns the name of the temporary file holding the stderr output.
@@ -537,7 +538,7 @@ static String ReadEntireFile(FILE * file) {
 // Starts capturing stderr.
 void CaptureStderr() {
   if (g_captured_stderr != NULL) {
-    GTEST_LOG_(FATAL, "Only one stderr capturer can exist at one time.");
+    GTEST_LOG_(FATAL) << "Only one stderr capturer can exist at one time.";
   }
   g_captured_stderr = new CapturedStderr;
 }
@@ -568,14 +569,14 @@ const ::std::vector<String>& GetArgvs() { return g_argvs; }
 
 #endif  // GTEST_HAS_DEATH_TEST
 
-#ifdef _WIN32_WCE
+#if GTEST_OS_WINDOWS_MOBILE
 namespace posix {
 void Abort() {
   DebugBreak();
   TerminateProcess(GetCurrentProcess(), 1);
 }
 }  // namespace posix
-#endif  // _WIN32_WCE
+#endif  // GTEST_OS_WINDOWS_MOBILE
 
 // Returns the name of the environment variable corresponding to the
 // given flag.  For example, FlagToEnvVar("foo") will return
@@ -585,7 +586,7 @@ static String FlagToEnvVar(const char* flag) {
       (Message() << GTEST_FLAG_PREFIX_ << flag).GetString();
 
   Message env_var;
-  for (int i = 0; i != full_flag.GetLength(); i++) {
+  for (size_t i = 0; i != full_flag.length(); i++) {
     env_var << static_cast<char>(toupper(full_flag.c_str()[i]));
   }
 

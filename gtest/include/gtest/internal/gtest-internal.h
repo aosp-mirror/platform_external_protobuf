@@ -107,7 +107,6 @@ class Test;                            // Represents a test.
 class TestInfo;                        // Information about a test.
 class TestPartResult;                  // Result of a test part.
 class UnitTest;                        // A collection of test cases.
-class UnitTestEventListenerInterface;  // Listens to Google Test events.
 
 namespace internal {
 
@@ -726,8 +725,8 @@ class TypeParameterizedTestCase {
 template <GTEST_TEMPLATE_ Fixture, typename Types>
 class TypeParameterizedTestCase<Fixture, Templates0, Types> {
  public:
-  static bool Register(const char* prefix, const char* case_name,
-                       const char* test_names) {
+  static bool Register(const char* /*prefix*/, const char* /*case_name*/,
+                       const char* /*test_names*/) {
     return true;
   }
 };
@@ -746,8 +745,36 @@ class TypeParameterizedTestCase<Fixture, Templates0, Types> {
 // the trace but Bar() and GetCurrentOsStackTraceExceptTop() won't.
 String GetCurrentOsStackTraceExceptTop(UnitTest* unit_test, int skip_count);
 
-// A helper for suppressing warnings on unreachable code in some macros.
+// Helpers for suppressing warnings on unreachable code or constant
+// condition.
+
+// Always returns true.
 bool AlwaysTrue();
+
+// Always returns false.
+inline bool AlwaysFalse() { return !AlwaysTrue(); }
+
+// A simple Linear Congruential Generator for generating random
+// numbers with a uniform distribution.  Unlike rand() and srand(), it
+// doesn't use global state (and therefore can't interfere with user
+// code).  Unlike rand_r(), it's portable.  An LCG isn't very random,
+// but it's good enough for our purposes.
+class Random {
+ public:
+  static const UInt32 kMaxRange = 1u << 31;
+
+  explicit Random(UInt32 seed) : state_(seed) {}
+
+  void Reseed(UInt32 seed) { state_ = seed; }
+
+  // Generates a random number from [0, range).  Crashes if 'range' is
+  // 0 or greater than kMaxRange.
+  UInt32 Generate(UInt32 range);
+
+ private:
+  UInt32 state_;
+  GTEST_DISALLOW_COPY_AND_ASSIGN_(Random);
+};
 
 }  // namespace internal
 }  // namespace testing
@@ -757,18 +784,18 @@ bool AlwaysTrue();
     = ::testing::Message()
 
 #define GTEST_FATAL_FAILURE_(message) \
-  return GTEST_MESSAGE_(message, ::testing::TPRT_FATAL_FAILURE)
+  return GTEST_MESSAGE_(message, ::testing::TestPartResult::kFatalFailure)
 
 #define GTEST_NONFATAL_FAILURE_(message) \
-  GTEST_MESSAGE_(message, ::testing::TPRT_NONFATAL_FAILURE)
+  GTEST_MESSAGE_(message, ::testing::TestPartResult::kNonFatalFailure)
 
 #define GTEST_SUCCESS_(message) \
-  GTEST_MESSAGE_(message, ::testing::TPRT_SUCCESS)
+  GTEST_MESSAGE_(message, ::testing::TestPartResult::kSuccess)
 
 // Suppresses MSVC warnings 4072 (unreachable code) for the code following
 // statement if it returns or throws (or doesn't return or throw in some
 // situations).
-#define GTEST_HIDE_UNREACHABLE_CODE_(statement) \
+#define GTEST_SUPPRESS_UNREACHABLE_CODE_WARNING_BELOW_(statement) \
   if (::testing::internal::AlwaysTrue()) { statement; }
 
 #define GTEST_TEST_THROW_(statement, expected_exception, fail) \
@@ -776,7 +803,7 @@ bool AlwaysTrue();
   if (const char* gtest_msg = "") { \
     bool gtest_caught_expected = false; \
     try { \
-      GTEST_HIDE_UNREACHABLE_CODE_(statement); \
+      GTEST_SUPPRESS_UNREACHABLE_CODE_WARNING_BELOW_(statement); \
     } \
     catch (expected_exception const&) { \
       gtest_caught_expected = true; \
@@ -800,7 +827,7 @@ bool AlwaysTrue();
   GTEST_AMBIGUOUS_ELSE_BLOCKER_ \
   if (const char* gtest_msg = "") { \
     try { \
-      GTEST_HIDE_UNREACHABLE_CODE_(statement); \
+      GTEST_SUPPRESS_UNREACHABLE_CODE_WARNING_BELOW_(statement); \
     } \
     catch (...) { \
       gtest_msg = "Expected: " #statement " doesn't throw an exception.\n" \
@@ -816,7 +843,7 @@ bool AlwaysTrue();
   if (const char* gtest_msg = "") { \
     bool gtest_caught_any = false; \
     try { \
-      GTEST_HIDE_UNREACHABLE_CODE_(statement); \
+      GTEST_SUPPRESS_UNREACHABLE_CODE_WARNING_BELOW_(statement); \
     } \
     catch (...) { \
       gtest_caught_any = true; \
@@ -833,7 +860,7 @@ bool AlwaysTrue();
 
 #define GTEST_TEST_BOOLEAN_(boolexpr, booltext, actual, expected, fail) \
   GTEST_AMBIGUOUS_ELSE_BLOCKER_ \
-  if (boolexpr) \
+  if (::testing::internal::IsTrue(boolexpr)) \
     ; \
   else \
     fail("Value of: " booltext "\n  Actual: " #actual "\nExpected: " #expected)
@@ -842,7 +869,7 @@ bool AlwaysTrue();
   GTEST_AMBIGUOUS_ELSE_BLOCKER_ \
   if (const char* gtest_msg = "") { \
     ::testing::internal::HasNewFatalFailureHelper gtest_fatal_failure_checker; \
-    GTEST_HIDE_UNREACHABLE_CODE_(statement); \
+    GTEST_SUPPRESS_UNREACHABLE_CODE_WARNING_BELOW_(statement); \
     if (gtest_fatal_failure_checker.has_new_fatal_failure()) { \
       gtest_msg = "Expected: " #statement " doesn't generate new fatal " \
                   "failures in the current thread.\n" \

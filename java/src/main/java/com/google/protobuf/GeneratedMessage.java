@@ -352,7 +352,10 @@ public abstract class GeneratedMessage extends AbstractMessage {
       FieldDescriptor descriptor = extension.getDescriptor();
       final Object value = extensions.getField(descriptor);
       if (value == null) {
-        if (descriptor.getJavaType() == FieldDescriptor.JavaType.MESSAGE) {
+        if (descriptor.isRepeated()) {
+          return (Type) Collections.emptyList();
+        } else if (descriptor.getJavaType() ==
+                   FieldDescriptor.JavaType.MESSAGE) {
           return (Type) extension.getMessageDefaultInstance();
         } else {
           return (Type) extension.fromReflectionType(
@@ -721,25 +724,8 @@ public abstract class GeneratedMessage extends AbstractMessage {
   /** For use by generated code only. */
   public static <ContainingType extends Message, Type>
       GeneratedExtension<ContainingType, Type>
-      newGeneratedExtension(final FieldDescriptor descriptor,
-                            final Class<Type> type) {
-    if (descriptor.isRepeated()) {
-      throw new IllegalArgumentException(
-        "Must call newRepeatedGeneratedExtension() for repeated types.");
-    }
-    return new GeneratedExtension<ContainingType, Type>(descriptor, type);
-  }
-
-  /** For use by generated code only. */
-  public static <ContainingType extends Message, Type>
-      GeneratedExtension<ContainingType, List<Type>>
-      newRepeatedGeneratedExtension(
-        final FieldDescriptor descriptor, final Class<Type> type) {
-    if (!descriptor.isRepeated()) {
-      throw new IllegalArgumentException(
-        "Must call newGeneratedExtension() for non-repeated types.");
-    }
-    return new GeneratedExtension<ContainingType, List<Type>>(descriptor, type);
+      newGeneratedExtension() {
+    return new GeneratedExtension<ContainingType, Type>();
   }
 
   /**
@@ -772,8 +758,23 @@ public abstract class GeneratedMessage extends AbstractMessage {
     // TODO(kenton):  Find ways to avoid using Java reflection within this
     //   class.  Also try to avoid suppressing unchecked warnings.
 
-    private GeneratedExtension(final FieldDescriptor descriptor,
-                               final Class type) {
+    // We can't always initialize a GeneratedExtension when we first construct
+    // it due to initialization order difficulties (namely, the descriptor may
+    // not have been constructed yet, since it is often constructed by the
+    // initializer of a separate module).  So, we construct an uninitialized
+    // GeneratedExtension once, then call internalInit() on it later.  Generated
+    // code will always call internalInit() on all extensions as part of the
+    // static initialization code, and internalInit() throws an exception if
+    // called more than once, so this method is useless to users.
+    private GeneratedExtension() {}
+
+    /** For use by generated code only. */
+    public void internalInit(final FieldDescriptor descriptor,
+                             final Class type) {
+      if (this.descriptor != null) {
+        throw new IllegalStateException("Already initialized.");
+      }
+
       if (!descriptor.isExtension()) {
         throw new IllegalArgumentException(
           "GeneratedExtension given a regular (non-extension) field.");
@@ -789,6 +790,10 @@ public abstract class GeneratedMessage extends AbstractMessage {
           messageDefaultInstance =
             (Message) invokeOrDie(getMethodOrDie(type, "getDefaultInstance"),
                                   null);
+          if (messageDefaultInstance == null) {
+            throw new IllegalStateException(
+                type.getName() + ".getDefaultInstance() returned null.");
+          }
           break;
         case ENUM:
           enumValueOf = getMethodOrDie(type, "valueOf",
@@ -804,11 +809,11 @@ public abstract class GeneratedMessage extends AbstractMessage {
       }
     }
 
-    private final FieldDescriptor descriptor;
-    private final Class type;
-    private final Method enumValueOf;
-    private final Method enumGetValueDescriptor;
-    private final Message messageDefaultInstance;
+    private FieldDescriptor descriptor;
+    private Class type;
+    private Method enumValueOf;
+    private Method enumGetValueDescriptor;
+    private Message messageDefaultInstance;
 
     public FieldDescriptor getDescriptor() { return descriptor; }
 
