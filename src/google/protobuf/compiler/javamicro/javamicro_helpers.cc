@@ -206,31 +206,44 @@ string ClassName(const Params& params, const EnumDescriptor* descriptor) {
   const FileDescriptor* file = descriptor->file();
   const string file_name = file->name();
   const string full_name = descriptor->full_name();
-  int last_period = full_name.find_last_of('.');
-  int first_period = full_name.find_first_of('.');
 
-  // Remove class_name as we're using public static final int's not enums
+  // Remove enum class name as we use int's for enums
   string base_name = full_name.substr(0, full_name.find_last_of('.'));
 
   if (!file->package().empty()) {
-    // Remove package name.
-    int offset = first_period;
-    if (last_period > first_period) {
-      // There was two or more periods so we need to remove this one too.
-      offset += 1;
+    if (file->package() == base_name.substr(0, file->package().size())) {
+      // Remove package name leaving just the parent class of the enum
+      int offset = file->package().size();
+      if (base_name.size() > offset) {
+        // Remove period between package and class name if there is a classname
+        offset += 1;
+      }
+      base_name = base_name.substr(offset);
+    } else {
+      GOOGLE_LOG(FATAL) << "Expected package name to start an enum";
     }
-    base_name = base_name.substr(offset);
   }
 
+  // Construct the path name from the package and outer class
+
+  // Add the java package name if it exsits
   if (params.has_java_package(file_name)) {
     result += params.java_package(file_name);
   }
+
+  // Add the outer classname if it exists
   if (params.has_java_outer_classname(file_name)) {
-    result += ".";
+    if (!result.empty()) {
+      result += ".";
+    }
     result += params.java_outer_classname(file_name);
   }
+
+  // Create the full class name from the base and path
   if (!base_name.empty()) {
-    result += ".";
+    if (!result.empty()) {
+      result += ".";
+    }
     result += base_name;
   }
   return result;
