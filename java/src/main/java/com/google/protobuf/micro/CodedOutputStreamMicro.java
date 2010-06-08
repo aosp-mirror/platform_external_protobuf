@@ -179,13 +179,6 @@ public final class CodedOutputStreamMicro {
     writeStringNoTag(value);
   }
 
-  /** Write a {@code StringUtf8Micro} field, including tag, to the stream. */
-  public void writeStringUtf8(final int fieldNumber, final StringUtf8Micro value)
-                          throws IOException {
-    writeTag(fieldNumber, WireFormatMicro.WIRETYPE_LENGTH_DELIMITED);
-    writeStringUtf8NoTag(value);
-  }
-
   /** Write a {@code group} field, including tag, to the stream. */
   public void writeGroup(final int fieldNumber, final MessageMicro value)
                          throws IOException {
@@ -207,6 +200,14 @@ public final class CodedOutputStreamMicro {
     writeTag(fieldNumber, WireFormatMicro.WIRETYPE_LENGTH_DELIMITED);
     writeBytesNoTag(value);
   }
+
+  /** Write a {@code byte} field, including tag, to the stream. */
+  public void writeByteArray(final int fieldNumber, final byte[] value)
+                         throws IOException {
+    writeTag(fieldNumber, WireFormatMicro.WIRETYPE_LENGTH_DELIMITED);
+    writeByteArrayNoTag(value);
+  }
+
 
   /** Write a {@code uint32} field, including tag, to the stream. */
   public void writeUInt32(final int fieldNumber, final int value)
@@ -336,13 +337,6 @@ public final class CodedOutputStreamMicro {
     writeRawBytes(bytes);
   }
 
-  /** Write a {@code StringUtf8Micro} field to the stream. */
-  public void writeStringUtf8NoTag(final StringUtf8Micro value) throws IOException {
-    final byte[] bytes = value.getBytes();
-    writeRawVarint32(bytes.length);
-    writeRawBytes(bytes);
-  }
-
   /** Write a {@code group} field to the stream. */
   public void writeGroupNoTag(final MessageMicro value) throws IOException {
     value.writeTo(this);
@@ -359,6 +353,12 @@ public final class CodedOutputStreamMicro {
     final byte[] bytes = value.toByteArray();
     writeRawVarint32(bytes.length);
     writeRawBytes(bytes);
+  }
+
+  /** Write a {@code byte[]} field to the stream. */
+  public void writeByteArrayNoTag(final byte [] value) throws IOException {
+    writeRawVarint32(value.length);
+    writeRawBytes(value);
   }
 
   /** Write a {@code uint32} field to the stream. */
@@ -475,15 +475,6 @@ public final class CodedOutputStreamMicro {
 
   /**
    * Compute the number of bytes that would be needed to encode a
-   * {@code StringUtf8Micro} field, including tag.
-   */
-  public static int computeStringUtf8Size(final int fieldNumber,
-                                      final StringUtf8Micro value) {
-    return computeTagSize(fieldNumber) + computeStringUtf8SizeNoTag(value);
-  }
-
-  /**
-   * Compute the number of bytes that would be needed to encode a
    * {@code group} field, including tag.
    */
   public static int computeGroupSize(final int fieldNumber,
@@ -507,6 +498,15 @@ public final class CodedOutputStreamMicro {
   public static int computeBytesSize(final int fieldNumber,
                                      final ByteStringMicro value) {
     return computeTagSize(fieldNumber) + computeBytesSizeNoTag(value);
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
+   * {@code byte[]} field, including tag.
+   */
+  public static int computeByteArraySize(final int fieldNumber,
+                                     final byte[] value) {
+    return computeTagSize(fieldNumber) + computeByteArraySizeNoTag(value);
   }
 
   /**
@@ -671,16 +671,6 @@ public final class CodedOutputStreamMicro {
 
   /**
    * Compute the number of bytes that would be needed to encode a
-   * {@code StringUtf8Micro} field.
-   */
-  public static int computeStringUtf8SizeNoTag(final StringUtf8Micro value) {
-    final byte[] bytes = value.getBytes();
-    return computeRawVarint32Size(bytes.length) +
-             bytes.length;
-  }
-
-  /**
-   * Compute the number of bytes that would be needed to encode a
    * {@code group} field.
    */
   public static int computeGroupSizeNoTag(final MessageMicro value) {
@@ -701,8 +691,15 @@ public final class CodedOutputStreamMicro {
    * {@code bytes} field.
    */
   public static int computeBytesSizeNoTag(final ByteStringMicro value) {
-    return computeRawVarint32Size(value.size()) +
-           value.size();
+    return computeRawVarint32Size(value.size()) + value.size();
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
+   * {@code byte[]} field.
+   */
+  public static int computeByteArraySizeNoTag(final byte[] value) {
+    return computeRawVarint32Size(value.length) + value.length;
   }
 
   /**

@@ -198,7 +198,6 @@
                 <include>**/CodedInputStreamMicro.java</include>
                 <include>**/CodedOutputStreamMicro.java</include>
                 <include>**/InvalidProtocolBufferMicroException.java</include>
-                <include>**/StringUtf8Micro.java</include>
                 <include>**/WireFormatMicro.java</include>
               </includes>
               <testIncludes>

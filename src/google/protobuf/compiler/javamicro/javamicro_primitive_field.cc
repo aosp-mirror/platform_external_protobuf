@@ -175,7 +175,7 @@ bool IsVariableLenType(JavaType type) {
   return false;
 }
 
-bool IsStringUtf8Handling(const FieldDescriptor* descriptor,
+bool IsFastStringHandling(const FieldDescriptor* descriptor,
       const Params params) {
   return ((params.optimization() == JAVAMICRO_OPT_SPEED)
       && (GetJavaType(descriptor) == JAVATYPE_STRING));
@@ -188,20 +188,8 @@ void SetPrimitiveVariables(const FieldDescriptor* descriptor, const Params param
   (*variables)["capitalized_name"] =
     UnderscoresToCapitalizedCamelCase(descriptor);
   (*variables)["number"] = SimpleItoa(descriptor->number());
-  if (IsStringUtf8Handling(descriptor, params)) {
-    (*variables)["type"] = "com.google.protobuf.micro.StringUtf8Micro";
-    string defaultValue = DefaultValue(params, descriptor);
-    if (defaultValue == "\"\"") {
-      (*variables)["default"] =
-          "com.google.protobuf.micro.StringUtf8Micro.EMPTY";
-    } else {
-      (*variables)["default"] = "new com.google.protobuf.micro.StringUtf8Micro("
-              + defaultValue + ")";
-    }
-  } else {
-    (*variables)["type"] = PrimitiveTypeName(GetJavaType(descriptor));
-    (*variables)["default"] = DefaultValue(params, descriptor);
-  }
+  (*variables)["type"] = PrimitiveTypeName(GetJavaType(descriptor));
+  (*variables)["default"] = DefaultValue(params, descriptor);
   (*variables)["boxed_type"] = BoxedPrimitiveTypeName(GetJavaType(descriptor));
   (*variables)["capitalized_type"] = GetCapitalizedType(descriptor);
   (*variables)["tag"] = SimpleItoa(WireFormat::MakeTag(descriptor));
@@ -238,28 +226,24 @@ GenerateMembers(io::Printer* printer) const {
   printer->Print(variables_,
     "private boolean has$capitalized_name$;\n"
     "private $type$ $name$_ = $default$;\n"
+    "public $type$ get$capitalized_name$() { return $name$_; }\n"
     "public boolean has$capitalized_name$() { return has$capitalized_name$; }\n");
-  if (IsStringUtf8Handling(descriptor_, params_)) {
+  if (IsFastStringHandling(descriptor_, params_)) {
     printer->Print(variables_,
-      "public String get$capitalized_name$() { return $name$_.getString(); }\n"
-      "public $type$ get$capitalized_name$StringUtf8() { return $name$_; }\n"
-      "public $message_name$ set$capitalized_name$(String value) {\n"
+      "private byte [] $name$Utf8_ = null;\n"
+      "public $message_name$ set$capitalized_name$($type$ value) {\n"
       "  has$capitalized_name$ = true;\n"
-      "  if ($name$_ == $default$) {\n"
-      "    $name$_ = new $type$(value);\n"
-      "  } else {\n"
-      "    $name$_.setString(value);\n"
-      "  }\n"
+      "  $name$_ = value;\n"
+      "  $name$Utf8_ = null;\n"
       "  return this;\n"
       "}\n"
       "public $message_name$ clear$capitalized_name$() {\n"
       "  has$capitalized_name$ = false;\n"
       "  $name$_ = $default$;\n"
+      "  $name$Utf8_ = null;\n"
       "  return this;\n"
       "}\n");
   } else {
-    printer->Print(variables_,
-      "public $type$ get$capitalized_name$() { return $name$_; }\n");
     if (IsVariableLenType(GetJavaType(descriptor_))) {
       printer->Print(variables_,
         "public $message_name$ set$capitalized_name$($type$ value) {\n"
@@ -304,10 +288,10 @@ GenerateParsingCode(io::Printer* printer) const {
 
 void PrimitiveFieldGenerator::
 GenerateSerializationCode(io::Printer* printer) const {
-  if (IsStringUtf8Handling(descriptor_, params_)) {
+  if (IsFastStringHandling(descriptor_, params_)) {
     printer->Print(variables_,
       "if (has$capitalized_name$()) {\n"
-      "  output.writeStringUtf8($number$, get$capitalized_name$StringUtf8());\n"
+      "  output.writeByteArray($number$, $name$Utf8_);\n"
       "}\n");
   } else {
     printer->Print(variables_,
@@ -319,11 +303,16 @@ GenerateSerializationCode(io::Printer* printer) const {
 
 void PrimitiveFieldGenerator::
 GenerateSerializedSizeCode(io::Printer* printer) const {
-  if (IsStringUtf8Handling(descriptor_, params_)) {
+  if (IsFastStringHandling(descriptor_, params_)) {
     printer->Print(variables_,
       "if (has$capitalized_name$()) {\n"
+      "  try {\n"
+      "    $name$Utf8_ = $name$_.getBytes(\"UTF-8\");\n"
+      "  } catch (java.io.UnsupportedEncodingException e) {\n"
+      "    throw new RuntimeException(\"UTF-8 not supported.\");\n"
+      "  }\n"
       "  size += com.google.protobuf.micro.CodedOutputStreamMicro\n"
-      "    .computeStringUtf8Size($number$, get$capitalized_name$StringUtf8());\n"
+      "    .computeByteArraySize($number$, $name$Utf8_);\n"
       "}\n");
   } else {
     printer->Print(variables_,
@@ -353,32 +342,33 @@ RepeatedPrimitiveFieldGenerator::~RepeatedPrimitiveFieldGenerator() {}
 
 void RepeatedPrimitiveFieldGenerator::
 GenerateMembers(io::Printer* printer) const {
-  if (IsStringUtf8Handling(descriptor_, params_)) {
+  if (IsFastStringHandling(descriptor_, params_)) {
     if (params_.java_use_vector()) {
       printer->Print(variables_,
         "private java.util.Vector $name$_ = new java.util.Vector();\n"
         "public java.util.Vector get$capitalized_name$List() {\n"
         "  return $name$_;\n"
         "}\n"
+        "private java.util.Vector $name$Utf8_ = new java.util.Vector();\n"
         "public int get$capitalized_name$Count() { return $name$_.size(); }\n"
-        "public String get$capitalized_name$(int index) {\n"
-        "  return (($type$)$name$_.elementAt(index)).getString();\n"
+        "public $type$ get$capitalized_name$(int index) {\n"
+        "  return (($type$)$name$_.elementAt(index));\n"
         "}\n"
-        "public $type$ get$capitalized_name$StringUtf8(int index) {\n"
-        "  return ($type$)$name$_.elementAt(index);\n"
-        "}\n"
-        "public $message_name$ set$capitalized_name$(int index, String value) {\n"
+        "public $message_name$ set$capitalized_name$(int index, $type$ value) {\n"
         "$null_check$"
-        "  $name$_.setElementAt(new $type$(value), index);\n"
+        "  $name$_.setElementAt(value, index);\n"
+        "  $name$Utf8_ = null;\n"
         "  return this;\n"
         "}\n"
-        "public $message_name$ add$capitalized_name$(String value) {\n"
+        "public $message_name$ add$capitalized_name$($type$ value) {\n"
         "$null_check$"
-        "  $name$_.addElement(new $type$(value));\n"
+        "  $name$_.addElement(value);\n"
+        "  $name$Utf8_ = null;\n"
         "  return this;\n"
         "}\n"
         "public $message_name$ clear$capitalized_name$() {\n"
         "  $name$_.removeAllElements();\n"
+        "  $name$Utf8_ = null;\n"
         "  return this;\n"
         "}\n");
     } else {
@@ -388,25 +378,29 @@ GenerateMembers(io::Printer* printer) const {
         "public java.util.List<$type$> get$capitalized_name$List() {\n"
         "  return $name$_;\n"   // note:  unmodifiable list
         "}\n"
+        "private java.util.List<byte []> $name$Utf8_ = null;\n"
         "public int get$capitalized_name$Count() { return $name$_.size(); }\n"
-        "public String get$capitalized_name$(int index) {\n"
-        "  return $name$_.get(index).getString();\n"
+        "public $type$ get$capitalized_name$(int index) {\n"
+        "  return $name$_.get(index);\n"
         "}\n"
-        "public $message_name$ set$capitalized_name$(int index, String value) {\n"
+        "public $message_name$ set$capitalized_name$(int index, $type$ value) {\n"
         "$null_check$"
-        "  $name$_.set(index, new $type$(value));\n"
+        "  $name$_.set(index, value);\n"
+        "  $name$Utf8_ = null;\n"
         "  return this;\n"
         "}\n"
-        "public $message_name$ add$capitalized_name$(String value) {\n"
+        "public $message_name$ add$capitalized_name$($type$ value) {\n"
         "$null_check$"
         "  if ($name$_.isEmpty()) {\n"
         "    $name$_ = new java.util.ArrayList<$type$>();\n"
         "  }\n"
-        "  $name$_.add(new $type$(value));\n"
+        "  $name$_.add(value);\n"
+        "  $name$Utf8_ = null;\n"
         "  return this;\n"
         "}\n"
         "public $message_name$ clear$capitalized_name$() {\n"
         "  $name$_ = java.util.Collections.emptyList();\n"
+        "  $name$Utf8_ = null;\n"
         "  return this;\n"
         "}\n");
     }
@@ -535,7 +529,7 @@ void RepeatedPrimitiveFieldGenerator::
 GenerateSerializationCode(io::Printer* printer) const {
   if (descriptor_->options().packed()) {
     printer->Print(variables_,
-        "if (get$capitalized_name$List().size() > 0) {\n"
+      "if (get$capitalized_name$List().size() > 0) {\n"
         "  output.writeRawVarint32($tag$);\n"
         "  output.writeRawVarint32($name$MemoizedSerializedSize);\n"
         "}\n");
@@ -552,10 +546,10 @@ GenerateSerializationCode(io::Printer* printer) const {
     }
   } else {
     if (params_.java_use_vector()) {
-      if (IsStringUtf8Handling(descriptor_, params_)) {
+      if (IsFastStringHandling(descriptor_, params_)) {
         printer->Print(variables_,
-          "for (int i = 0; i < get$capitalized_name$List().size(); i++) {\n"
-          "  output.writeStringUtf8($number$, get$capitalized_name$StringUtf8(i));\n"
+          "for (int i = 0; i < $name$Utf8_.size(); i++) {\n"
+          "  output.writeByteArray($number$, (byte []) $name$Utf8_.get(i));\n"
           "}\n");
       } else {
         printer->Print(variables_,
@@ -564,10 +558,10 @@ GenerateSerializationCode(io::Printer* printer) const {
           "}\n");
       }
     } else {
-      if (IsStringUtf8Handling(descriptor_, params_)) {
+      if (IsFastStringHandling(descriptor_, params_)) {
         printer->Print(variables_,
-          "for ($type$ element : get$capitalized_name$List()) {\n"
-          "  output.writeStringUtf8($number$, element);\n"
+          "for (byte [] element : $name$Utf8_) {\n"
+          "  output.writeByteArray($number$, element);\n"
           "}\n");
       } else {
         printer->Print(variables_,
@@ -588,29 +582,51 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
 
   if (FixedSize(descriptor_->type()) == -1) {
     if (params_.java_use_vector()) {
-      printer->Print(variables_,
-        "for (int i = 0; i < get$capitalized_name$List().size(); i++) {\n"
-        "  dataSize += com.google.protobuf.micro.CodedOutputStreamMicro\n");
-      if (IsStringUtf8Handling(descriptor_, params_)) {
+      if (IsFastStringHandling(descriptor_, params_)) {
         printer->Print(variables_,
-          "    .computeStringUtf8SizeNoTag(get$capitalized_name$StringUtf8(i));\n"
+          "$name$Utf8_ = new java.util.Vector();\n"
+          "byte[] bytes = null;\n"
+          "int sizeArray = get$capitalized_name$List().size();\n"
+          "for (int i = 0; i < sizeArray; i++) {\n"
+          "  $type$ element = ($type$)$name$_.elementAt(i);\n"
+          "  try {\n"
+          "    bytes = element.getBytes(\"UTF-8\");\n"
+          "  } catch (java.io.UnsupportedEncodingException e) {\n"
+          "    throw new RuntimeException(\"UTF-8 not supported.\");\n"
+          "  }\n"
+          "  $name$Utf8_.addElement(bytes);\n"
+          "  dataSize += com.google.protobuf.micro.CodedOutputStreamMicro\n"
+          "    .computeByteArraySizeNoTag(bytes);\n"
           "}\n");
       } else {
         printer->Print(variables_,
+          "for (int i = 0; i < get$capitalized_name$List().size(); i++) {\n"
+          "  dataSize += com.google.protobuf.micro.CodedOutputStreamMicro\n"
           "    .compute$capitalized_type$SizeNoTag(($type$)get$capitalized_name$(i));\n"
           "}\n");
       }
     } else {
-      printer->Print(variables_,
-        "for ($type$ element : get$capitalized_name$List()) {\n"
-        "  dataSize += com.google.protobuf.micro.CodedOutputStreamMicro\n");
-      if (IsStringUtf8Handling(descriptor_, params_)) {
-        printer->Print(variables_,
-          "    .computeStringUtf8SizeNoTag(element);\n"
-          "}\n");
+      if (IsFastStringHandling(descriptor_, params_)) {
+          printer->Print(variables_,
+            "$name$Utf8_ = new java.util.ArrayList<byte[]>();\n"
+            "byte[] bytes = null;\n"
+            "int sizeArray = get$capitalized_name$List().size();\n"
+            "for (int i = 0; i < sizeArray; i++) {\n"
+            "   $type$ element = get$capitalized_name$(i);\n"
+            "  try {\n"
+            "    bytes = element.getBytes(\"UTF-8\");\n"
+            "  } catch (java.io.UnsupportedEncodingException e) {\n"
+            "    throw new RuntimeException(\"UTF-8 not supported.\");\n"
+            "  }\n"
+            "  $name$Utf8_.add(bytes);\n"
+            "  dataSize += com.google.protobuf.micro.CodedOutputStreamMicro\n"
+            "    .computeByteArraySizeNoTag(bytes);\n"
+            "}\n");
       } else {
         printer->Print(variables_,
-          "    .compute$capitalized_type$SizeNoTag(element);\n"
+            "for ($type$ element : get$capitalized_name$List()) {\n"
+            "  dataSize += com.google.protobuf.micro.CodedOutputStreamMicro\n"
+            "    .compute$capitalized_type$SizeNoTag(element);\n"
           "}\n");
       }
     }
