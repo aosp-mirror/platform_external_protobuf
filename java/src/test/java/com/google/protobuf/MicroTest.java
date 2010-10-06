@@ -35,7 +35,6 @@ import com.google.protobuf.micro.MicroOuterClass.TestAllTypesMicro;
 import com.google.protobuf.micro.RecursiveMessageMicro;
 import com.google.protobuf.micro.SimpleMessageMicro;
 import com.google.protobuf.micro.StringUtf8;
-import com.google.protobuf.micro.StringUtf8Micro;
 import com.google.protobuf.micro.UnittestImportMicro;
 import com.google.protobuf.micro.ByteStringMicro;
 
