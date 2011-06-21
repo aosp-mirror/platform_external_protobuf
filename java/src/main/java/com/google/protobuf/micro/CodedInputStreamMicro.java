@@ -786,7 +786,7 @@ public final class CodedInputStreamMicro {
     } else {
       // Skipping more bytes than are in the buffer.  First skip what we have.
       int pos = bufferSize - bufferPos;
-      totalBytesRetired += pos;
+      totalBytesRetired += bufferSize;
       bufferPos = 0;
       bufferSize = 0;
 

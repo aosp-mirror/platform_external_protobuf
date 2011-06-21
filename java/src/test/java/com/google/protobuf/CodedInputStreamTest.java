@@ -325,6 +325,32 @@ public class CodedInputStreamTest extends TestCase {
     assertEquals(2, input.readRawByte());
   }
 
+  /**
+   * Test that a bug in skipRawBytes() has been fixed:  if the skip skips
+   * past the end of a buffer with a limit that has been set past the end of
+   * that buffer, this should not break things.
+   */
+  public void testSkipRawBytesPastEndOfBufferWithLimit() throws Exception {
+    System.out.printf("testSkipRawBytesPastEndOfBufferWithLimit: E ...\n");
+
+    byte[] rawBytes = new byte[] { 1, 2, 3, 4, 5 };
+    CodedInputStream input = CodedInputStream.newInstance(
+        new SmallBlockInputStream(rawBytes, 3));
+
+    int limit = input.pushLimit(4);
+    System.out.printf("testSkipRawBytesPastEndOfBufferWithLimit: limit=%d\n", limit);
+    // In order to expose the bug we need to read at least one byte to prime the
+    // buffer inside the CodedInputStream.
+    assertEquals(1, input.readRawByte());
+    // Skip to the end of the limit.
+    input.skipRawBytes(3);
+    assertTrue(input.isAtEnd());
+    input.popLimit(limit);
+    assertEquals(5, input.readRawByte());
+
+    System.out.printf("testSkipRawBytesPastEndOfBufferWithLimit: X ...\n");
+  }
+
   public void testReadHugeBlob() throws Exception {
     // Allocate and initialize a 1MB blob.
     byte[] blob = new byte[1 << 20];

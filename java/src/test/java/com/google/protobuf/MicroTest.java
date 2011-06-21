@@ -37,8 +37,14 @@ import com.google.protobuf.micro.SimpleMessageMicro;
 import com.google.protobuf.micro.StringUtf8;
 import com.google.protobuf.micro.UnittestImportMicro;
 import com.google.protobuf.micro.ByteStringMicro;
+import com.google.protobuf.micro.CodedInputStreamMicro;
 
 import junit.framework.TestCase;
+
+import java.io.ByteArrayInputStream;
+import java.io.FilterInputStream;
+import java.io.InputStream;
+import java.io.IOException;
 
 /**
  * Test micro runtime.
@@ -2133,5 +2139,66 @@ public class MicroTest extends TestCase {
     assertEquals(MicroOuterClass.FOREIGN_MICRO_BAR, msg.getDefaultForeignEnum());
     assertFalse(msg.hasDefaultImportEnum());
     assertEquals(UnittestImportMicro.IMPORT_MICRO_BAR, msg.getDefaultImportEnum());
+  }
+
+  /**
+   * Test that a bug in skipRawBytes() has been fixed:  if the skip skips
+   * exactly up to a limit, this should not break things.
+   */
+  public void testSkipRawBytesBug() throws Exception {
+    byte[] rawBytes = new byte[] { 1, 2 };
+    CodedInputStreamMicro input = CodedInputStreamMicro.newInstance(rawBytes);
+
+    int limit = input.pushLimit(1);
+    input.skipRawBytes(1);
+    input.popLimit(limit);
+    assertEquals(2, input.readRawByte());
+  }
+
+  /**
+   * Test that a bug in skipRawBytes() has been fixed:  if the skip skips
+   * past the end of a buffer with a limit that has been set past the end of
+   * that buffer, this should not break things.
+   */
+  public void testSkipRawBytesPastEndOfBufferWithLimit() throws Exception {
+    byte[] rawBytes = new byte[] { 1, 2, 3, 4, 5 };
+    CodedInputStreamMicro input = CodedInputStreamMicro.newInstance(
+        new SmallBlockInputStream(rawBytes, 3));
+
+    int limit = input.pushLimit(4);
+    // In order to expose the bug we need to read at least one byte to prime the
+    // buffer inside the CodedInputStream.
+    assertEquals(1, input.readRawByte());
+    // Skip to the end of the limit.
+    input.skipRawBytes(3);
+    assertTrue(input.isAtEnd());
+    input.popLimit(limit);
+    assertEquals(5, input.readRawByte());
+  }
+
+  /**
+   * An InputStream which limits the number of bytes it reads at a time.
+   * We use this to make sure that CodedInputStream doesn't screw up when
+   * reading in small blocks.
+   */
+  private static final class SmallBlockInputStream extends FilterInputStream {
+    private final int blockSize;
+
+    public SmallBlockInputStream(byte[] data, int blockSize) {
+      this(new ByteArrayInputStream(data), blockSize);
+    }
+
+    public SmallBlockInputStream(InputStream in, int blockSize) {
+      super(in);
+      this.blockSize = blockSize;
+    }
+
+    public int read(byte[] b) throws IOException {
+      return super.read(b, 0, Math.min(b.length, blockSize));
+    }
+
+    public int read(byte[] b, int off, int len) throws IOException {
+      return super.read(b, off, Math.min(len, blockSize));
+    }
   }
 }
