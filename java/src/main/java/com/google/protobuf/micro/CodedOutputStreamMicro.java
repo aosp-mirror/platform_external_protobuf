@@ -674,7 +674,7 @@ public final class CodedOutputStreamMicro {
    * {@code group} field.
    */
   public static int computeGroupSizeNoTag(final MessageMicro value) {
-    return value.getCachedSize();
+    return value.getSerializedSize();
   }
 
   /**
@@ -682,7 +682,7 @@ public final class CodedOutputStreamMicro {
    * message field.
    */
   public static int computeMessageSizeNoTag(final MessageMicro value) {
-    final int size = value.getCachedSize();
+    final int size = value.getSerializedSize();
     return computeRawVarint32Size(size) + size;
   }
 
