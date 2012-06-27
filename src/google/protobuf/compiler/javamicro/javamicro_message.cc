@@ -186,7 +186,11 @@ void MessageGenerator::Generate(io::Printer* printer) {
     GOOGLE_LOG(FATAL) << "Extensions not supported in MICRO_RUNTIME\n";
   }
 
+  // Note: Fields (which will be emitted in the loop, below) may have the same names as fields in
+  // the inner or outer class.  This causes Java warnings, but is not fatal, so we suppress those
+  // warnings here in the class declaration.
   printer->Print(
+    "@SuppressWarnings(\"hiding\")\n"
     "public $modifiers$ final class $classname$ extends\n"
     "    com.google.protobuf.micro.MessageMicro {\n",
     "modifiers", is_own_file ? "" : "static",
@@ -237,9 +241,17 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
     GOOGLE_LOG(FATAL) << "Extensions not supported in MICRO_RUNTIME\n";
   }
 
-  printer->Print(
-    "public void writeTo(com.google.protobuf.micro.CodedOutputStreamMicro output)\n"
-    "                    throws java.io.IOException {\n");
+  // writeTo only throws an exception if it contains one or more fields to write
+  if (descriptor_->field_count() > 0) {
+    printer->Print(
+      "@Override\n"
+      "public void writeTo(com.google.protobuf.micro.CodedOutputStreamMicro output)\n"
+      "                    throws java.io.IOException {\n");
+  } else {
+    printer->Print(
+      "@Override\n"
+      "public void writeTo(com.google.protobuf.micro.CodedOutputStreamMicro output) {\n");
+  }
   printer->Indent();
 
   // Output the fields in sorted order
@@ -252,6 +264,7 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
     "}\n"
     "\n"
     "private int cachedSize = -1;\n"
+    "@Override\n"
     "public int getCachedSize() {\n"
     "  if (cachedSize < 0) {\n"
     "    // getSerializedSize sets cachedSize\n"
@@ -260,6 +273,7 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
     "  return cachedSize;\n"
     "}\n"
     "\n"
+    "@Override\n"
     "public int getSerializedSize() {\n"
     "  int size = 0;\n");
   printer->Indent();
@@ -282,12 +296,14 @@ void MessageGenerator::GenerateMergeFromMethods(io::Printer* printer) {
 
   if (params_.java_use_vector()) {
     printer->Print(
+      "@Override\n"
       "public com.google.protobuf.micro.MessageMicro mergeFrom(\n"
       "    com.google.protobuf.micro.CodedInputStreamMicro input)\n"
       "    throws java.io.IOException {\n",
       "classname", descriptor_->name());
   } else {
     printer->Print(
+      "@Override\n"
       "public $classname$ mergeFrom(\n"
       "    com.google.protobuf.micro.CodedInputStreamMicro input)\n"
       "    throws java.io.IOException {\n",
@@ -359,7 +375,7 @@ GenerateParseFromMethods(io::Printer* printer) {
     "public $static$ $classname$ parseFrom(\n"
     "        com.google.protobuf.micro.CodedInputStreamMicro input)\n"
     "    throws java.io.IOException {\n"
-    "  return ($classname$) (new $classname$().mergeFrom(input));\n"
+    "  return new $classname$().mergeFrom(input);\n"
     "}\n"
     "\n",
     "static", (is_own_file ? "static" : ""),
