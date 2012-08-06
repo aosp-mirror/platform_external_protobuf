@@ -1,0 +1,137 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 45;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		B009C3C9127FA7CA008F0D2B /* protobuf */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = B009C3D0127FA7D7008F0D2B /* Build configuration list for PBXAggregateTarget "protobuf" */;
+			buildPhases = (
+				B009C3C8127FA7CA008F0D2B /* ShellScript */,
+			);
+			dependencies = (
+			);
+			name = protobuf;
+			productName = protobuf;
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXFileReference section */
+		FA0FFB9212838F22007C5050 /* MacBuild.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = MacBuild.sh; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		B009C3BE127FA7BA008F0D2B = {
+			isa = PBXGroup;
+			children = (
+				FA0FFB9212838F22007C5050 /* MacBuild.sh */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXProject section */
+		B009C3C0127FA7BA008F0D2B /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = B009C3C3127FA7BA008F0D2B /* Build configuration list for PBXProject "protobuf" */;
+			compatibilityVersion = "Xcode 3.1";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				English,
+				Japanese,
+				French,
+				German,
+			);
+			mainGroup = B009C3BE127FA7BA008F0D2B;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B009C3C9127FA7CA008F0D2B /* protobuf */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		B009C3C8127FA7CA008F0D2B /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# \n./MacBuild.sh\n\n# We are done\nexit 0";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B009C3C2127FA7BA008F0D2B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				SDKROOT = macosx10.5;
+			};
+			name = Release;
+		};
+		B009C3CB127FA7CA008F0D2B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = protobuf;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+		B0D669C21280788000FAB970 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				SDKROOT = macosx10.5;
+			};
+			name = Debug;
+		};
+		B0D669C31280788000FAB970 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = protobuf;
+				ZERO_LINK = NO;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B009C3C3127FA7BA008F0D2B /* Build configuration list for PBXProject "protobuf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B0D669C21280788000FAB970 /* Debug */,
+				B009C3C2127FA7BA008F0D2B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B009C3D0127FA7D7008F0D2B /* Build configuration list for PBXAggregateTarget "protobuf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B0D669C31280788000FAB970 /* Debug */,
+				B009C3CB127FA7CA008F0D2B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B009C3C0127FA7BA008F0D2B /* Project object */;
+}

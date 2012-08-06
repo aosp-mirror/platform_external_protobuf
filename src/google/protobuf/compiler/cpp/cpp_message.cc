@@ -907,9 +907,9 @@ GenerateStructors(io::Printer* printer) {
 
   // Generate SetCachedSize.
   printer->Print(
-    "void $classname$::SetCachedSize(int size) const {\n"
+    "void $classname$::SetCachedSize(int new_size) const {\n"
     "  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();\n"
-    "  _cached_size_ = size;\n"
+    "  _cached_size_ = new_size;\n"
     "  GOOGLE_SAFE_CONCURRENT_WRITES_END();\n"
     "}\n",
     "classname", classname_);

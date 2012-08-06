@@ -115,7 +115,7 @@ void PrimitiveFieldGenerator::
 GenerateAccessorDeclarations(io::Printer* printer) const {
   printer->Print(variables_,
     "inline $type$ $name$() const$deprecation$;\n"
-    "inline void set_$name$($type$ value)$deprecation$;\n");
+    "inline void set_$name$($type$ new_value)$deprecation$;\n");
 }
 
 void PrimitiveFieldGenerator::
@@ -124,9 +124,9 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
     "inline $type$ $classname$::$name$() const {\n"
     "  return $name$_;\n"
     "}\n"
-    "inline void $classname$::set_$name$($type$ value) {\n"
+    "inline void $classname$::set_$name$($type$ new_value) {\n"
     "  _set_bit($index$);\n"
-    "  $name$_ = value;\n"
+    "  $name$_ = new_value;\n"
     "}\n");
 }
 
@@ -219,8 +219,8 @@ void RepeatedPrimitiveFieldGenerator::
 GenerateAccessorDeclarations(io::Printer* printer) const {
   printer->Print(variables_,
     "inline $type$ $name$(int index) const$deprecation$;\n"
-    "inline void set_$name$(int index, $type$ value)$deprecation$;\n"
-    "inline void add_$name$($type$ value)$deprecation$;\n");
+    "inline void set_$name$(int index, $type$ new_value)$deprecation$;\n"
+    "inline void add_$name$($type$ new_value)$deprecation$;\n");
   printer->Print(variables_,
     "inline const ::google::protobuf::RepeatedField< $type$ >&\n"
     "    $name$() const$deprecation$;\n"
@@ -234,11 +234,11 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
     "inline $type$ $classname$::$name$(int index) const {\n"
     "  return $name$_.Get(index);\n"
     "}\n"
-    "inline void $classname$::set_$name$(int index, $type$ value) {\n"
-    "  $name$_.Set(index, value);\n"
+    "inline void $classname$::set_$name$(int index, $type$ new_value) {\n"
+    "  $name$_.Set(index, new_value);\n"
     "}\n"
-    "inline void $classname$::add_$name$($type$ value) {\n"
-    "  $name$_.Add(value);\n"
+    "inline void $classname$::add_$name$($type$ new_value) {\n"
+    "  $name$_.Add(new_value);\n"
     "}\n");
   printer->Print(variables_,
     "inline const ::google::protobuf::RepeatedField< $type$ >&\n"

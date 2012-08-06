@@ -106,15 +106,15 @@ void EnumGenerator::GenerateDefinition(io::Printer* printer) {
       "$dllexport$const ::google::protobuf::EnumDescriptor* $classname$_descriptor();\n");
     // The _Name and _Parse methods
     printer->Print(vars,
-      "inline const ::std::string& $classname$_Name($classname$ value) {\n"
+      "inline const ::std::string& $classname$_Name($classname$ new_value) {\n"
       "  return ::google::protobuf::internal::NameOfEnum(\n"
-      "    $classname$_descriptor(), value);\n"
+      "    $classname$_descriptor(), new_value);\n"
       "}\n");
     printer->Print(vars,
       "inline bool $classname$_Parse(\n"
-      "    const ::std::string& name, $classname$* value) {\n"
+      "    const ::std::string& name, $classname$* new_value) {\n"
       "  return ::google::protobuf::internal::ParseNamedEnum<$classname$>(\n"
-      "    $classname$_descriptor(), name, value);\n"
+      "    $classname$_descriptor(), name, new_value);\n"
       "}\n");
   }
 }

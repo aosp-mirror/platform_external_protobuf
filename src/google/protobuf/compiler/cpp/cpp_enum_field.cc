@@ -83,10 +83,10 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
     "inline $type$ $classname$::$name$() const {\n"
     "  return static_cast< $type$ >($name$_);\n"
     "}\n"
-    "inline void $classname$::set_$name$($type$ value) {\n"
-    "  GOOGLE_DCHECK($type$_IsValid(value));\n"
+    "inline void $classname$::set_$name$($type$ new_value) {\n"
+    "  GOOGLE_DCHECK($type$_IsValid(new_value));\n"
     "  _set_bit($index$);\n"
-    "  $name$_ = value;\n"
+    "  $name$_ = new_value;\n"
     "}\n");
 }
 
