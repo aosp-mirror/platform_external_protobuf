@@ -1,5 +1,6 @@
 #!/bin/sh
 
+set -e 
 # Check if we need to build
 if [ -f install/protoc ]
 then
@@ -11,12 +12,15 @@ fi
 rm -rf build install
 mkdir -p build/ppc build/i386 install
 cd build/ppc
-../../configure --enable-static --disable-shared --target=powerpc-apple CFLAGS="-mmacosx-version-min=10.5 -arch ppc" CXXFLAGS="-mmacosx-version-min=10.5 -arch ppc" LDFLAGS="-mmacosx-version-min=10.5 -arch ppc" --prefix=`pwd`/../../install/ppc 
-make
-make install
+# Use --host=ppc to keep configure from trying to run a generated ppc file, which will fail.
+../../configure --enable-static --disable-shared --target=powerpc-apple CXX=$DEVELOPER_BIN_DIR/g++ CC=$DEVELOPER_BIN_DIR/gcc CFLAGS="-mmacosx-version-min=10.5 -arch ppc -isysroot $SDKROOT" CXXFLAGS="-mmacosx-version-min=10.5 -arch ppc -isysroot $SDKROOT" LDFLAGS="-mmacosx-version-min=10.5 -arch ppc -isysroot $SDKROOT" --prefix=`pwd`/../../install/ppc --host=ppc
+# Build with -i (ignore errors) because the build tries to run unit tests.  10.7+
+# can't run PPC binaries any longer.
+make -j16 -i
+make install -i
 cd ../i386
-../../configure --enable-static --disable-shared --target=i386-apple CFLAGS="-mmacosx-version-min=10.5 -arch i386" CXXFLAGS="-mmacosx-version-min=10.5 -arch i386" LDFLAGS="-mmacosx-version-min=10.5 -arch i386" --prefix=`pwd`/../../install/i386
-make
+../../configure --enable-static --disable-shared --target=i386-apple CXX=$DEVELOPER_BIN_DIR/g++ CC=$DEVELOPER_BIN_DIR/gcc CFLAGS="-mmacosx-version-min=10.5 -arch i386 -isysroot $SDKROOT" CXXFLAGS="-mmacosx-version-min=10.5 -arch i386 -isysroot $SDKROOT" LDFLAGS="-mmacosx-version-min=10.5 -arch i386 -isysroot $SDKROOT" --prefix=`pwd`/../../install/i386
+make -j16
 make install
 cd ../..
 
