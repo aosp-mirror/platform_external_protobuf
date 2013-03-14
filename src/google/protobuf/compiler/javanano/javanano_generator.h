@@ -29,45 +29,44 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Author: kenton@google.com (Kenton Varda)
+//  Based on original Protocol Buffers design by
+//  Sanjay Ghemawat, Jeff Dean, and others.
+//
+// Generates Java nano code for a given .proto file.
 
-#include <google/protobuf/compiler/command_line_interface.h>
-#include <google/protobuf/compiler/cpp/cpp_generator.h>
-#include <google/protobuf/compiler/python/python_generator.h>
-#include <google/protobuf/compiler/java/java_generator.h>
-#include <google/protobuf/compiler/javamicro/javamicro_generator.h>
-#include <google/protobuf/compiler/javanano/javanano_generator.h>
+#ifndef GOOGLE_PROTOBUF_COMPILER_JAVA_NANO_GENERATOR_H__
+#define GOOGLE_PROTOBUF_COMPILER_JAVA_NANO_GENERATOR_H__
 
+#include <string>
+#include <google/protobuf/compiler/code_generator.h>
 
-int main(int argc, char* argv[]) {
+namespace google {
+namespace protobuf {
+namespace compiler {
+namespace javanano {
 
-  google::protobuf::compiler::CommandLineInterface cli;
-  cli.AllowPlugins("protoc-");
+// CodeGenerator implementation which generates Java nano code.  If you create your
+// own protocol compiler binary and you want it to support Java output for the
+// nano runtime, you can do so by registering an instance of this CodeGenerator with
+// the CommandLineInterface in your main() function.
+class LIBPROTOC_EXPORT JavaNanoGenerator : public CodeGenerator {
+ public:
+  JavaNanoGenerator();
+  ~JavaNanoGenerator();
 
-  // Proto2 C++
-  google::protobuf::compiler::cpp::CppGenerator cpp_generator;
-  cli.RegisterGenerator("--cpp_out", &cpp_generator,
-                        "Generate C++ header and source.");
+  // implements CodeGenerator ----------------------------------------
+  bool Generate(const FileDescriptor* file,
+                const string& parameter,
+                OutputDirectory* output_directory,
+                string* error) const;
 
-  // Proto2 Java
-  google::protobuf::compiler::java::JavaGenerator java_generator;
-  cli.RegisterGenerator("--java_out", &java_generator,
-                        "Generate Java source file.");
+ private:
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(JavaNanoGenerator);
+};
 
+}  // namespace javanano
+}  // namespace compiler
+}  // namespace protobuf
 
-  // Proto2 Python
-  google::protobuf::compiler::python::Generator py_generator;
-  cli.RegisterGenerator("--python_out", &py_generator,
-                        "Generate Python source file.");
-
-  // Proto2 JavaMicro
-  google::protobuf::compiler::javamicro::JavaMicroGenerator javamicro_generator;
-  cli.RegisterGenerator("--javamicro_out", &javamicro_generator,
-                        "Generate Java source file micro runtime.");
-
-  // Proto2 JavaNano
-  google::protobuf::compiler::javanano::JavaNanoGenerator javanano_generator;
-  cli.RegisterGenerator("--javanano_out", &javanano_generator,
-                        "Generate Java source file nano runtime.");
-
-  return cli.Run(argc, argv);
-}
+}  // namespace google
+#endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_NANO_GENERATOR_H__
