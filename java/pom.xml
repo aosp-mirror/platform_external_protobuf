@@ -127,6 +127,16 @@
                   <arg value="../src/google/protobuf/unittest_recursive_micro.proto" />
                   <arg value="../src/google/protobuf/unittest_import_micro.proto" />
                 </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=java_package=google/protobuf/unittest_import_nano.proto|com.google.protobuf.nano,java_outer_classname=google/protobuf/unittest_import_nano.proto|UnittestImportNano:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_simple_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_stringutf8_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_recursive_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_import_nano.proto" />
+                </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
               <!--testSourceRoot>target/generated-test-sources/opt-space</testSourceRoot-->
@@ -222,6 +232,48 @@
             <artifactId>maven-jar-plugin</artifactId>
             <configuration>
               <classifier>micro</classifier>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>nano</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/MessageNano.java</include>
+                <include>**/CodedInputByteBufferNano.java</include>
+                <include>**/CodedOutputByteBufferNano.java</include>
+                <include>**/InternalNano.java</include>
+                <include>**/InvalidProtocolBufferNanoException.java</include>
+                <include>**/WireFormatNano.java</include>
+              </includes>
+              <testIncludes>
+                <testInclude>**/NanoTest.java</testInclude>
+                <testInclude>**/NanoOuterClass.java</testInclude>
+                <testInclude>**/SimpleMessageNano.java</testInclude>
+                <testInclude>**/StringUtf8.java</testInclude>
+                <testInclude>**/RecursiveMessageNano.java</testInclude>
+                <testInclude>**/UnittestImportNano.java</testInclude>
+              </testIncludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/NanoTest.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-jar-plugin</artifactId>
+            <configuration>
+              <classifier>nano</classifier>
             </configuration>
           </plugin>
         </plugins>
