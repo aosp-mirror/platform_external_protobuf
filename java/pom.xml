@@ -117,6 +117,7 @@
                   <arg value="../src/google/protobuf/unittest_enormous_descriptor.proto" />
                   <arg value="../src/google/protobuf/unittest_no_generic_services.proto" />
                 </exec>
+		<!-- java micro -->
                 <exec executable="../src/protoc">
                   <arg value="--javamicro_out=opt=speed,java_use_vector=false,java_package=google/protobuf/unittest_import_micro.proto|com.google.protobuf.micro,java_outer_classname=google/protobuf/unittest_import_micro.proto|UnittestImportMicro:target/generated-test-sources" />
                   <arg value="--proto_path=../src" />
@@ -128,6 +129,7 @@
                   <arg value="../src/google/protobuf/unittest_import_micro.proto" />
                   <arg value="../src/google/protobuf/unittest_multiple_micro.proto" />
                 </exec>
+		<!-- java nano -->
                 <exec executable="../src/protoc">
                   <arg value="--javanano_out=java_package=google/protobuf/unittest_import_nano.proto|com.google.protobuf.nano,java_outer_classname=google/protobuf/unittest_import_nano.proto|UnittestImportNano:target/generated-test-sources" />
                   <arg value="--proto_path=../src" />
@@ -145,6 +147,12 @@
                   <arg value="--proto_path=../src" />
                   <arg value="--proto_path=src/test/java" />
                   <arg value="../src/google/protobuf/unittest_extension_nano.proto" />
+                </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=java_nano_generate_has=true:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_has_nano.proto" />
                 </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
