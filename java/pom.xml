@@ -136,6 +136,7 @@
                   <arg value="../src/google/protobuf/unittest_stringutf8_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_recursive_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_import_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_enum_multiplejava_nano.proto" />
                 </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
