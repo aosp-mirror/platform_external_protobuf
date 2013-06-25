@@ -138,6 +138,12 @@
                   <arg value="../src/google/protobuf/unittest_import_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_enum_multiplejava_nano.proto" />
                 </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=store_unknown_fields=true:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_extension_nano.proto" />
+                </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
               <!--testSourceRoot>target/generated-test-sources/opt-space</testSourceRoot-->
