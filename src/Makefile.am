@@ -201,6 +201,7 @@ libprotoc_la_SOURCES =                                         \
   google/protobuf/compiler/javanano/javanano_enum.h          \
   google/protobuf/compiler/javanano/javanano_enum_field.cc   \
   google/protobuf/compiler/javanano/javanano_enum_field.h    \
+  google/protobuf/compiler/javanano/javanano_extension.cc    \
   google/protobuf/compiler/javanano/javanano_field.cc        \
   google/protobuf/compiler/javanano/javanano_field.h         \
   google/protobuf/compiler/javanano/javanano_file.cc         \
