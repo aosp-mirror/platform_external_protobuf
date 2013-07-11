@@ -134,10 +134,10 @@ am_libprotoc_la_OBJECTS = code_generator.lo command_line_interface.lo \
 	javamicro_generator.lo javamicro_helpers.lo \
 	javamicro_message.lo javamicro_message_field.lo \
 	javamicro_primitive_field.lo javanano_enum.lo \
-	javanano_enum_field.lo javanano_field.lo javanano_file.lo \
-	javanano_generator.lo javanano_helpers.lo javanano_message.lo \
-	javanano_message_field.lo javanano_primitive_field.lo \
-	python_generator.lo
+	javanano_enum_field.lo javanano_extension.lo javanano_field.lo \
+	javanano_file.lo javanano_generator.lo javanano_helpers.lo \
+	javanano_message.lo javanano_message_field.lo \
+	javanano_primitive_field.lo python_generator.lo
 libprotoc_la_OBJECTS = $(am_libprotoc_la_OBJECTS)
 libprotoc_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
@@ -654,6 +654,7 @@ libprotoc_la_SOURCES = \
   google/protobuf/compiler/javanano/javanano_enum.h          \
   google/protobuf/compiler/javanano/javanano_enum_field.cc   \
   google/protobuf/compiler/javanano/javanano_enum_field.h    \
+  google/protobuf/compiler/javanano/javanano_extension.cc    \
   google/protobuf/compiler/javanano/javanano_field.cc        \
   google/protobuf/compiler/javanano/javanano_field.h         \
   google/protobuf/compiler/javanano/javanano_file.cc         \
@@ -1029,6 +1030,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javamicro_primitive_field.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javanano_enum.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javanano_enum_field.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javanano_extension.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javanano_field.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javanano_file.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/javanano_generator.Plo@am__quote@
@@ -1654,6 +1656,13 @@ javanano_enum_field.lo: google/protobuf/compiler/javanano/javanano_enum_field.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javanano/javanano_enum_field.cc' object='javanano_enum_field.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL)  --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javanano_enum_field.lo `test -f 'google/protobuf/compiler/javanano/javanano_enum_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javanano/javanano_enum_field.cc
+
+javanano_extension.lo: google/protobuf/compiler/javanano/javanano_extension.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL)  --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javanano_extension.lo -MD -MP -MF $(DEPDIR)/javanano_extension.Tpo -c -o javanano_extension.lo `test -f 'google/protobuf/compiler/javanano/javanano_extension.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javanano/javanano_extension.cc
+@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/javanano_extension.Tpo $(DEPDIR)/javanano_extension.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='google/protobuf/compiler/javanano/javanano_extension.cc' object='javanano_extension.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL)  --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o javanano_extension.lo `test -f 'google/protobuf/compiler/javanano/javanano_extension.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javanano/javanano_extension.cc
 
 javanano_field.lo: google/protobuf/compiler/javanano/javanano_field.cc
 @am__fastdepCXX_TRUE@	$(LIBTOOL)  --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT javanano_field.lo -MD -MP -MF $(DEPDIR)/javanano_field.Tpo -c -o javanano_field.lo `test -f 'google/protobuf/compiler/javanano/javanano_field.cc' || echo '$(srcdir)/'`google/protobuf/compiler/javanano/javanano_field.cc
