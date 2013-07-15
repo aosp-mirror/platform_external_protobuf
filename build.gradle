@@ -1,51 +1,51 @@
 apply plugin: 'java'
 
+configurations {
+    micro
+    nano
+}
+
+sourceSets {
+    micro {
+        java {
+            srcDirs = ['java/src/main/java/com/google/protobuf/micro']
+        }
+    }
+
+    nano {
+        java {
+            srcDirs = ['java/src/main/java/com/google/protobuf/nano']
+        }
+    }
+}
+
 jar {
+    from sourceSets.nano.output, sourceSets.micro.output
     baseName "libprotobuf"
-        appendix "java"
-        version "2.3"
-        classifier "micronano"
+    appendix "java"
+    version "2.3"
+    classifier "micronano"
 }
 
-project(":external:protobuf:nano") {
-    apply plugin: 'java'
-    sourceSets {
-        main {
-            java {
-                // path is relative to external/protobuf/nano which doesn't exist.
-                srcDirs = ['../java/src/main/java/com/google/protobuf/nano']
-            }
-        }
-    }
-
-    jar {
-        baseName "libprotobuf"
-        appendix "java"
-        version "2.3"
-        classifier "nano"
-    }
+task nanoJar(type: Jar) {
+    from sourceSets.nano.output
+    dependsOn nanoClasses
+    baseName "libprotobuf"
+    appendix "java"
+    version "2.3"
+    classifier "nano"
 }
 
-project(":external:protobuf:micro") {
-    apply plugin: 'java'
-    sourceSets {
-        main {
-            java {
-                srcDirs = ['../java/src/main/java/com/google/protobuf/micro']
-            }
-        }
-    }
-
-    jar {
-        baseName "libprotobuf"
-        appendix "java"
-        version "2.3"
-        classifier "micro"
-    }
+task microJar(type: Jar) {
+    from sourceSets.micro.output
+    dependsOn microClasses
+    baseName "libprotobuf"
+    appendix "java"
+    version "2.3"
+    classifier "micro"
 }
 
-
-dependencies {
-    compile project(':external:protobuf:micro')
-    compile project(':external:protobuf:nano')
+artifacts {
+    micro microJar
+    nano nanoJar
 }
