@@ -2139,6 +2139,18 @@ public class MicroTest extends TestCase {
     assertEquals(MicroOuterClass.FOREIGN_MICRO_BAR, msg.getDefaultForeignEnum());
     assertFalse(msg.hasDefaultImportEnum());
     assertEquals(UnittestImportMicro.IMPORT_MICRO_BAR, msg.getDefaultImportEnum());
+    assertFalse(msg.hasDefaultFloatInf());
+    assertEquals(Float.POSITIVE_INFINITY, msg.getDefaultFloatInf());
+    assertFalse(msg.hasDefaultFloatNegInf());
+    assertEquals(Float.NEGATIVE_INFINITY, msg.getDefaultFloatNegInf());
+    assertFalse(msg.hasDefaultFloatNan());
+    assertEquals(Float.NaN, msg.getDefaultFloatNan());
+    assertFalse(msg.hasDefaultDoubleInf());
+    assertEquals(Double.POSITIVE_INFINITY, msg.getDefaultDoubleInf());
+    assertFalse(msg.hasDefaultDoubleNegInf());
+    assertEquals(Double.NEGATIVE_INFINITY, msg.getDefaultDoubleNegInf());
+    assertFalse(msg.hasDefaultDoubleNan());
+    assertEquals(Double.NaN, msg.getDefaultDoubleNan());
   }
 
   /**
