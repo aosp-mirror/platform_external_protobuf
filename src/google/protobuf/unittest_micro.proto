@@ -133,6 +133,13 @@ message TestAllTypesMicro {
   optional   string default_string   = 74 [default = "hello"];
   optional    bytes default_bytes    = 75 [default = "world"];
 
+  optional  float default_float_inf      = 96  [default =  inf];
+  optional  float default_float_neg_inf  = 97  [default = -inf];
+  optional  float default_float_nan      = 98  [default =  nan];
+  optional double default_double_inf     = 99  [default =  inf];
+  optional double default_double_neg_inf = 100 [default = -inf];
+  optional double default_double_nan     = 101 [default =  nan];
+
   optional NestedEnum default_nested_enum = 81 [default = BAR];
   optional ForeignEnumMicro default_foreign_enum = 82
       [default = FOREIGN_MICRO_BAR];
