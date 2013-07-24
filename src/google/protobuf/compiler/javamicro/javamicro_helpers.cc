@@ -163,7 +163,7 @@ string FileJavaPackage(const Params& params, const FileDescriptor* file) {
 string ToJavaName(const Params& params, const string& full_name,
     const FileDescriptor* file) {
   string result;
-  if (params.java_multiple_files()) {
+  if (params.java_multiple_files(file->name())) {
     result = FileJavaPackage(params, file);
   } else {
     result = ClassName(params, file);

@@ -34,6 +34,7 @@
 #define PROTOBUF_COMPILER_JAVAMICRO_JAVAMICRO_PARAMS_H_
 
 #include <map>
+#include <set>
 #include <google/protobuf/stubs/strutil.h>
 
 namespace google {
@@ -42,26 +43,29 @@ namespace compiler {
 namespace javamicro {
 
 enum eOptimization { JAVAMICRO_OPT_SPEED, JAVAMICRO_OPT_SPACE, JAVAMICRO_OPT_DEFAULT = JAVAMICRO_OPT_SPACE };
+enum eMultipleFiles { JAVAMICRO_MUL_UNSET, JAVAMICRO_MUL_FALSE, JAVAMICRO_MUL_TRUE };
 
 // Parameters for used by the generators
 class Params {
  public:
   typedef map<string, string> NameMap;
+  typedef set<string> NameSet;
  private:
   string empty_;
   string base_name_;
   eOptimization optimization_;
-  bool java_multiple_files_;
+  eMultipleFiles override_java_multiple_files_;
   bool java_use_vector_;
   NameMap java_packages_;
   NameMap java_outer_classnames_;
+  NameSet java_multiple_files_;
 
  public:
   Params(const string & base_name) :
     empty_(""),
     base_name_(base_name),
     optimization_(JAVAMICRO_OPT_DEFAULT),
-    java_multiple_files_(false),
+    override_java_multiple_files_(JAVAMICRO_MUL_UNSET),
     java_use_vector_(false) {
   }
 
@@ -120,11 +124,34 @@ class Params {
     return optimization_;
   }
 
-  void set_java_multiple_files(bool value) {
-    java_multiple_files_ = value;
+  void set_override_java_multiple_files(bool value) {
+    if (value) {
+      override_java_multiple_files_ = JAVAMICRO_MUL_TRUE;
+    } else {
+      override_java_multiple_files_ = JAVAMICRO_MUL_FALSE;
+    }
   }
-  bool java_multiple_files() const {
-    return java_multiple_files_;
+  void clear_override_java_multiple_files() {
+    override_java_multiple_files_ = JAVAMICRO_MUL_UNSET;
+  }
+
+  void set_java_multiple_files(const string& file_name, bool value) {
+    if (value) {
+      java_multiple_files_.insert(file_name);
+    } else {
+      java_multiple_files_.erase(file_name);
+    }
+  }
+  bool java_multiple_files(const string& file_name) const {
+    switch (override_java_multiple_files_) {
+      case JAVAMICRO_MUL_FALSE:
+        return false;
+      case JAVAMICRO_MUL_TRUE:
+        return true;
+      default:
+        return java_multiple_files_.find(file_name)
+                != java_multiple_files_.end();
+    }
   }
 
   void set_java_use_vector(bool value) {
