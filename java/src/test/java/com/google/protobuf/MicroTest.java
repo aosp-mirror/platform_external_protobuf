@@ -30,14 +30,16 @@
 
 package com.google.protobuf;
 
+import com.google.protobuf.micro.ByteStringMicro;
+import com.google.protobuf.micro.CodedInputStreamMicro;
 import com.google.protobuf.micro.MicroOuterClass;
 import com.google.protobuf.micro.MicroOuterClass.TestAllTypesMicro;
+import com.google.protobuf.micro.MultipleImportingNonMultipleMicro1;
+import com.google.protobuf.micro.MultipleImportingNonMultipleMicro2;
 import com.google.protobuf.micro.RecursiveMessageMicro;
 import com.google.protobuf.micro.SimpleMessageMicro;
 import com.google.protobuf.micro.StringUtf8;
 import com.google.protobuf.micro.UnittestImportMicro;
-import com.google.protobuf.micro.ByteStringMicro;
-import com.google.protobuf.micro.CodedInputStreamMicro;
 
 import junit.framework.TestCase;
 
@@ -2099,6 +2101,21 @@ public class MicroTest extends TestCase {
     assertEquals(2, newMsg.getRepeatedCordCount());
     assertEquals("hello", newMsg.getRepeatedCord(0));
     assertEquals("world", newMsg.getRepeatedCord(1));
+  }
+
+  /**
+   * Tests that code generation with mixed values of the java_multiple_files
+   * options between the main source file and the imported source files would
+   * generate correct references. Any error would cause this method to fail
+   * compilation.
+   */
+  public void testMicroMultipleImportingNonMultiple() throws Exception {
+    UnittestImportMicro.ImportMessageMicro importMsg =
+        new UnittestImportMicro.ImportMessageMicro();
+    MultipleImportingNonMultipleMicro1 micro1 = new MultipleImportingNonMultipleMicro1();
+    micro1.setField(importMsg);
+    MultipleImportingNonMultipleMicro2 micro2 = new MultipleImportingNonMultipleMicro2();
+    micro2.setMicro1(micro1);
   }
 
   public void testMicroDefaults() throws Exception {
