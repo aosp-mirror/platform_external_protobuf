@@ -127,7 +127,9 @@
                   <arg value="../src/google/protobuf/unittest_stringutf8_micro.proto" />
                   <arg value="../src/google/protobuf/unittest_recursive_micro.proto" />
                   <arg value="../src/google/protobuf/unittest_import_micro.proto" />
+                  <arg value="../src/google/protobuf/unittest_single_micro.proto" />
                   <arg value="../src/google/protobuf/unittest_multiple_micro.proto" />
+                  <arg value="../src/google/protobuf/unittest_multiple_nameclash_micro.proto" />
                 </exec>
 		<!-- java nano -->
                 <exec executable="../src/protoc">
@@ -139,8 +141,9 @@
                   <arg value="../src/google/protobuf/unittest_stringutf8_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_recursive_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_import_nano.proto" />
-                  <arg value="../src/google/protobuf/unittest_enum_multiplejava_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_single_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_multiple_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_multiple_nameclash_nano.proto" />
                 </exec>
                 <exec executable="../src/protoc">
                   <arg value="--javanano_out=store_unknown_fields=true:target/generated-test-sources" />

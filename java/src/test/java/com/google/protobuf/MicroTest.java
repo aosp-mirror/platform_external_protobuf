@@ -32,14 +32,19 @@ package com.google.protobuf;
 
 import com.google.protobuf.micro.ByteStringMicro;
 import com.google.protobuf.micro.CodedInputStreamMicro;
+import com.google.protobuf.micro.FileScopeEnumRefMicro;
+import com.google.protobuf.micro.MessageScopeEnumRefMicro;
 import com.google.protobuf.micro.MicroOuterClass;
 import com.google.protobuf.micro.MicroOuterClass.TestAllTypesMicro;
 import com.google.protobuf.micro.MultipleImportingNonMultipleMicro1;
 import com.google.protobuf.micro.MultipleImportingNonMultipleMicro2;
-import com.google.protobuf.micro.RecursiveMessageMicro;
-import com.google.protobuf.micro.SimpleMessageMicro;
-import com.google.protobuf.micro.StringUtf8;
+import com.google.protobuf.micro.MultipleNameClashMicro;
 import com.google.protobuf.micro.UnittestImportMicro;
+import com.google.protobuf.micro.UnittestMultipleMicro;
+import com.google.protobuf.micro.UnittestRecursiveMicro.RecursiveMessageMicro;
+import com.google.protobuf.micro.UnittestSimpleMicro.SimpleMessageMicro;
+import com.google.protobuf.micro.UnittestSingleMicro.SingleMessageMicro;
+import com.google.protobuf.micro.UnittestStringutf8Micro.StringUtf8;
 
 import junit.framework.TestCase;
 
@@ -2101,6 +2106,41 @@ public class MicroTest extends TestCase {
     assertEquals(2, newMsg.getRepeatedCordCount());
     assertEquals("hello", newMsg.getRepeatedCord(0));
     assertEquals("world", newMsg.getRepeatedCord(1));
+  }
+
+  /**
+   * Tests that code generation correctly wraps a single message into its outer
+   * class. The class {@code SingleMessageMicro} is imported from the outer
+   * class {@code UnittestSingleMicro}, whose name is implicit. Any error would
+   * cause this method to fail compilation.
+   */
+  public void testMicroSingle() throws Exception {
+    SingleMessageMicro msg = new SingleMessageMicro();
+  }
+
+  /**
+   * Tests that code generation correctly skips generating the outer class if
+   * unnecessary, letting a file-scope entity have the same name. The class
+   * {@code MultipleNameClashMicro} shares the same name with the file's outer
+   * class defined explicitly, but the file contains no other entities and has
+   * java_multiple_files set. Any error would cause this method to fail
+   * compilation.
+   */
+  public void testMicroMultipleNameClash() throws Exception {
+    MultipleNameClashMicro msg = new MultipleNameClashMicro();
+    msg.setField(0);
+  }
+
+  /**
+   * Tests that code generation correctly handles enums in different scopes in
+   * a source file with the option java_multiple_files set to true. Any error
+   * would cause this method to fail compilation.
+   */
+  public void testMicroMultipleEnumScoping() throws Exception {
+    FileScopeEnumRefMicro msg1 = new FileScopeEnumRefMicro();
+    msg1.setEnumField(UnittestMultipleMicro.ONE);
+    MessageScopeEnumRefMicro msg2 = new MessageScopeEnumRefMicro();
+    msg2.setEnumField(MessageScopeEnumRefMicro.TWO);
   }
 
   /**
