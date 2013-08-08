@@ -28,22 +28,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Author: wink@google.com (Wink Saville)
-//
+// Author: maxtroy@google.com (Max Cai)
 
 package protobuf_unittest_import;
 
 option java_package = "com.google.protobuf.micro";
-// Explicit outer classname to suppress legacy info.
-option java_outer_classname = "UnittestRecursiveMicro";
 
-message RecursiveMessageMicro {
-  message NestedMessage {
-    optional RecursiveMessageMicro a = 1;
-  }
-
-  required int32 id = 1;
-  optional NestedMessage nested_message = 2;
-  optional RecursiveMessageMicro optional_recursive_message_micro = 3;
-  repeated RecursiveMessageMicro repeated_recursive_message_micro = 4;
+message SingleMessageMicro {
 }
