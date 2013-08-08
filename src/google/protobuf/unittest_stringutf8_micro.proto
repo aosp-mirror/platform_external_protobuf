@@ -34,6 +34,8 @@
 package protobuf_unittest_import;
 
 option java_package = "com.google.protobuf.micro";
+// Explicit outer classname to suppress legacy info.
+option java_outer_classname = "UnittestStringutf8Micro";
 
 message StringUtf8 {
   optional string id = 1;
