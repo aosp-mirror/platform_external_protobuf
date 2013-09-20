@@ -157,6 +157,12 @@
                   <arg value="--proto_path=src/test/java" />
                   <arg value="../src/google/protobuf/unittest_has_nano.proto" />
                 </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=optional_field_style=accessors:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_accessors_nano.proto" />
+                </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
               <!--testSourceRoot>target/generated-test-sources/opt-space</testSourceRoot-->
