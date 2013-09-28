@@ -144,6 +144,7 @@
                   <arg value="../src/google/protobuf/unittest_single_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_multiple_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_multiple_nameclash_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_enum_class_nano.proto" />
                 </exec>
                 <exec executable="../src/protoc">
                   <arg value="--javanano_out=store_unknown_fields=true:target/generated-test-sources" />
@@ -162,6 +163,13 @@
                   <arg value="--proto_path=../src" />
                   <arg value="--proto_path=src/test/java" />
                   <arg value="../src/google/protobuf/unittest_accessors_nano.proto" />
+                </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=enum_style=java:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_enum_class_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_enum_class_multiple_nano.proto" />
                 </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
