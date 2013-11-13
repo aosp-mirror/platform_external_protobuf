@@ -521,7 +521,7 @@ class LIBPROTOBUF_EXPORT CodedInputStream {
   bool ReadStringFallback(string* buffer, int size);
 
   // Return the size of the buffer.
-  int BufferSize() const;
+  uint32 BufferSize() const;
 
   static const int kDefaultTotalBytesLimit = 64 << 20;  // 64MB
 
@@ -1031,7 +1031,7 @@ inline MessageFactory* CodedInputStream::GetExtensionFactory() {
   return extension_factory_;
 }
 
-inline int CodedInputStream::BufferSize() const {
+inline uint32 CodedInputStream::BufferSize() const {
   return buffer_end_ - buffer_;
 }
 
