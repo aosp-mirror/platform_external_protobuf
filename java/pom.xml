@@ -154,6 +154,24 @@
                   <arg value="../src/google/protobuf/unittest_extension_nano.proto" />
                 </exec>
                 <exec executable="../src/protoc">
+                  <arg value="--javanano_out=store_unknown_fields=true:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_extension_singular_nano.proto" />
+                </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=store_unknown_fields=true:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_extension_repeated_nano.proto" />
+                </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=store_unknown_fields=true:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_extension_packed_nano.proto" />
+                </exec>
+                <exec executable="../src/protoc">
                   <arg value="--javanano_out=java_nano_generate_has=true,generate_equals=true:target/generated-test-sources" />
                   <arg value="--proto_path=../src" />
                   <arg value="--proto_path=src/test/java" />
