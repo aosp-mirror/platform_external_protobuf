@@ -133,7 +133,11 @@
                 </exec>
 		<!-- java nano -->
                 <exec executable="../src/protoc">
-                  <arg value="--javanano_out=java_package=google/protobuf/unittest_import_nano.proto|com.google.protobuf.nano,java_outer_classname=google/protobuf/unittest_import_nano.proto|UnittestImportNano,generate_equals=true:target/generated-test-sources" />
+                  <arg value="--javanano_out=
+                                  java_package = google/protobuf/unittest_import_nano.proto|com.google.protobuf.nano,
+                                  java_outer_classname = google/protobuf/unittest_import_nano.proto|UnittestImportNano,
+                                  generate_equals = true
+                                :target/generated-test-sources" />
                   <arg value="--proto_path=../src" />
                   <arg value="--proto_path=src/test/java" />
                   <arg value="../src/google/protobuf/unittest_nano.proto" />
