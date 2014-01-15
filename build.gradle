@@ -24,13 +24,15 @@ configurations {
 sourceSets {
     micro {
         java {
-            srcDirs = ['java/src/main/java/com/google/protobuf/micro']
+            srcDirs = ['java/src/main/java/']
+            include("com/google/protobuf/micro/*")
         }
     }
 
     nano {
         java {
-            srcDirs = ['java/src/main/java/com/google/protobuf/nano']
+            srcDirs = ['java/src/main/java/']
+            include("com/google/protobuf/nano/*")
         }
     }
 }
