@@ -176,6 +176,16 @@
                   <arg value="../src/google/protobuf/unittest_enum_class_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_enum_class_multiple_nano.proto" />
                   <arg value="../src/google/protobuf/unittest_repeated_packables_nano.proto" />
+                  <arg value="../src/google/protobuf/unittest_enum_validity_nano.proto" />
+                </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=
+                                  optional_field_style=accessors,
+                                  java_outer_classname=google/protobuf/unittest_enum_validity_nano.proto|EnumValidityAccessors
+                                :target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_enum_validity_nano.proto" />
                 </exec>
                 <exec executable="../src/protoc">
                   <arg value="--javanano_out=optional_field_style=reftypes,generate_equals=true:target/generated-test-sources" />
