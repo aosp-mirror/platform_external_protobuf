@@ -31,10 +31,24 @@ sourceSets {
 
     nano {
         java {
-            srcDirs = ['java/src/main/java/']
-            include("com/google/protobuf/nano/*")
+            srcDirs = [
+                    'java/src/main/java/',
+                    'java/src/device/main/java/'
+            ]
+            include("com/google/protobuf/nano/**")
         }
     }
+}
+
+if (project == rootProject) {
+    ext.getAndroidPrebuilt = { apiLevel ->
+        files("$rootDir/../../prebuilts/sdk/$apiLevel/android.jar")
+    }
+}
+
+dependencies {
+    compile getAndroidPrebuilt('8')
+    nanoCompile getAndroidPrebuilt('8')
 }
 
 jar {
