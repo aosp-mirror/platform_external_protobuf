@@ -19,13 +19,40 @@ apply plugin: 'java'
 configurations {
     micro
     nano
+    lite
 }
 
 sourceSets {
+
     micro {
         java {
             srcDirs = ['java/src/main/java/']
             include("com/google/protobuf/micro/*")
+        }
+    }
+
+    lite {
+        java {
+            srcDirs = ['java/src/main/java/']
+            exclude 'com/google/protobuf/Descriptors.java'
+            exclude 'com/google/protobuf/AbstractMessage.java'
+            exclude 'com/google/protobuf/BlockingRpcChannel.java'
+            exclude 'com/google/protobuf/BlockingService.java'
+            exclude 'com/google/protobuf/DynamicMessage.java'
+            exclude 'com/google/protobuf/ExtensionRegistry.java'
+            exclude 'com/google/protobuf/GeneratedMessage.java'
+            exclude 'com/google/protobuf/Message.java'
+            exclude 'com/google/protobuf/micro/**'
+            exclude 'com/google/protobuf/nano/**'
+            exclude 'com/google/protobuf/ProtocolMessageEnum.java'
+            exclude 'com/google/protobuf/RpcCallback.java'
+            exclude 'com/google/protobuf/RpcChannel.java'
+            exclude 'com/google/protobuf/RpcController.java'
+            exclude 'com/google/protobuf/RpcUtil.java'
+            exclude 'com/google/protobuf/ServiceException.java'
+            exclude 'com/google/protobuf/Service.java'
+            exclude 'com/google/protobuf/TextFormat.java'
+            exclude 'com/google/protobuf/UnknownFieldSet.java'
         }
     }
 
@@ -77,8 +104,18 @@ task microJar(type: Jar) {
     classifier "micro"
 }
 
+task liteJar(type: Jar) {
+    from sourceSets.lite.output
+    dependsOn liteClasses
+    baseName "libprotobuf"
+    appendix "java"
+    version "2.3"
+    classifier "lite"
+}
+
 artifacts {
     micro microJar
     nano nanoJar
+    lite liteJar
 }
 
