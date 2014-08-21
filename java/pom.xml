@@ -134,7 +134,7 @@
 		<!-- java nano -->
                 <exec executable="../src/protoc">
                   <arg value="--javanano_out=
-                                  java_package = google/protobuf/unittest_import_nano.proto|com.google.protobuf.nano,
+                                  java_package = google/protobuf/unittest_import_nano.proto|com.google.protobuf.nano.testimport,
                                   java_outer_classname = google/protobuf/unittest_import_nano.proto|UnittestImportNano,
                                   generate_equals = true
                                 :target/generated-test-sources" />
