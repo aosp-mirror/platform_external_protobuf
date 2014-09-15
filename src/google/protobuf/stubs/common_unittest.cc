@@ -94,9 +94,9 @@ TEST(LoggingTest, DefaultLogging) {
 
   string text = GetCapturedTestStderr();
   EXPECT_EQ(
-    "libprotobuf INFO "__FILE__":" + SimpleItoa(line + 1) + "] A message.\n"
-    "libprotobuf WARNING "__FILE__":" + SimpleItoa(line + 2) + "] A warning.\n"
-    "libprotobuf ERROR "__FILE__":" + SimpleItoa(line + 3) + "] An error.\n",
+    "[libprotobuf INFO "__FILE__":" + SimpleItoa(line + 1) + "] A message.\n"
+    "[libprotobuf WARNING "__FILE__":" + SimpleItoa(line + 2) + "] A warning.\n"
+    "[libprotobuf ERROR "__FILE__":" + SimpleItoa(line + 3) + "] An error.\n",
     text);
 }
 
@@ -182,11 +182,17 @@ class ClosureTest : public testing::Test {
     a_ = 0;
     b_ = NULL;
     c_.clear();
+    permanent_closure_ = NULL;
+  }
+
+  void DeleteClosureInCallback() {
+    delete permanent_closure_;
   }
 
   int a_;
   const char* b_;
   string c_;
+  Closure* permanent_closure_;
 
   static ClosureTest* current_instance_;
 };
@@ -338,6 +344,12 @@ TEST_F(ClosureTest, TestPermanentClosureMethod2) {
   EXPECT_EQ(789, a_);
   EXPECT_EQ(cstr, b_);
   delete closure;
+}
+
+TEST_F(ClosureTest, TestPermanentClosureDeleteInCallback) {
+  permanent_closure_ = NewPermanentCallback((ClosureTest*) this,
+      &ClosureTest::DeleteClosureInCallback);
+  permanent_closure_->Run();
 }
 
 }  // anonymous namespace

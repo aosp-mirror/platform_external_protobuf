@@ -32,13 +32,16 @@
 
 #include <google/protobuf/compiler/subprocess.h>
 
+#include <algorithm>
+#include <iostream>
+
 #ifndef _WIN32
 #include <errno.h>
+#include <sys/select.h>
 #include <sys/wait.h>
 #include <signal.h>
 #endif
 
-#include <algorithm>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/stubs/substitute.h>
@@ -96,7 +99,7 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
   }
 
   // Setup STARTUPINFO to redirect handles.
-  STARTUPINFO startup_info;
+  STARTUPINFOA startup_info;
   ZeroMemory(&startup_info, sizeof(startup_info));
   startup_info.cb = sizeof(startup_info);
   startup_info.dwFlags = STARTF_USESTDHANDLES;
@@ -115,16 +118,16 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
   // Create the process.
   PROCESS_INFORMATION process_info;
 
-  if (CreateProcess((search_mode == SEARCH_PATH) ? NULL : program.c_str(),
-                    (search_mode == SEARCH_PATH) ? name_copy : NULL,
-                    NULL,  // process security attributes
-                    NULL,  // thread security attributes
-                    TRUE,  // inherit handles?
-                    0,     // obscure creation flags
-                    NULL,  // environment (inherit from parent)
-                    NULL,  // current directory (inherit from parent)
-                    &startup_info,
-                    &process_info)) {
+  if (CreateProcessA((search_mode == SEARCH_PATH) ? NULL : program.c_str(),
+                     (search_mode == SEARCH_PATH) ? name_copy : NULL,
+                     NULL,  // process security attributes
+                     NULL,  // thread security attributes
+                     TRUE,  // inherit handles?
+                     0,     // obscure creation flags
+                     NULL,  // environment (inherit from parent)
+                     NULL,  // current directory (inherit from parent)
+                     &startup_info,
+                     &process_info)) {
     child_handle_ = process_info.hProcess;
     CloseHandleOrDie(process_info.hThread);
     child_stdin_ = stdin_pipe_write;
@@ -292,8 +295,8 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
   int stdin_pipe[2];
   int stdout_pipe[2];
 
-  pipe(stdin_pipe);
-  pipe(stdout_pipe);
+  GOOGLE_CHECK(pipe(stdin_pipe) != -1);
+  GOOGLE_CHECK(pipe(stdout_pipe) != -1);
 
   char* argv[2] = { strdup(program.c_str()), NULL };
 
@@ -321,9 +324,11 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
 
     // Write directly to STDERR_FILENO to avoid stdio code paths that may do
     // stuff that is unsafe here.
-    write(STDERR_FILENO, argv[0], strlen(argv[0]));
+    int ignored;
+    ignored = write(STDERR_FILENO, argv[0], strlen(argv[0]));
     const char* message = ": program not found or is not executable\n";
-    write(STDERR_FILENO, message, strlen(message));
+    ignored = write(STDERR_FILENO, message, strlen(message));
+    (void) ignored;
 
     // Must use _exit() rather than exit() to avoid flushing output buffers
     // that will also be flushed by the parent.
@@ -444,7 +449,7 @@ bool Subprocess::Communicate(const Message& input, Message* output,
   }
 
   if (!output->ParseFromString(output_data)) {
-    *error = "Plugin output is unparseable.";
+    *error = "Plugin output is unparseable: " + CEscape(output_data);
     return false;
   }
 

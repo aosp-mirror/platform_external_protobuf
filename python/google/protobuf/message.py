@@ -67,14 +67,28 @@ class Message(object):
 
   DESCRIPTOR = None
 
+  def __deepcopy__(self, memo=None):
+    clone = type(self)()
+    clone.MergeFrom(self)
+    return clone
+
   def __eq__(self, other_msg):
+    """Recursively compares two messages by value and structure."""
     raise NotImplementedError
 
   def __ne__(self, other_msg):
     # Can't just say self != other_msg, since that would infinitely recurse. :)
     return not self == other_msg
 
+  def __hash__(self):
+    raise TypeError('unhashable object')
+
   def __str__(self):
+    """Outputs a human-readable representation of the message."""
+    raise NotImplementedError
+
+  def __unicode__(self):
+    """Outputs a human-readable representation of the message."""
     raise NotImplementedError
 
   def MergeFrom(self, other_msg):
@@ -163,7 +177,11 @@ class Message(object):
     raise NotImplementedError
 
   def ParseFromString(self, serialized):
-    """Like MergeFromString(), except we clear the object first."""
+    """Parse serialized protocol buffer data into this message.
+
+    Like MergeFromString(), except we clear the object first and
+    do not return the value that MergeFromString returns.
+    """
     self.Clear()
     self.MergeFromString(serialized)
 
@@ -215,6 +233,9 @@ class Message(object):
     raise NotImplementedError
 
   def HasField(self, field_name):
+    """Checks if a certain field is set for the message. Note if the
+    field_name is not defined in the message descriptor, ValueError will be
+    raised."""
     raise NotImplementedError
 
   def ClearField(self, field_name):
@@ -252,3 +273,12 @@ class Message(object):
     via a previous _SetListener() call.
     """
     raise NotImplementedError
+
+  def __getstate__(self):
+    """Support the pickle protocol."""
+    return dict(serialized=self.SerializePartialToString())
+
+  def __setstate__(self, state):
+    """Support the pickle protocol."""
+    self.__init__()
+    self.ParseFromString(state['serialized'])

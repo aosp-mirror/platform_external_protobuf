@@ -55,7 +55,7 @@ jar {
     from sourceSets.nano.output, sourceSets.micro.output
     baseName "libprotobuf"
     appendix "java"
-    version "2.3"
+    version "2.6"
     classifier "micronano"
 }
 
@@ -64,7 +64,7 @@ task nanoJar(type: Jar) {
     dependsOn nanoClasses
     baseName "libprotobuf"
     appendix "java"
-    version "2.3"
+    version "2.6"
     classifier "nano"
 }
 
@@ -73,7 +73,7 @@ task microJar(type: Jar) {
     dependsOn microClasses
     baseName "libprotobuf"
     appendix "java"
-    version "2.3"
+    version "2.6"
     classifier "micro"
 }
 

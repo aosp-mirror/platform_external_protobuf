@@ -33,10 +33,12 @@
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
 #include <limits>
+#include <map>
 #include <vector>
 #include <google/protobuf/stubs/hash.h>
 
 #include <google/protobuf/compiler/cpp/cpp_helpers.h>
+#include <google/protobuf/io/printer.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
@@ -80,6 +82,22 @@ hash_set<string> MakeKeywordsMap() {
 
 hash_set<string> kKeywords = MakeKeywordsMap();
 
+// Returns whether the provided descriptor has an extension. This includes its
+// nested types.
+bool HasExtension(const Descriptor* descriptor) {
+  if (descriptor->extension_count() > 0) {
+    return true;
+  }
+  for (int i = 0; i < descriptor->nested_type_count(); ++i) {
+    if (HasExtension(descriptor->nested_type(i))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 string UnderscoresToCamelCase(const string& input, bool cap_next_letter) {
   string result;
   // Note:  I distrust ctype.h due to locales.
@@ -104,8 +122,6 @@ string UnderscoresToCamelCase(const string& input, bool cap_next_letter) {
   }
   return result;
 }
-
-}  // namespace
 
 const char kThickSeparator[] =
   "// ===================================================================\n";
@@ -132,7 +148,7 @@ string ClassName(const Descriptor* descriptor, bool qualified) {
 string ClassName(const EnumDescriptor* enum_descriptor, bool qualified) {
   if (enum_descriptor->containing_type() == NULL) {
     if (qualified) {
-      return DotsToColons(enum_descriptor->full_name());
+      return "::" + DotsToColons(enum_descriptor->full_name());
     } else {
       return enum_descriptor->name();
     }
@@ -240,14 +256,35 @@ const char* DeclaredTypeMethodName(FieldDescriptor::Type type) {
   return "";
 }
 
+string Int32ToString(int number) {
+  // gcc rejects the decimal form of kint32min.
+  if (number == kint32min) {
+    GOOGLE_COMPILE_ASSERT(kint32min == (~0x7fffffff), kint32min_value_error);
+    return "(~0x7fffffff)";
+  } else {
+    return SimpleItoa(number);
+  }
+}
+
+string Int64ToString(int64 number) {
+  // gcc rejects the decimal form of kint64min
+  if (number == kint64min) {
+    // Make sure we are in a 2's complement system.
+    GOOGLE_COMPILE_ASSERT(kint64min == GOOGLE_LONGLONG(~0x7fffffffffffffff),
+                   kint64min_value_error);
+    return "GOOGLE_LONGLONG(~0x7fffffffffffffff)";
+  }
+  return "GOOGLE_LONGLONG(" + SimpleItoa(number) + ")";
+}
+
 string DefaultValue(const FieldDescriptor* field) {
   switch (field->cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32:
-      return SimpleItoa(field->default_value_int32());
+      return Int32ToString(field->default_value_int32());
     case FieldDescriptor::CPPTYPE_UINT32:
       return SimpleItoa(field->default_value_uint32()) + "u";
     case FieldDescriptor::CPPTYPE_INT64:
-      return "GOOGLE_LONGLONG(" + SimpleItoa(field->default_value_int64()) + ")";
+      return Int64ToString(field->default_value_int64());
     case FieldDescriptor::CPPTYPE_UINT64:
       return "GOOGLE_ULONGLONG(" + SimpleItoa(field->default_value_uint64())+ ")";
     case FieldDescriptor::CPPTYPE_DOUBLE: {
@@ -290,9 +327,11 @@ string DefaultValue(const FieldDescriptor* field) {
       return strings::Substitute(
           "static_cast< $0 >($1)",
           ClassName(field->enum_type(), true),
-          field->default_value_enum()->number());
+          Int32ToString(field->default_value_enum()->number()));
     case FieldDescriptor::CPPTYPE_STRING:
-      return "\"" + CEscape(field->default_value_string()) + "\"";
+      return "\"" + EscapeTrigraphs(
+        CEscape(field->default_value_string())) +
+        "\"";
     case FieldDescriptor::CPPTYPE_MESSAGE:
       return FieldMessageTypeName(field) + "::default_instance()";
   }
@@ -333,6 +372,120 @@ string GlobalAssignDescriptorsName(const string& filename) {
 // Return the name of the ShutdownFile() function for a given file.
 string GlobalShutdownFileName(const string& filename) {
   return "protobuf_ShutdownFile_" + FilenameIdentifier(filename);
+}
+
+// Return the qualified C++ name for a file level symbol.
+string QualifiedFileLevelSymbol(const string& package, const string& name) {
+  if (package.empty()) {
+    return StrCat("::", name);
+  }
+  return StrCat("::", DotsToColons(package), "::", name);
+}
+
+// Escape C++ trigraphs by escaping question marks to \?
+string EscapeTrigraphs(const string& to_escape) {
+  return StringReplace(to_escape, "?", "\\?", true);
+}
+
+// Escaped function name to eliminate naming conflict.
+string SafeFunctionName(const Descriptor* descriptor,
+                        const FieldDescriptor* field,
+                        const string& prefix) {
+  // Do not use FieldName() since it will escape keywords.
+  string name = field->name();
+  LowerString(&name);
+  string function_name = prefix + name;
+  if (descriptor->FindFieldByName(function_name)) {
+    // Single underscore will also make it conflicting with the private data
+    // member. We use double underscore to escape function names.
+    function_name.append("__");
+  } else if (kKeywords.count(name) > 0) {
+    // If the field name is a keyword, we append the underscore back to keep it
+    // consistent with other function names.
+    function_name.append("_");
+  }
+  return function_name;
+}
+
+bool StaticInitializersForced(const FileDescriptor* file) {
+  if (HasDescriptorMethods(file) || file->extension_count() > 0) {
+    return true;
+  }
+  for (int i = 0; i < file->message_type_count(); ++i) {
+    if (HasExtension(file->message_type(i))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void PrintHandlingOptionalStaticInitializers(
+    const FileDescriptor* file, io::Printer* printer,
+    const char* with_static_init, const char* without_static_init,
+    const char* var1, const string& val1,
+    const char* var2, const string& val2) {
+  map<string, string> vars;
+  if (var1) {
+    vars[var1] = val1;
+  }
+  if (var2) {
+    vars[var2] = val2;
+  }
+  PrintHandlingOptionalStaticInitializers(
+      vars, file, printer, with_static_init, without_static_init);
+}
+
+void PrintHandlingOptionalStaticInitializers(
+    const map<string, string>& vars, const FileDescriptor* file,
+    io::Printer* printer, const char* with_static_init,
+    const char* without_static_init) {
+  if (StaticInitializersForced(file)) {
+    printer->Print(vars, with_static_init);
+  } else {
+    printer->Print(vars, (string(
+      "#ifdef GOOGLE_PROTOBUF_NO_STATIC_INITIALIZER\n") +
+      without_static_init +
+      "#else\n" +
+      with_static_init +
+      "#endif\n").c_str());
+  }
+}
+
+
+static bool HasEnumDefinitions(const Descriptor* message_type) {
+  if (message_type->enum_type_count() > 0) return true;
+  for (int i = 0; i < message_type->nested_type_count(); ++i) {
+    if (HasEnumDefinitions(message_type->nested_type(i))) return true;
+  }
+  return false;
+}
+
+bool HasEnumDefinitions(const FileDescriptor* file) {
+  if (file->enum_type_count() > 0) return true;
+  for (int i = 0; i < file->message_type_count(); ++i) {
+    if (HasEnumDefinitions(file->message_type(i))) return true;
+  }
+  return false;
+}
+
+bool IsStringOrMessage(const FieldDescriptor* field) {
+  switch (field->cpp_type()) {
+    case FieldDescriptor::CPPTYPE_INT32:
+    case FieldDescriptor::CPPTYPE_INT64:
+    case FieldDescriptor::CPPTYPE_UINT32:
+    case FieldDescriptor::CPPTYPE_UINT64:
+    case FieldDescriptor::CPPTYPE_DOUBLE:
+    case FieldDescriptor::CPPTYPE_FLOAT:
+    case FieldDescriptor::CPPTYPE_BOOL:
+    case FieldDescriptor::CPPTYPE_ENUM:
+      return false;
+    case FieldDescriptor::CPPTYPE_STRING:
+    case FieldDescriptor::CPPTYPE_MESSAGE:
+      return true;
+  }
+
+  GOOGLE_LOG(FATAL) << "Can't get here.";
+  return false;
 }
 
 }  // namespace cpp

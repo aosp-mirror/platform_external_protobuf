@@ -39,6 +39,7 @@
 #include <google/protobuf/wire_format.h>
 
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/stringprintf.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/wire_format_lite_inl.h>
 #include <google/protobuf/descriptor.pb.h>
@@ -48,11 +49,10 @@
 #include <google/protobuf/unknown_field_set.h>
 
 
+
 namespace google {
 namespace protobuf {
 namespace internal {
-
-using internal::WireFormatLite;
 
 namespace {
 
@@ -183,7 +183,8 @@ void WireFormat::SerializeUnknownFields(const UnknownFieldSet& unknown_fields,
         output->WriteVarint32(WireFormatLite::MakeTag(field.number(),
             WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
         output->WriteVarint32(field.length_delimited().size());
-        output->WriteString(field.length_delimited());
+        output->WriteRawMaybeAliased(field.length_delimited().data(),
+                                     field.length_delimited().size());
         break;
       case UnknownField::TYPE_GROUP:
         output->WriteVarint32(WireFormatLite::MakeTag(field.number(),
@@ -239,8 +240,6 @@ void WireFormat::SerializeUnknownMessageSetItems(
     // The only unknown fields that are allowed to exist in a MessageSet are
     // messages, which are length-delimited.
     if (field.type() == UnknownField::TYPE_LENGTH_DELIMITED) {
-      const string& data = field.length_delimited();
-
       // Start group.
       output->WriteVarint32(WireFormatLite::kMessageSetItemStartTag);
 
@@ -250,8 +249,7 @@ void WireFormat::SerializeUnknownMessageSetItems(
 
       // Write message.
       output->WriteVarint32(WireFormatLite::kMessageSetMessageTag);
-      output->WriteVarint32(data.size());
-      output->WriteString(data);
+      field.SerializeLengthDelimitedNoTag(output);
 
       // End group.
       output->WriteVarint32(WireFormatLite::kMessageSetItemEndTag);
@@ -268,8 +266,6 @@ uint8* WireFormat::SerializeUnknownMessageSetItemsToArray(
     // The only unknown fields that are allowed to exist in a MessageSet are
     // messages, which are length-delimited.
     if (field.type() == UnknownField::TYPE_LENGTH_DELIMITED) {
-      const string& data = field.length_delimited();
-
       // Start group.
       target = io::CodedOutputStream::WriteTagToArray(
           WireFormatLite::kMessageSetItemStartTag, target);
@@ -283,8 +279,7 @@ uint8* WireFormat::SerializeUnknownMessageSetItemsToArray(
       // Write message.
       target = io::CodedOutputStream::WriteTagToArray(
           WireFormatLite::kMessageSetMessageTag, target);
-      target = io::CodedOutputStream::WriteVarint32ToArray(data.size(), target);
-      target = io::CodedOutputStream::WriteStringToArray(data, target);
+      target = field.SerializeLengthDelimitedNoTagToArray(target);
 
       // End group.
       target = io::CodedOutputStream::WriteTagToArray(
@@ -354,9 +349,10 @@ int WireFormat::ComputeUnknownMessageSetItemsSize(
     if (field.type() == UnknownField::TYPE_LENGTH_DELIMITED) {
       size += WireFormatLite::kMessageSetItemTagsSize;
       size += io::CodedOutputStream::VarintSize32(field.number());
-      size += io::CodedOutputStream::VarintSize32(
-        field.length_delimited().size());
-      size += field.length_delimited().size();
+
+      int field_size = field.GetLengthDelimitedSize();
+      size += io::CodedOutputStream::VarintSize32(field_size);
+      size += field_size;
     }
   }
 
@@ -414,6 +410,37 @@ bool WireFormat::ParseAndMergePartial(io::CodedInputStream* input,
     if (!ParseAndMergeField(tag, field, message, input)) {
       return false;
     }
+  }
+}
+
+bool WireFormat::SkipMessageSetField(io::CodedInputStream* input,
+                                     uint32 field_number,
+                                     UnknownFieldSet* unknown_fields) {
+  uint32 length;
+  if (!input->ReadVarint32(&length)) return false;
+  return input->ReadString(
+      unknown_fields->AddLengthDelimited(field_number), length);
+}
+
+bool WireFormat::ParseAndMergeMessageSetField(uint32 field_number,
+                                              const FieldDescriptor* field,
+                                              Message* message,
+                                              io::CodedInputStream* input) {
+  const Reflection* message_reflection = message->GetReflection();
+  if (field == NULL) {
+    // We store unknown MessageSet extensions as groups.
+    return SkipMessageSetField(
+        input, field_number, message_reflection->MutableUnknownFields(message));
+  } else if (field->is_repeated() ||
+             field->type() != FieldDescriptor::TYPE_MESSAGE) {
+    // This shouldn't happen as we only allow optional message extensions to
+    // MessageSet.
+    GOOGLE_LOG(ERROR) << "Extensions of MessageSets must be optional messages.";
+    return false;
+  } else {
+    Message* sub_message = message_reflection->MutableMessage(
+        message, field, input->GetExtensionFactory());
+    return WireFormatLite::ReadMessage(input, sub_message);
   }
 }
 
@@ -568,7 +595,8 @@ bool WireFormat::ParseAndMergeField(
       case FieldDescriptor::TYPE_STRING: {
         string value;
         if (!WireFormatLite::ReadString(input, &value)) return false;
-        VerifyUTF8String(value.data(), value.length(), PARSE);
+        VerifyUTF8StringNamedField(value.data(), value.length(), PARSE,
+                                   field->name().c_str());
         if (field->is_repeated()) {
           message_reflection->AddString(message, field, value);
         } else {
@@ -632,20 +660,14 @@ bool WireFormat::ParseAndMergeMessageSetItem(
   //   required int32 type_id = 2;
   //   required data message = 3;
 
-  // Once we see a type_id, we'll construct a fake tag for this extension
-  // which is the tag it would have had under the proto2 extensions wire
-  // format.
-  uint32 fake_tag = 0;
+  uint32 last_type_id = 0;
 
   // Once we see a type_id, we'll look up the FieldDescriptor for the
   // extension.
   const FieldDescriptor* field = NULL;
 
   // If we see message data before the type_id, we'll append it to this so
-  // we can parse it later.  This will probably never happen in practice,
-  // as no MessageSet encoder I know of writes the message before the type ID.
-  // But, it's technically valid so we should allow it.
-  // TODO(kenton):  Use a Cord instead?  Do I care?
+  // we can parse it later.
   string message_data;
 
   while (true) {
@@ -656,8 +678,7 @@ bool WireFormat::ParseAndMergeMessageSetItem(
       case WireFormatLite::kMessageSetTypeIdTag: {
         uint32 type_id;
         if (!input->ReadVarint32(&type_id)) return false;
-        fake_tag = WireFormatLite::MakeTag(
-            type_id, WireFormatLite::WIRETYPE_LENGTH_DELIMITED);
+        last_type_id = type_id;
         field = message_reflection->FindKnownExtensionByNumber(type_id);
 
         if (!message_data.empty()) {
@@ -666,8 +687,8 @@ bool WireFormat::ParseAndMergeMessageSetItem(
           io::ArrayInputStream raw_input(message_data.data(),
                                          message_data.size());
           io::CodedInputStream sub_input(&raw_input);
-          if (!ParseAndMergeField(fake_tag, field, message,
-                                  &sub_input)) {
+          if (!ParseAndMergeMessageSetField(last_type_id, field, message,
+                                            &sub_input)) {
             return false;
           }
           message_data.clear();
@@ -677,16 +698,20 @@ bool WireFormat::ParseAndMergeMessageSetItem(
       }
 
       case WireFormatLite::kMessageSetMessageTag: {
-        if (fake_tag == 0) {
+        if (last_type_id == 0) {
           // We haven't seen a type_id yet.  Append this data to message_data.
           string temp;
           uint32 length;
           if (!input->ReadVarint32(&length)) return false;
           if (!input->ReadString(&temp, length)) return false;
-          message_data.append(temp);
+          io::StringOutputStream output_stream(&message_data);
+          io::CodedOutputStream coded_output(&output_stream);
+          coded_output.WriteVarint32(length);
+          coded_output.WriteString(temp);
         } else {
           // Already saw type_id, so we can parse this directly.
-          if (!ParseAndMergeField(fake_tag, field, message, input)) {
+          if (!ParseAndMergeMessageSetField(last_type_id, field, message,
+                                            input)) {
             return false;
           }
         }
@@ -834,7 +859,8 @@ void WireFormat::SerializeFieldWithCachedSizes(
           message_reflection->GetRepeatedStringReference(
             message, field, j, &scratch) :
           message_reflection->GetStringReference(message, field, &scratch);
-        VerifyUTF8String(value.data(), value.length(), SERIALIZE);
+        VerifyUTF8StringNamedField(value.data(), value.length(), SERIALIZE,
+                                   field->name().c_str());
         WireFormatLite::WriteString(field->number(), value, output);
         break;
       }
@@ -1044,7 +1070,8 @@ int WireFormat::MessageSetItemByteSize(
 
 void WireFormat::VerifyUTF8StringFallback(const char* data,
                                           int size,
-                                          Operation op) {
+                                          Operation op,
+                                          const char* field_name) {
   if (!IsStructurallyValidUTF8(data, size)) {
     const char* operation_str = NULL;
     switch (op) {
@@ -1056,10 +1083,15 @@ void WireFormat::VerifyUTF8StringFallback(const char* data,
         break;
       // no default case: have the compiler warn if a case is not covered.
     }
-    GOOGLE_LOG(ERROR) << "Encountered string containing invalid UTF-8 data while "
-               << operation_str
-               << " protocol buffer. Strings must contain only UTF-8; "
-                  "use the 'bytes' type for raw bytes.";
+    string quoted_field_name = "";
+    if (field_name != NULL) {
+      quoted_field_name = StringPrintf(" '%s'", field_name);
+    }
+    // no space below to avoid double space when the field name is missing.
+    GOOGLE_LOG(ERROR) << "String field" << quoted_field_name << " contains invalid "
+               << "UTF-8 data when " << operation_str << " a protocol "
+               << "buffer. Use the 'bytes' type if you intend to send raw "
+               << "bytes. ";
   }
 }
 

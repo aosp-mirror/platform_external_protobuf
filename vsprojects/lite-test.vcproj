@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="8.00"
+	Version="9.00"
 	Name="lite-test"
 	ProjectGUID="{12015ACE-42BE-4952-A5A0-44A9A46908E2}"
 	RootNamespace="tests"
@@ -46,7 +46,7 @@
 				AdditionalOptions="/wd4244 /wd4267 /wd4018 /wd4355 /wd4800 /wd4251 /wd4996 /wd4146 /wd4305"
 				Optimization="0"
 				AdditionalIncludeDirectories="../src;.;../gtest/include"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_VARIADIC_MAX=10;"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -122,7 +122,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/wd4244 /wd4267 /wd4018 /wd4355 /wd4800 /wd4251 /wd4996 /wd4146 /wd4305"
 				AdditionalIncludeDirectories="../src;.;../gtest/include"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;_VARIADIC_MAX=10;"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -190,6 +190,10 @@
 				RelativePath=".\google\protobuf\unittest_import_lite.pb.h"
 				>
 			</File>
+			<File
+				RelativePath=".\google\protobuf\unittest_import_public_lite.pb.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
@@ -216,6 +220,10 @@
 			</File>
 			<File
 				RelativePath=".\google\protobuf\unittest_import_lite.pb.cc"
+				>
+			</File>
+			<File
+				RelativePath=".\google\protobuf\unittest_import_public_lite.pb.cc"
 				>
 			</File>
 		</Filter>
@@ -264,6 +272,30 @@
 					Description="Generating unittest_import_lite.pb.{h,cc}..."
 					CommandLine="Release\protoc -I../src --cpp_out=. ../src/google/protobuf/unittest_import_lite.proto&#x0D;&#x0A;"
 					Outputs="google\protobuf\unittest_import_lite.pb.h;google\protobuf\unittest_import_lite.pb.cc"
+				/>
+			</FileConfiguration>
+		</File>
+		<File
+			RelativePath="..\src\google\protobuf\unittest_import_public_lite.proto"
+			>
+			<FileConfiguration
+				Name="Debug|Win32"
+				>
+				<Tool
+					Name="VCCustomBuildTool"
+					Description="Generating unittest_import_public_lite.pb.{h,cc}..."
+					CommandLine="Debug\protoc -I../src --cpp_out=. ../src/google/protobuf/unittest_import_public_lite.proto&#x0D;&#x0A;"
+					Outputs="google\protobuf\unittest_import_public_lite.pb.h;google\protobuf\unittest_import_public_lite.pb.cc"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release|Win32"
+				>
+				<Tool
+					Name="VCCustomBuildTool"
+					Description="Generating unittest_import_public_lite.pb.{h,cc}..."
+					CommandLine="Release\protoc -I../src --cpp_out=. ../src/google/protobuf/unittest_import_public_lite.proto&#x0D;&#x0A;"
+					Outputs="google\protobuf\unittest_import_public_lite.pb.h;google\protobuf\unittest_import_public_lite.pb.cc"
 				/>
 			</FileConfiguration>
 		</File>
