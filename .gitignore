@@ -55,3 +55,4 @@ src/testzip.proto
 src/testzip.zip
 vsprojects/config.h
 java/target/
+!prebuilts/**
