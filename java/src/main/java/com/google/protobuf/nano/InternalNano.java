@@ -330,4 +330,12 @@ public final class InternalNano {
     return result;
   }
 
+  // This avoids having to make FieldArray public.
+  public static void cloneUnknownFieldData(ExtendableMessageNano original,
+      ExtendableMessageNano cloned) {
+    if (original.unknownFieldData != null) {
+      cloned.unknownFieldData = (FieldArray) original.unknownFieldData.clone();
+    }
+  }
+
 }
