@@ -79,6 +79,7 @@ class MessageGenerator {
   void GenerateClear(io::Printer* printer);
   void GenerateEquals(io::Printer* printer);
   void GenerateHashCode(io::Printer* printer);
+  void GenerateClone(io::Printer* printer);
 
   const Params& params_;
   const Descriptor* descriptor_;
