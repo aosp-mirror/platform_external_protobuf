@@ -49,6 +49,7 @@ import com.google.protobuf.nano.NanoHasOuterClass.TestAllTypesNanoHas;
 import com.google.protobuf.nano.NanoOuterClass;
 import com.google.protobuf.nano.NanoOuterClass.TestAllTypesNano;
 import com.google.protobuf.nano.NanoReferenceTypes;
+import com.google.protobuf.nano.NanoReferenceTypesCompat;
 import com.google.protobuf.nano.NanoRepeatedPackables;
 import com.google.protobuf.nano.PackedExtensions;
 import com.google.protobuf.nano.RepeatedExtensions;
@@ -3791,6 +3792,11 @@ public class NanoTest extends TestCase {
     assertTrue(Arrays.equals(new int[] {13000, 14, 15, 13000, 14, 15}, nonPacked.sint32S));
     assertTrue(Arrays.equals(new int[] {25, 26, 27, 25, 26, 27}, nonPacked.sfixed32S));
     assertTrue(Arrays.equals(new boolean[] {false, true, false, true}, nonPacked.bools));
+  }
+
+  public void testRepeatedFieldInitializedInReftypesCompatMode() {
+    NanoReferenceTypesCompat.TestAllTypesNano proto = new NanoReferenceTypesCompat.TestAllTypesNano();
+    assertNotNull(proto.repeatedString);
   }
 
   private void assertRepeatedPackablesEqual(
