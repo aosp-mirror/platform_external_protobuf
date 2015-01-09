@@ -134,18 +134,23 @@ void MessageGenerator::Generate(io::Printer* printer) {
   }
   if (params_.store_unknown_fields() && params_.parcelable_messages()) {
     printer->Print(
-      "    com.google.protobuf.nano.android.ParcelableExtendableMessageNano<$classname$> {\n",
+      "    com.google.protobuf.nano.android.ParcelableExtendableMessageNano<$classname$>",
       "classname", descriptor_->name());
   } else if (params_.store_unknown_fields()) {
     printer->Print(
-      "    com.google.protobuf.nano.ExtendableMessageNano<$classname$> {\n",
+      "    com.google.protobuf.nano.ExtendableMessageNano<$classname$>",
       "classname", descriptor_->name());
   } else if (params_.parcelable_messages()) {
     printer->Print(
-      "    com.google.protobuf.nano.android.ParcelableMessageNano {\n");
+      "    com.google.protobuf.nano.android.ParcelableMessageNano");
   } else {
     printer->Print(
-      "    com.google.protobuf.nano.MessageNano {\n");
+      "    com.google.protobuf.nano.MessageNano");
+  }
+  if (params_.generate_clone()) {
+    printer->Print(" implements java.lang.Cloneable {\n");
+  } else {
+    printer->Print(" {\n");
   }
   printer->Indent();
 
@@ -264,6 +269,10 @@ void MessageGenerator::Generate(io::Printer* printer) {
   // Other methods in this class
 
   GenerateClear(printer);
+
+  if (params_.generate_clone()) {
+    GenerateClone(printer);
+  }
 
   if (params_.generate_equals()) {
     GenerateEquals(printer);
@@ -476,6 +485,33 @@ void MessageGenerator::GenerateClear(io::Printer* printer) {
     "  cachedSize = -1;\n"
     "  return this;\n"
     "}\n");
+}
+
+void MessageGenerator::GenerateClone(io::Printer* printer) {
+  printer->Print(
+    "@Override\n"
+    "public $classname$ clone() {\n",
+    "classname", descriptor_->name());
+  printer->Indent();
+
+  printer->Print(
+    "$classname$ cloned;\n"
+    "try {\n"
+    "  cloned = ($classname$) super.clone();\n"
+    "} catch (java.lang.CloneNotSupportedException e) {\n"
+    "  throw new java.lang.AssertionError(e);\n"
+    "}\n",
+    "classname", descriptor_->name());
+
+  for (int i = 0; i < descriptor_->field_count(); i++) {
+    field_generators_.get(descriptor_->field(i)).GenerateFixClonedCode(printer);
+  }
+
+  printer->Outdent();
+  printer->Print(
+    "  return cloned;\n"
+    "}\n"
+    "\n");
 }
 
 void MessageGenerator::GenerateEquals(io::Printer* printer) {
