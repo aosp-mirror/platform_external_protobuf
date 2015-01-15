@@ -46,7 +46,7 @@ import java.util.TreeMap;
  * {@code UnknownFieldSet} is used to keep track of fields which were seen when
  * parsing a protocol message but whose field numbers or types are unrecognized.
  * This most frequently occurs when new fields are added to a message type
- * and then messages containing those feilds are read by old software that was
+ * and then messages containing those fields are read by old software that was
  * compiled before the new types were added.
  *
  * <p>Every {@link Message} contains an {@code UnknownFieldSet} (and every
@@ -90,6 +90,7 @@ public final class UnknownFieldSet implements MessageLite {
     this.fields = fields;
   }
   private Map<Integer, Field> fields;
+
 
   @Override
   public boolean equals(final Object other) {
@@ -367,6 +368,22 @@ public final class UnknownFieldSet implements MessageLite {
       reinitialize();
       return this;
     }
+    
+    /** Clear fields from the set with a given field number. */
+    public Builder clearField(final int number) {
+      if (number == 0) {
+        throw new IllegalArgumentException("Zero is not a valid field number.");
+      }
+      if (lastField != null && lastFieldNumber == number) {
+        // Discard this.
+        lastField = null;
+        lastFieldNumber = 0;
+      }
+      if (fields.containsKey(number)) {
+        fields.remove(number);
+      }
+      return this;
+    }
 
     /**
      * Merge the fields from {@code other} into this set.  If a field number
@@ -468,7 +485,7 @@ public final class UnknownFieldSet implements MessageLite {
     /**
      * Parse a single field from {@code input} and merge it into this set.
      * @param tag The field's tag number, which was already parsed.
-     * @return {@code false} if the tag is an engroup tag.
+     * @return {@code false} if the tag is an end group tag.
      */
     public boolean mergeFieldFrom(final int tag, final CodedInputStream input)
                                   throws IOException {
@@ -949,5 +966,30 @@ public final class UnknownFieldSet implements MessageLite {
         return this;
       }
     }
+  }
+
+  /**
+   * Parser to implement MessageLite interface.
+   */
+  public static final class Parser extends AbstractParser<UnknownFieldSet> {
+    public UnknownFieldSet parsePartialFrom(
+        CodedInputStream input, ExtensionRegistryLite extensionRegistry)
+        throws InvalidProtocolBufferException {
+      Builder builder = newBuilder();
+      try {
+        builder.mergeFrom(input);
+      } catch (InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(builder.buildPartial());
+      } catch (IOException e) {
+        throw new InvalidProtocolBufferException(e.getMessage())
+            .setUnfinishedMessage(builder.buildPartial());
+      }
+      return builder.buildPartial();
+    }
+  }
+
+  private static final Parser PARSER = new Parser();
+  public final Parser getParserForType() {
+    return PARSER;
   }
 }

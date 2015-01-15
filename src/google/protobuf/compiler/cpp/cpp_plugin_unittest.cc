@@ -34,6 +34,8 @@
 //   It seemed like parameterizing it would add more complexity than it is
 //   worth.
 
+#include <memory>
+
 #include <google/protobuf/compiler/cpp/cpp_generator.h>
 #include <google/protobuf/compiler/command_line_interface.h>
 #include <google/protobuf/io/zero_copy_stream.h>
@@ -56,24 +58,24 @@ class TestGenerator : public CodeGenerator {
 
   virtual bool Generate(const FileDescriptor* file,
                         const string& parameter,
-                        OutputDirectory* output_directory,
+                        GeneratorContext* context,
                         string* error) const {
-    TryInsert("test.pb.h", "includes", output_directory);
-    TryInsert("test.pb.h", "namespace_scope", output_directory);
-    TryInsert("test.pb.h", "global_scope", output_directory);
-    TryInsert("test.pb.h", "class_scope:foo.Bar", output_directory);
-    TryInsert("test.pb.h", "class_scope:foo.Bar.Baz", output_directory);
+    TryInsert("test.pb.h", "includes", context);
+    TryInsert("test.pb.h", "namespace_scope", context);
+    TryInsert("test.pb.h", "global_scope", context);
+    TryInsert("test.pb.h", "class_scope:foo.Bar", context);
+    TryInsert("test.pb.h", "class_scope:foo.Bar.Baz", context);
 
-    TryInsert("test.pb.cc", "includes", output_directory);
-    TryInsert("test.pb.cc", "namespace_scope", output_directory);
-    TryInsert("test.pb.cc", "global_scope", output_directory);
+    TryInsert("test.pb.cc", "includes", context);
+    TryInsert("test.pb.cc", "namespace_scope", context);
+    TryInsert("test.pb.cc", "global_scope", context);
     return true;
   }
 
   void TryInsert(const string& filename, const string& insertion_point,
-                 OutputDirectory* output_directory) const {
+                 GeneratorContext* context) const {
     scoped_ptr<io::ZeroCopyOutputStream> output(
-      output_directory->OpenForInsert(filename, insertion_point));
+        context->OpenForInsert(filename, insertion_point));
     io::Printer printer(output.get(), '$');
     printer.Print("// inserted $name$\n", "name", insertion_point);
   }
@@ -83,13 +85,13 @@ class TestGenerator : public CodeGenerator {
 // not verify that they are correctly-placed; that would require actually
 // compiling the output which is a bit more than I care to do for this test.
 TEST(CppPluginTest, PluginTest) {
-  File::WriteStringToFileOrDie(
-      "syntax = \"proto2\";\n"
-      "package foo;\n"
-      "message Bar {\n"
-      "  message Baz {}\n"
-      "}\n",
-      TestTempDir() + "/test.proto");
+  GOOGLE_CHECK_OK(File::SetContents(TestTempDir() + "/test.proto",
+                             "syntax = \"proto2\";\n"
+                             "package foo;\n"
+                             "message Bar {\n"
+                             "  message Baz {}\n"
+                             "}\n",
+                             true));
 
   google::protobuf::compiler::CommandLineInterface cli;
   cli.SetInputsAreProtoPathRelative(true);

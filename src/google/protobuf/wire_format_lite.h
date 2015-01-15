@@ -41,16 +41,14 @@
 #define GOOGLE_PROTOBUF_WIRE_FORMAT_LITE_H__
 
 #include <string>
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/message_lite.h>
+#include <google/protobuf/io/coded_stream.h>  // for CodedOutputStream::Varint32Size
 
 namespace google {
 
 namespace protobuf {
   template <typename T> class RepeatedField;  // repeated_field.h
-  namespace io {
-    class CodedInputStream;             // coded_stream.h
-    class CodedOutputStream;            // coded_stream.h
-  }
 }
 
 namespace protobuf {
@@ -165,10 +163,21 @@ class LIBPROTOBUF_EXPORT WireFormatLite {
   // records to an UnknownFieldSet.
   static bool SkipField(io::CodedInputStream* input, uint32 tag);
 
+  // Skips a field value with the given tag.  The input should start
+  // positioned immediately after the tag. Skipped values are recorded to a
+  // CodedOutputStream.
+  static bool SkipField(io::CodedInputStream* input, uint32 tag,
+                        io::CodedOutputStream* output);
+
   // Reads and ignores a message from the input.  Skipped values are simply
   // discarded, not recorded anywhere.  See WireFormat::SkipMessage() for a
   // version that records to an UnknownFieldSet.
   static bool SkipMessage(io::CodedInputStream* input);
+
+  // Reads and ignores a message from the input.  Skipped values are recorded
+  // to a CodedOutputStream.
+  static bool SkipMessage(io::CodedInputStream* input,
+                          io::CodedOutputStream* output);
 
 // This macro does the same thing as WireFormatLite::MakeTag(), but the
 // result is usable as a compile-time constant, which makes it usable
@@ -342,6 +351,10 @@ class LIBPROTOBUF_EXPORT WireFormatLite {
 
   static void WriteString(field_number, const string& value, output);
   static void WriteBytes (field_number, const string& value, output);
+  static void WriteStringMaybeAliased(
+      field_number, const string& value, output);
+  static void WriteBytesMaybeAliased(
+      field_number, const string& value, output);
 
   static void WriteGroup(
     field_number, const MessageLite& value, output);
@@ -477,6 +490,10 @@ class LIBPROTOBUF_EXPORT WireFormatLite {
   template<typename MessageType>
   static inline int MessageSizeNoVirtual(const MessageType& value);
 
+  // Given the length of data, calculate the byte size of the data on the
+  // wire if we encode the data as a length delimited field.
+  static inline int LengthDelimitedSize(int length);
+
  private:
   // A helper method for the repeated primitive reader. This method has
   // optimizations for primitive types that have fixed size on the wire, and
@@ -485,6 +502,12 @@ class LIBPROTOBUF_EXPORT WireFormatLite {
   static inline bool ReadRepeatedFixedSizePrimitive(
       int tag_size,
       uint32 tag,
+      google::protobuf::io::CodedInputStream* input,
+      RepeatedField<CType>* value) GOOGLE_ATTRIBUTE_ALWAYS_INLINE;
+
+  // Like ReadRepeatedFixedSizePrimitive but for packed primitive fields.
+  template <typename CType, enum FieldType DeclaredType>
+  static inline bool ReadPackedFixedSizePrimitive(
       google::protobuf::io::CodedInputStream* input,
       RepeatedField<CType>* value) GOOGLE_ATTRIBUTE_ALWAYS_INLINE;
 
@@ -515,6 +538,24 @@ class LIBPROTOBUF_EXPORT FieldSkipper {
   // saves it as an unknown varint.
   virtual void SkipUnknownEnum(int field_number, int value);
 };
+
+// Subclass of FieldSkipper which saves skipped fields to a CodedOutputStream.
+
+class LIBPROTOBUF_EXPORT CodedOutputStreamFieldSkipper : public FieldSkipper {
+ public:
+  explicit CodedOutputStreamFieldSkipper(io::CodedOutputStream* unknown_fields)
+      : unknown_fields_(unknown_fields) {}
+  virtual ~CodedOutputStreamFieldSkipper() {}
+
+  // implements FieldSkipper -----------------------------------------
+  virtual bool SkipField(io::CodedInputStream* input, uint32 tag);
+  virtual bool SkipMessage(io::CodedInputStream* input);
+  virtual void SkipUnknownEnum(int field_number, int value);
+
+ protected:
+  io::CodedOutputStream* unknown_fields_;
+};
+
 
 // inline methods ====================================================
 

@@ -72,8 +72,19 @@ class BaseContainer(object):
     # The concrete classes should define __eq__.
     return not self == other
 
+  def __hash__(self):
+    raise TypeError('unhashable object')
+
   def __repr__(self):
     return repr(self._values)
+
+  def sort(self, *args, **kwargs):
+    # Continue to support the old sort_function keyword argument.
+    # This is expected to be a rare occurrence, so use LBYL to avoid
+    # the overhead of actually catching KeyError.
+    if 'sort_function' in kwargs:
+      kwargs['cmp'] = kwargs.pop('sort_function')
+    self._values.sort(*args, **kwargs)
 
 
 class RepeatedScalarFieldContainer(BaseContainer):
@@ -97,15 +108,13 @@ class RepeatedScalarFieldContainer(BaseContainer):
 
   def append(self, value):
     """Appends an item to the list. Similar to list.append()."""
-    self._type_checker.CheckValue(value)
-    self._values.append(value)
+    self._values.append(self._type_checker.CheckValue(value))
     if not self._message_listener.dirty:
       self._message_listener.Modified()
 
   def insert(self, key, value):
     """Inserts the item at the specified position. Similar to list.insert()."""
-    self._type_checker.CheckValue(value)
-    self._values.insert(key, value)
+    self._values.insert(key, self._type_checker.CheckValue(value))
     if not self._message_listener.dirty:
       self._message_listener.Modified()
 
@@ -116,8 +125,7 @@ class RepeatedScalarFieldContainer(BaseContainer):
 
     new_values = []
     for elem in elem_seq:
-      self._type_checker.CheckValue(elem)
-      new_values.append(elem)
+      new_values.append(self._type_checker.CheckValue(elem))
     self._values.extend(new_values)
     self._message_listener.Modified()
 
@@ -135,9 +143,13 @@ class RepeatedScalarFieldContainer(BaseContainer):
 
   def __setitem__(self, key, value):
     """Sets the item on the specified position."""
-    self._type_checker.CheckValue(value)
-    self._values[key] = value
-    self._message_listener.Modified()
+    if isinstance(key, slice):  # PY3
+      if key.step is not None:
+        raise ValueError('Extended slices not supported')
+      self.__setslice__(key.start, key.stop, value)
+    else:
+      self._values[key] = self._type_checker.CheckValue(value)
+      self._message_listener.Modified()
 
   def __getslice__(self, start, stop):
     """Retrieves the subset of items from between the specified indices."""
@@ -147,8 +159,7 @@ class RepeatedScalarFieldContainer(BaseContainer):
     """Sets the subset of items from between the specified indices."""
     new_values = []
     for value in values:
-      self._type_checker.CheckValue(value)
-      new_values.append(value)
+      new_values.append(self._type_checker.CheckValue(value))
     self._values[start:stop] = new_values
     self._message_listener.Modified()
 
@@ -198,27 +209,41 @@ class RepeatedCompositeFieldContainer(BaseContainer):
     super(RepeatedCompositeFieldContainer, self).__init__(message_listener)
     self._message_descriptor = message_descriptor
 
-  def add(self):
-    new_element = self._message_descriptor._concrete_class()
+  def add(self, **kwargs):
+    """Adds a new element at the end of the list and returns it. Keyword
+    arguments may be used to initialize the element.
+    """
+    new_element = self._message_descriptor._concrete_class(**kwargs)
     new_element._SetListener(self._message_listener)
     self._values.append(new_element)
     if not self._message_listener.dirty:
       self._message_listener.Modified()
     return new_element
 
-  def MergeFrom(self, other):
-    """Appends the contents of another repeated field of the same type to this
-    one, copying each individual message.
+  def extend(self, elem_seq):
+    """Extends by appending the given sequence of elements of the same type
+    as this one, copying each individual message.
     """
     message_class = self._message_descriptor._concrete_class
     listener = self._message_listener
     values = self._values
-    for message in other._values:
+    for message in elem_seq:
       new_element = message_class()
       new_element._SetListener(listener)
       new_element.MergeFrom(message)
       values.append(new_element)
     listener.Modified()
+
+  def MergeFrom(self, other):
+    """Appends the contents of another repeated field of the same type to this
+    one, copying each individual message.
+    """
+    self.extend(other._values)
+
+  def remove(self, elem):
+    """Removes an item from the list. Similar to list.remove()."""
+    self._values.remove(elem)
+    self._message_listener.Modified()
 
   def __getslice__(self, start, stop):
     """Retrieves the subset of items from between the specified indices."""

@@ -37,8 +37,9 @@
 #define GOOGLE_PROTOBUF_IO_CODED_STREAM_INL_H__
 
 #include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 #include <string>
-#include <google/protobuf/stubs/stl_util-inl.h>
+#include <google/protobuf/stubs/stl_util.h>
 
 namespace google {
 namespace protobuf {
@@ -50,8 +51,12 @@ inline bool CodedInputStream::InternalReadStringInline(string* buffer,
 
   if (BufferSize() >= size) {
     STLStringResizeUninitialized(buffer, size);
-    memcpy(string_as_array(buffer), buffer_, size);
-    Advance(size);
+    // When buffer is empty, string_as_array(buffer) will return NULL but memcpy
+    // requires non-NULL pointers even when size is 0. Hench this check.
+    if (size > 0) {
+      memcpy(mutable_string_data(buffer), buffer_, size);
+      Advance(size);
+    }
     return true;
   }
 

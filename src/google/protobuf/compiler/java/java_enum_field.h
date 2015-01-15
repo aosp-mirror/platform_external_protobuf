@@ -41,56 +41,113 @@
 
 namespace google {
 namespace protobuf {
+  namespace compiler {
+    namespace java {
+      class Context;            // context.h
+      class ClassNameResolver;  // name_resolver.h
+    }
+  }
+}
+
+namespace protobuf {
 namespace compiler {
 namespace java {
 
-class EnumFieldGenerator : public FieldGenerator {
+class ImmutableEnumFieldGenerator : public ImmutableFieldGenerator {
  public:
-  explicit EnumFieldGenerator(const FieldDescriptor* descriptor);
-  ~EnumFieldGenerator();
+  explicit ImmutableEnumFieldGenerator(
+      const FieldDescriptor* descriptor, int messageBitIndex,
+      int builderBitIndex, Context* context);
+  ~ImmutableEnumFieldGenerator();
 
-  // implements FieldGenerator ---------------------------------------
+  // implements ImmutableFieldGenerator ---------------------------------------
+  int GetNumBitsForMessage() const;
+  int GetNumBitsForBuilder() const;
+  void GenerateInterfaceMembers(io::Printer* printer) const;
   void GenerateMembers(io::Printer* printer) const;
   void GenerateBuilderMembers(io::Printer* printer) const;
   void GenerateInitializationCode(io::Printer* printer) const;
+  void GenerateBuilderClearCode(io::Printer* printer) const;
+  void GenerateMergingCode(io::Printer* printer) const;
+  void GenerateBuildingCode(io::Printer* printer) const;
+  void GenerateParsingCode(io::Printer* printer) const;
+  void GenerateParsingDoneCode(io::Printer* printer) const;
+  void GenerateSerializationCode(io::Printer* printer) const;
+  void GenerateSerializedSizeCode(io::Printer* printer) const;
+  void GenerateFieldBuilderInitializationCode(io::Printer* printer) const;
+  void GenerateEqualsCode(io::Printer* printer) const;
+  void GenerateHashCode(io::Printer* printer) const;
+
+  string GetBoxedType() const;
+
+ protected:
+  const FieldDescriptor* descriptor_;
+  map<string, string> variables_;
+  const int messageBitIndex_;
+  const int builderBitIndex_;
+  Context* context_;
+  ClassNameResolver* name_resolver_;
+
+ private:
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImmutableEnumFieldGenerator);
+};
+
+class ImmutableEnumOneofFieldGenerator : public ImmutableEnumFieldGenerator {
+ public:
+  ImmutableEnumOneofFieldGenerator(
+      const FieldDescriptor* descriptor, int messageBitIndex,
+      int builderBitIndex, Context* context);
+  ~ImmutableEnumOneofFieldGenerator();
+
+  void GenerateMembers(io::Printer* printer) const;
+  void GenerateBuilderMembers(io::Printer* printer) const;
   void GenerateMergingCode(io::Printer* printer) const;
   void GenerateBuildingCode(io::Printer* printer) const;
   void GenerateParsingCode(io::Printer* printer) const;
   void GenerateSerializationCode(io::Printer* printer) const;
   void GenerateSerializedSizeCode(io::Printer* printer) const;
 
-  string GetBoxedType() const;
-
  private:
-  const FieldDescriptor* descriptor_;
-  map<string, string> variables_;
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(EnumFieldGenerator);
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImmutableEnumOneofFieldGenerator);
 };
 
-class RepeatedEnumFieldGenerator : public FieldGenerator {
+class RepeatedImmutableEnumFieldGenerator : public ImmutableFieldGenerator {
  public:
-  explicit RepeatedEnumFieldGenerator(const FieldDescriptor* descriptor);
-  ~RepeatedEnumFieldGenerator();
+  explicit RepeatedImmutableEnumFieldGenerator(
+      const FieldDescriptor* descriptor, int messageBitIndex,
+      int builderBitIndex, Context* context);
+  ~RepeatedImmutableEnumFieldGenerator();
 
-  // implements FieldGenerator ---------------------------------------
+  // implements ImmutableFieldGenerator ---------------------------------------
+  int GetNumBitsForMessage() const;
+  int GetNumBitsForBuilder() const;
+  void GenerateInterfaceMembers(io::Printer* printer) const;
   void GenerateMembers(io::Printer* printer) const;
   void GenerateBuilderMembers(io::Printer* printer) const;
   void GenerateInitializationCode(io::Printer* printer) const;
+  void GenerateBuilderClearCode(io::Printer* printer) const;
   void GenerateMergingCode(io::Printer* printer) const;
   void GenerateBuildingCode(io::Printer* printer) const;
   void GenerateParsingCode(io::Printer* printer) const;
   void GenerateParsingCodeFromPacked(io::Printer* printer) const;
+  void GenerateParsingDoneCode(io::Printer* printer) const;
   void GenerateSerializationCode(io::Printer* printer) const;
   void GenerateSerializedSizeCode(io::Printer* printer) const;
+  void GenerateFieldBuilderInitializationCode(io::Printer* printer) const;
+  void GenerateEqualsCode(io::Printer* printer) const;
+  void GenerateHashCode(io::Printer* printer) const;
 
   string GetBoxedType() const;
 
  private:
   const FieldDescriptor* descriptor_;
   map<string, string> variables_;
+  const int messageBitIndex_;
+  const int builderBitIndex_;
+  Context* context_;
+  ClassNameResolver* name_resolver_;
 
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(RepeatedEnumFieldGenerator);
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(RepeatedImmutableEnumFieldGenerator);
 };
 
 }  // namespace java

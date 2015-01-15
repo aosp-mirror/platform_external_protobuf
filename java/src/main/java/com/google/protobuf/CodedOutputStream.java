@@ -30,9 +30,10 @@
 
 package com.google.protobuf;
 
-import java.io.OutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 
 /**
  * Encodes and writes protocol message fields.
@@ -52,6 +53,7 @@ public final class CodedOutputStream {
   private final byte[] buffer;
   private final int limit;
   private int position;
+  private int totalBytesWritten = 0;
 
   private final OutputStream output;
 
@@ -128,6 +130,38 @@ public final class CodedOutputStream {
     return new CodedOutputStream(flatArray, offset, length);
   }
 
+  /**
+   * Create a new {@code CodedOutputStream} that writes to the given ByteBuffer.
+   */
+  public static CodedOutputStream newInstance(ByteBuffer byteBuffer) {
+    return newInstance(byteBuffer, DEFAULT_BUFFER_SIZE);
+  }
+
+  /**
+   * Create a new {@code CodedOutputStream} that writes to the given ByteBuffer.
+   */
+  public static CodedOutputStream newInstance(ByteBuffer byteBuffer,
+      int bufferSize) {
+    return newInstance(new ByteBufferOutputStream(byteBuffer), bufferSize);
+  }
+  
+  private static class ByteBufferOutputStream extends OutputStream {
+    private final ByteBuffer byteBuffer;
+    public ByteBufferOutputStream(ByteBuffer byteBuffer) {
+      this.byteBuffer = byteBuffer;
+    }
+
+    @Override
+    public void write(int b) throws IOException {
+      byteBuffer.put((byte) b);
+    }
+
+    @Override
+    public void write(byte[] data, int offset, int length) throws IOException {
+      byteBuffer.put(data, offset, length);
+    }
+  }
+
   // -----------------------------------------------------------------
 
   /** Write a {@code double} field, including tag, to the stream. */
@@ -201,6 +235,7 @@ public final class CodedOutputStream {
     writeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP);
   }
 
+
   /**
    * Write a group represented by an {@link UnknownFieldSet}.
    *
@@ -221,11 +256,45 @@ public final class CodedOutputStream {
     writeMessageNoTag(value);
   }
 
+
   /** Write a {@code bytes} field, including tag, to the stream. */
   public void writeBytes(final int fieldNumber, final ByteString value)
                          throws IOException {
     writeTag(fieldNumber, WireFormat.WIRETYPE_LENGTH_DELIMITED);
     writeBytesNoTag(value);
+  }
+
+  /** Write a {@code bytes} field, including tag, to the stream. */
+  public void writeByteArray(final int fieldNumber, final byte[] value)
+                             throws IOException {
+    writeTag(fieldNumber, WireFormat.WIRETYPE_LENGTH_DELIMITED);
+    writeByteArrayNoTag(value);
+  }
+
+  /** Write a {@code bytes} field, including tag, to the stream. */
+  public void writeByteArray(final int fieldNumber,
+                             final byte[] value,
+                             final int offset,
+                             final int length)
+                             throws IOException {
+    writeTag(fieldNumber, WireFormat.WIRETYPE_LENGTH_DELIMITED);
+    writeByteArrayNoTag(value, offset, length);
+  }
+
+  /**
+   * Write a {@code bytes} field, including tag, to the stream.
+   * This method will write all content of the ByteBuffer regardless of the
+   * current position and limit (i.e., the number of bytes to be written is
+   * value.capacity(), not value.remaining()). Furthermore, this method doesn't
+   * alter the state of the passed-in ByteBuffer. Its position, limit, mark,
+   * etc. will remain unchanged. If you only want to write the remaining bytes
+   * of a ByteBuffer, you can call
+   * {@code writeByteBuffer(fieldNumber, byteBuffer.slice())}.
+   */
+  public void writeByteBuffer(final int fieldNumber, final ByteBuffer value)
+      throws IOException {
+    writeTag(fieldNumber, WireFormat.WIRETYPE_LENGTH_DELIMITED);
+    writeByteBufferNoTag(value);
   }
 
   /** Write a {@code uint32} field, including tag, to the stream. */
@@ -361,6 +430,7 @@ public final class CodedOutputStream {
     value.writeTo(this);
   }
 
+
   /**
    * Write a group represented by an {@link UnknownFieldSet}.
    *
@@ -379,11 +449,39 @@ public final class CodedOutputStream {
     value.writeTo(this);
   }
 
+
   /** Write a {@code bytes} field to the stream. */
   public void writeBytesNoTag(final ByteString value) throws IOException {
-    final byte[] bytes = value.toByteArray();
-    writeRawVarint32(bytes.length);
-    writeRawBytes(bytes);
+    writeRawVarint32(value.size());
+    writeRawBytes(value);
+  }
+
+  /** Write a {@code bytes} field to the stream. */
+  public void writeByteArrayNoTag(final byte[] value) throws IOException {
+    writeRawVarint32(value.length);
+    writeRawBytes(value);
+  }
+
+  /** Write a {@code bytes} field to the stream. */
+  public void writeByteArrayNoTag(final byte[] value,
+                                  final int offset,
+                                  final int length) throws IOException {
+    writeRawVarint32(length);
+    writeRawBytes(value, offset, length);
+  }
+
+  /**
+   * Write a {@code bytes} field to the stream.  This method will write all
+   * content of the ByteBuffer regardless of the current position and limit
+   * (i.e., the number of bytes to be written is value.capacity(), not
+   * value.remaining()). Furthermore, this method doesn't alter the state of
+   * the passed-in ByteBuffer. Its position, limit, mark, etc. will remain
+   * unchanged. If you only want to write the remaining bytes of a ByteBuffer,
+   * you can call {@code writeByteBufferNoTag(byteBuffer.slice())}.
+   */
+  public void writeByteBufferNoTag(final ByteBuffer value) throws IOException {
+    writeRawVarint32(value.capacity());
+    writeRawBytes(value);
   }
 
   /** Write a {@code uint32} field to the stream. */
@@ -396,7 +494,7 @@ public final class CodedOutputStream {
    * for converting the enum value to its numeric value.
    */
   public void writeEnumNoTag(final int value) throws IOException {
-    writeRawVarint32(value);
+    writeInt32NoTag(value);
   }
 
   /** Write an {@code sfixed32} field to the stream. */
@@ -541,6 +639,33 @@ public final class CodedOutputStream {
 
   /**
    * Compute the number of bytes that would be needed to encode a
+   * {@code bytes} field, including tag.
+   */
+  public static int computeByteArraySize(final int fieldNumber,
+                                         final byte[] value) {
+    return computeTagSize(fieldNumber) + computeByteArraySizeNoTag(value);
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
+   * {@code bytes} field, including tag.
+   */
+  public static int computeByteBufferSize(final int fieldNumber,
+                                         final ByteBuffer value) {
+    return computeTagSize(fieldNumber) + computeByteBufferSizeNoTag(value);
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode an
+   * embedded message in lazy field, including tag.
+   */
+  public static int computeLazyFieldSize(final int fieldNumber,
+                                         final LazyFieldLite value) {
+    return computeTagSize(fieldNumber) + computeLazyFieldSizeNoTag(value);
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
    * {@code uint32} field, including tag.
    */
   public static int computeUInt32Size(final int fieldNumber, final int value) {
@@ -614,6 +739,18 @@ public final class CodedOutputStream {
            computeBytesSize(WireFormat.MESSAGE_SET_MESSAGE, value);
   }
 
+  /**
+   * Compute the number of bytes that would be needed to encode an
+   * lazily parsed MessageSet extension field to the stream.  For
+   * historical reasons, the wire format differs from normal fields.
+   */
+  public static int computeLazyFieldMessageSetExtensionSize(
+      final int fieldNumber, final LazyFieldLite value) {
+    return computeTagSize(WireFormat.MESSAGE_SET_ITEM) * 2 +
+           computeUInt32Size(WireFormat.MESSAGE_SET_TYPE_ID, fieldNumber) +
+           computeLazyFieldSize(WireFormat.MESSAGE_SET_MESSAGE, value);
+  }
+  
   // -----------------------------------------------------------------
 
   /**
@@ -730,12 +867,37 @@ public final class CodedOutputStream {
   }
 
   /**
+   * Compute the number of bytes that would be needed to encode an embedded
+   * message stored in lazy field.
+   */
+  public static int computeLazyFieldSizeNoTag(final LazyFieldLite value) {
+    final int size = value.getSerializedSize();
+    return computeRawVarint32Size(size) + size;
+  }
+
+  /**
    * Compute the number of bytes that would be needed to encode a
    * {@code bytes} field.
    */
   public static int computeBytesSizeNoTag(final ByteString value) {
     return computeRawVarint32Size(value.size()) +
            value.size();
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
+   * {@code bytes} field.
+   */
+  public static int computeByteArraySizeNoTag(final byte[] value) {
+    return computeRawVarint32Size(value.length) + value.length;
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
+   * {@code bytes} field.
+   */
+  public static int computeByteBufferSizeNoTag(final ByteBuffer value) {
+    return computeRawVarint32Size(value.capacity()) + value.capacity();
   }
 
   /**
@@ -751,7 +913,7 @@ public final class CodedOutputStream {
    * Caller is responsible for converting the enum value to its numeric value.
    */
   public static int computeEnumSizeNoTag(final int value) {
-    return computeRawVarint32Size(value);
+    return computeInt32SizeNoTag(value);
   }
 
   /**
@@ -856,6 +1018,15 @@ public final class CodedOutputStream {
     }
   }
 
+  /**
+   * Get the total number of bytes successfully written to this stream.  The
+   * returned value is not guaranteed to be accurate if exceptions have been
+   * found in the middle of writing.
+   */
+  public int getTotalBytesWritten() {
+    return totalBytesWritten;
+  }
+
   /** Write a single byte. */
   public void writeRawByte(final byte value) throws IOException {
     if (position == limit) {
@@ -863,6 +1034,7 @@ public final class CodedOutputStream {
     }
 
     buffer[position++] = value;
+    ++totalBytesWritten;
   }
 
   /** Write a single byte, represented by an integer value. */
@@ -870,9 +1042,69 @@ public final class CodedOutputStream {
     writeRawByte((byte) value);
   }
 
+  /** Write a byte string. */
+  public void writeRawBytes(final ByteString value) throws IOException {
+    writeRawBytes(value, 0, value.size());
+  }
+
   /** Write an array of bytes. */
   public void writeRawBytes(final byte[] value) throws IOException {
     writeRawBytes(value, 0, value.length);
+  }
+
+  /**
+   * Write a ByteBuffer. This method will write all content of the ByteBuffer
+   * regardless of the current position and limit (i.e., the number of bytes
+   * to be written is value.capacity(), not value.remaining()). Furthermore,
+   * this method doesn't alter the state of the passed-in ByteBuffer. Its
+   * position, limit, mark, etc. will remain unchanged. If you only want to
+   * write the remaining bytes of a ByteBuffer, you can call
+   * {@code writeRawBytes(byteBuffer.slice())}.
+   */
+  public void writeRawBytes(final ByteBuffer value) throws IOException {
+    if (value.hasArray()) {
+      writeRawBytes(value.array(), value.arrayOffset(), value.capacity());
+    } else {
+      ByteBuffer duplicated = value.duplicate();
+      duplicated.clear();
+      writeRawBytesInternal(duplicated);
+    }
+  }
+
+  /** Write a ByteBuffer that isn't backed by an array. */
+  private void writeRawBytesInternal(final ByteBuffer value)
+      throws IOException {
+    int length = value.remaining();
+    if (limit - position >= length) {
+      // We have room in the current buffer.
+      value.get(buffer, position, length);
+      position += length;
+      totalBytesWritten += length;
+    } else {
+      // Write extends past current buffer.  Fill the rest of this buffer and
+      // flush.
+      final int bytesWritten = limit - position;
+      value.get(buffer, position, bytesWritten);
+      length -= bytesWritten;
+      position = limit;
+      totalBytesWritten += bytesWritten;
+      refreshBuffer();
+
+      // Now deal with the rest.
+      // Since we have an output stream, this is our buffer
+      // and buffer offset == 0
+      while (length > limit) {
+        // Copy data into the buffer before writing it to OutputStream.
+        // TODO(xiaofeng): Introduce ZeroCopyOutputStream to avoid this copy.
+        value.get(buffer, 0, limit);
+        output.write(buffer, 0, limit);
+        length -= limit;
+        totalBytesWritten += limit;
+      }
+      value.get(buffer, 0, length);
+      position = length;
+      totalBytesWritten += length;
+    }
   }
 
   /** Write part of an array of bytes. */
@@ -882,6 +1114,7 @@ public final class CodedOutputStream {
       // We have room in the current buffer.
       System.arraycopy(value, offset, buffer, position, length);
       position += length;
+      totalBytesWritten += length;
     } else {
       // Write extends past current buffer.  Fill the rest of this buffer and
       // flush.
@@ -890,6 +1123,7 @@ public final class CodedOutputStream {
       offset += bytesWritten;
       length -= bytesWritten;
       position = limit;
+      totalBytesWritten += bytesWritten;
       refreshBuffer();
 
       // Now deal with the rest.
@@ -903,6 +1137,40 @@ public final class CodedOutputStream {
         // Write is very big.  Let's do it all at once.
         output.write(value, offset, length);
       }
+      totalBytesWritten += length;
+    }
+  }
+
+  /** Write part of a byte string. */
+  public void writeRawBytes(final ByteString value, int offset, int length)
+                            throws IOException {
+    if (limit - position >= length) {
+      // We have room in the current buffer.
+      value.copyTo(buffer, offset, position, length);
+      position += length;
+      totalBytesWritten += length;
+    } else {
+      // Write extends past current buffer.  Fill the rest of this buffer and
+      // flush.
+      final int bytesWritten = limit - position;
+      value.copyTo(buffer, offset, position, bytesWritten);
+      offset += bytesWritten;
+      length -= bytesWritten;
+      position = limit;
+      totalBytesWritten += bytesWritten;
+      refreshBuffer();
+
+      // Now deal with the rest.
+      // Since we have an output stream, this is our buffer
+      // and buffer offset == 0
+      if (length <= limit) {
+        // Fits in new buffer.
+        value.copyTo(buffer, offset, 0, length);
+        position = length;
+      } else {
+        value.writeTo(output, offset, length);
+      }
+      totalBytesWritten += length;
     }
   }
 

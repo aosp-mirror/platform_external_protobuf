@@ -40,9 +40,30 @@ import java.io.IOException;
  */
 public class InvalidProtocolBufferException extends IOException {
   private static final long serialVersionUID = -1616151763072450476L;
+  private MessageLite unfinishedMessage = null;
 
   public InvalidProtocolBufferException(final String description) {
     super(description);
+  }
+
+  /**
+   * Attaches an unfinished message to the exception to support best-effort
+   * parsing in {@code Parser} interface.
+   *
+   * @return this
+   */
+  public InvalidProtocolBufferException setUnfinishedMessage(
+      MessageLite unfinishedMessage) {
+    this.unfinishedMessage = unfinishedMessage;
+    return this;
+  }
+
+  /**
+   * Returns the unfinished message attached to the exception, or null if
+   * no message is attached.
+   */
+  public MessageLite getUnfinishedMessage() {
+    return unfinishedMessage;
   }
 
   static InvalidProtocolBufferException truncatedMessage() {
@@ -89,5 +110,13 @@ public class InvalidProtocolBufferException extends IOException {
     return new InvalidProtocolBufferException(
       "Protocol message was too large.  May be malicious.  " +
       "Use CodedInputStream.setSizeLimit() to increase the size limit.");
+  }
+
+  static InvalidProtocolBufferException parseFailure() {
+    return new InvalidProtocolBufferException("Failed to parse the message.");
+  }
+
+  static InvalidProtocolBufferException invalidUtf8() {
+    return new InvalidProtocolBufferException("Protocol message had invalid UTF-8.");
   }
 }
