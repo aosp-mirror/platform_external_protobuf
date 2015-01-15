@@ -126,6 +126,7 @@ LIBPROTOBUF_EXPORT void StripString(string* s, const char* remove,
 // ----------------------------------------------------------------------
 // LowerString()
 // UpperString()
+// ToUpper()
 //    Convert the characters in "s" to lowercase or uppercase.  ASCII-only:
 //    these functions intentionally ignore locale because they are applied to
 //    identifiers used in the Protocol Buffer language, not to natural-language
@@ -148,6 +149,12 @@ inline void UpperString(string * s) {
   }
 }
 
+inline string ToUpper(const string& s) {
+  string out = s;
+  UpperString(&out);
+  return out;
+}
+
 // ----------------------------------------------------------------------
 // StringReplace()
 //    Give me a string and two patterns "old" and "new", and I replace
@@ -167,6 +174,33 @@ LIBPROTOBUF_EXPORT string StringReplace(const string& s, const string& oldsub,
 // ----------------------------------------------------------------------
 LIBPROTOBUF_EXPORT void SplitStringUsing(const string& full, const char* delim,
                                          vector<string>* res);
+
+// Split a string using one or more byte delimiters, presented
+// as a nul-terminated c string. Append the components to 'result'.
+// If there are consecutive delimiters, this function will return
+// corresponding empty strings.  If you want to drop the empty
+// strings, try SplitStringUsing().
+//
+// If "full" is the empty string, yields an empty string as the only value.
+// ----------------------------------------------------------------------
+LIBPROTOBUF_EXPORT void SplitStringAllowEmpty(const string& full,
+                                              const char* delim,
+                                              vector<string>* result);
+
+// ----------------------------------------------------------------------
+// Split()
+//    Split a string using a character delimiter.
+// ----------------------------------------------------------------------
+inline vector<string> Split(
+    const string& full, const char* delim, bool skip_empty = true) {
+  vector<string> result;
+  if (skip_empty) {
+    SplitStringUsing(full, delim, &result);
+  } else {
+    SplitStringAllowEmpty(full, delim, &result);
+  }
+  return result;
+}
 
 // ----------------------------------------------------------------------
 // JoinStrings()
@@ -207,9 +241,7 @@ inline string JoinStrings(const vector<string>& components,
 //    hex digits, upper or lower case) to specify a Unicode code
 //    point. The dest array will contain the UTF8-encoded version of
 //    that code-point (e.g., if source contains \u2019, then dest will
-//    contain the three bytes 0xE2, 0x80, and 0x99). For the inverse
-//    transformation, use UniLib::UTF8EscapeString
-//    (util/utf8/unilib.h), not CEscapeString.
+//    contain the three bytes 0xE2, 0x80, and 0x99).
 //
 //    Errors: In the first form of the call, errors are reported with
 //    LOG(ERROR). The same is true for the second form of the call if
@@ -314,6 +346,15 @@ inline uint64 strtou64(const char *nptr, char **endptr, int base) {
   GOOGLE_COMPILE_ASSERT(sizeof(uint64) == sizeof(unsigned long long),
                         sizeof_uint64_is_not_sizeof_long_long);
   return strtoull(nptr, endptr, base);
+}
+
+// ----------------------------------------------------------------------
+// safe_strto32()
+// ----------------------------------------------------------------------
+LIBPROTOBUF_EXPORT bool safe_int(string text, int32* value_p);
+
+inline bool safe_strto32(string text, int32* value) {
+  return safe_int(text, value);
 }
 
 // ----------------------------------------------------------------------
@@ -444,16 +485,78 @@ static const int kDoubleToBufferSize = 32;
 static const int kFloatToBufferSize = 24;
 
 // ----------------------------------------------------------------------
-// NoLocaleStrtod()
-//   Exactly like strtod(), except it always behaves as if in the "C"
-//   locale (i.e. decimal points must be '.'s).
+// ToString() are internal help methods used in StrCat() and Join()
 // ----------------------------------------------------------------------
+namespace internal {
+inline string ToString(int i) {
+  return SimpleItoa(i);
+}
 
-LIBPROTOBUF_EXPORT double NoLocaleStrtod(const char* text, char** endptr);
+inline string ToString(string a) {
+  return a;
+}
+}  // namespace internal
+
+// ----------------------------------------------------------------------
+// StrCat()
+//    These methods join some strings together.
+// ----------------------------------------------------------------------
+template <typename T1, typename T2, typename T3, typename T4, typename T5>
+string StrCat(
+    const T1& a, const T2& b, const T3& c, const T4& d, const T5& e) {
+  return internal::ToString(a) + internal::ToString(b) +
+      internal::ToString(c) + internal::ToString(d) + internal::ToString(e);
+}
+
+template <typename T1, typename T2, typename T3, typename T4>
+string StrCat(
+    const T1& a, const T2& b, const T3& c, const T4& d) {
+  return internal::ToString(a) + internal::ToString(b) +
+      internal::ToString(c) + internal::ToString(d);
+}
+
+template <typename T1, typename T2, typename T3>
+string StrCat(const T1& a, const T2& b, const T3& c) {
+  return internal::ToString(a) + internal::ToString(b) +
+      internal::ToString(c);
+}
+
+template <typename T1, typename T2>
+string StrCat(const T1& a, const T2& b) {
+  return internal::ToString(a) + internal::ToString(b);
+}
+
+// ----------------------------------------------------------------------
+// Join()
+//    These methods concatenate a range of components into a C++ string, using
+//    the C-string "delim" as a separator between components.
+// ----------------------------------------------------------------------
+template <typename Iterator>
+void Join(Iterator start, Iterator end,
+          const char* delim, string* result) {
+  for (Iterator it = start; it != end; ++it) {
+    if (it != start) {
+      result->append(delim);
+    }
+    result->append(internal::ToString(*it));
+  }
+}
+
+template <typename Range>
+string Join(const Range& components,
+            const char* delim) {
+  string result;
+  Join(components.begin(), components.end(), delim, &result);
+  return result;
+}
+
+// ----------------------------------------------------------------------
+// ToHex()
+//    Return a lower-case hex string representation of the given integer.
+// ----------------------------------------------------------------------
+LIBPROTOBUF_EXPORT string ToHex(uint64 num);
 
 }  // namespace protobuf
 }  // namespace google
 
 #endif  // GOOGLE_PROTOBUF_STUBS_STRUTIL_H__
-
-

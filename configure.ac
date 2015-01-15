@@ -12,8 +12,9 @@ AC_PREREQ(2.59)
 # In the SVN trunk, the version should always be the next anticipated release
 # version with the "-pre" suffix.  (We used to use "-SNAPSHOT" but this pushed
 # the size of one file name in the dist tarfile over the 99-char limit.)
-AC_INIT([Protocol Buffers],[2.3.0],[protobuf@googlegroups.com],[protobuf])
+AC_INIT([Protocol Buffers],[2.6.0],[protobuf@googlegroups.com],[protobuf])
 
+AM_MAINTAINER_MODE([enable])
 
 AC_CONFIG_SRCDIR(src/google/protobuf/message.cc)
 AC_CONFIG_HEADERS([config.h])
@@ -28,7 +29,7 @@ AS_IF([test "x${ac_cv_env_CXXFLAGS_set}" = "x"],
 
 AC_CANONICAL_TARGET
 
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([subdir-objects])
 
 AC_ARG_WITH([zlib],
   [AS_HELP_STRING([--with-zlib],
@@ -89,12 +90,12 @@ AS_IF([test "$with_zlib" != no], [
 
   # First check the zlib header version.
   AC_COMPILE_IFELSE(
-    AC_LANG_PROGRAM([[
+    [AC_LANG_PROGRAM([[
         #include <zlib.h>
         #if !defined(ZLIB_VERNUM) || (ZLIB_VERNUM < 0x1204)
         # error zlib version too old
         #endif
-        ]], []), [
+        ]], [])], [
     AC_MSG_RESULT([ok (1.2.0.4 or later)])
 
     # Also need to add -lz to the linker flags and make sure this succeeds.
@@ -118,7 +119,7 @@ AM_CONDITIONAL([HAVE_ZLIB], [test $HAVE_ZLIB = 1])
 
 AS_IF([test "$with_protoc" != "no"], [
   PROTOC=$with_protoc
-  AS_IF([test "$with_protoc" == "yes"], [
+  AS_IF([test "$with_protoc" = "yes"], [
     # No argument given.  Use system protoc.
     PROTOC=protoc
   ])

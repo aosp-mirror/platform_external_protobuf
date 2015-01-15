@@ -48,8 +48,8 @@
 #include <google/protobuf/compiler/importer.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/stubs/stl_util-inl.h>
-#include <google/protobuf/stubs/map-util.h>
+#include <google/protobuf/stubs/map_util.h>
+#include <google/protobuf/stubs/stl_util.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
 
@@ -79,10 +79,10 @@ class MockErrorCollector : public MultiFileErrorCollector {
   }
 };
 
-class MockOutputDirectory : public OutputDirectory {
+class MockGeneratorContext : public GeneratorContext {
  public:
-  MockOutputDirectory() {}
-  ~MockOutputDirectory() {
+  MockGeneratorContext() {}
+  ~MockGeneratorContext() {
     STLDeleteValues(&files_);
   }
 
@@ -93,16 +93,16 @@ class MockOutputDirectory : public OutputDirectory {
       << "Generator failed to generate file: " << virtual_filename;
 
     string actual_contents;
-    File::ReadFileToStringOrDie(
-      TestSourceDir() + "/" + physical_filename,
-      &actual_contents);
+    GOOGLE_CHECK_OK(
+        File::GetContents(TestSourceDir() + "/" + physical_filename,
+                          &actual_contents, true));
     EXPECT_TRUE(actual_contents == *expected_contents)
       << physical_filename << " needs to be regenerated.  Please run "
          "generate_descriptor_proto.sh and add this file "
          "to your CL.";
   }
 
-  // implements OutputDirectory --------------------------------------
+  // implements GeneratorContext --------------------------------------
 
   virtual io::ZeroCopyOutputStream* Open(const string& filename) {
     string** map_slot = &files_[filename];
@@ -130,24 +130,24 @@ TEST(BootstrapTest, GeneratedDescriptorMatches) {
   ASSERT_TRUE(plugin_proto_file != NULL);
 
   CppGenerator generator;
-  MockOutputDirectory output_directory;
+  MockGeneratorContext context;
   string error;
   string parameter;
   parameter = "dllexport_decl=LIBPROTOBUF_EXPORT";
   ASSERT_TRUE(generator.Generate(proto_file, parameter,
-                                 &output_directory, &error));
+                                 &context, &error));
   parameter = "dllexport_decl=LIBPROTOC_EXPORT";
   ASSERT_TRUE(generator.Generate(plugin_proto_file, parameter,
-                                 &output_directory, &error));
+                                 &context, &error));
 
-  output_directory.ExpectFileMatches("google/protobuf/descriptor.pb.h",
-                                     "google/protobuf/descriptor.pb.h");
-  output_directory.ExpectFileMatches("google/protobuf/descriptor.pb.cc",
-                                     "google/protobuf/descriptor.pb.cc");
-  output_directory.ExpectFileMatches("google/protobuf/compiler/plugin.pb.h",
-                                     "google/protobuf/compiler/plugin.pb.h");
-  output_directory.ExpectFileMatches("google/protobuf/compiler/plugin.pb.cc",
-                                     "google/protobuf/compiler/plugin.pb.cc");
+  context.ExpectFileMatches("google/protobuf/descriptor.pb.h",
+                            "google/protobuf/descriptor.pb.h");
+  context.ExpectFileMatches("google/protobuf/descriptor.pb.cc",
+                            "google/protobuf/descriptor.pb.cc");
+  context.ExpectFileMatches("google/protobuf/compiler/plugin.pb.h",
+                            "google/protobuf/compiler/plugin.pb.h");
+  context.ExpectFileMatches("google/protobuf/compiler/plugin.pb.cc",
+                            "google/protobuf/compiler/plugin.pb.cc");
 }
 
 }  // namespace

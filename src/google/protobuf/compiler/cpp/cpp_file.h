@@ -35,10 +35,12 @@
 #ifndef GOOGLE_PROTOBUF_COMPILER_CPP_FILE_H__
 #define GOOGLE_PROTOBUF_COMPILER_CPP_FILE_H__
 
+#include <memory>
 #include <string>
 #include <vector>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/compiler/cpp/cpp_field.h>
+#include <google/protobuf/compiler/cpp/cpp_options.h>
 
 namespace google {
 namespace protobuf {
@@ -61,7 +63,7 @@ class FileGenerator {
  public:
   // See generator.cc for the meaning of dllexport_decl.
   explicit FileGenerator(const FileDescriptor* file,
-                         const string& dllexport_decl);
+                         const Options& options);
   ~FileGenerator();
 
   void GenerateHeader(io::Printer* printer);
@@ -84,8 +86,7 @@ class FileGenerator {
 
   // E.g. if the package is foo.bar, package_parts_ is {"foo", "bar"}.
   vector<string> package_parts_;
-
-  string dllexport_decl_;
+  const Options options_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FileGenerator);
 };

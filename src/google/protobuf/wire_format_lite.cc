@@ -40,7 +40,7 @@
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/io/coded_stream_inl.h>
 #include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 
 namespace google {
 namespace protobuf {
@@ -56,10 +56,10 @@ const int WireFormatLite::kMessageSetMessageTag;
 #endif
 
 const int WireFormatLite::kMessageSetItemTagsSize =
-  io::CodedOutputStream::VarintSize32(kMessageSetItemStartTag) +
-  io::CodedOutputStream::VarintSize32(kMessageSetItemEndTag) +
-  io::CodedOutputStream::VarintSize32(kMessageSetTypeIdTag) +
-  io::CodedOutputStream::VarintSize32(kMessageSetMessageTag);
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetItemStartTag>::value +
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetItemEndTag>::value +
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetTypeIdTag>::value +
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetMessageTag>::value;
 
 const WireFormatLite::CppType
 WireFormatLite::kFieldTypeToCppTypeMap[MAX_FIELD_TYPE + 1] = {
@@ -153,8 +153,65 @@ bool WireFormatLite::SkipField(
   }
 }
 
+bool WireFormatLite::SkipField(
+    io::CodedInputStream* input, uint32 tag, io::CodedOutputStream* output) {
+  switch (WireFormatLite::GetTagWireType(tag)) {
+    case WireFormatLite::WIRETYPE_VARINT: {
+      uint64 value;
+      if (!input->ReadVarint64(&value)) return false;
+      output->WriteVarint32(tag);
+      output->WriteVarint64(value);
+      return true;
+    }
+    case WireFormatLite::WIRETYPE_FIXED64: {
+      uint64 value;
+      if (!input->ReadLittleEndian64(&value)) return false;
+      output->WriteVarint32(tag);
+      output->WriteLittleEndian64(value);
+      return true;
+    }
+    case WireFormatLite::WIRETYPE_LENGTH_DELIMITED: {
+      uint32 length;
+      if (!input->ReadVarint32(&length)) return false;
+      output->WriteVarint32(tag);
+      output->WriteVarint32(length);
+      // TODO(mkilavuz): Provide API to prevent extra string copying.
+      string temp;
+      if (!input->ReadString(&temp, length)) return false;
+      output->WriteString(temp);
+      return true;
+    }
+    case WireFormatLite::WIRETYPE_START_GROUP: {
+      output->WriteVarint32(tag);
+      if (!input->IncrementRecursionDepth()) return false;
+      if (!SkipMessage(input, output)) return false;
+      input->DecrementRecursionDepth();
+      // Check that the ending tag matched the starting tag.
+      if (!input->LastTagWas(WireFormatLite::MakeTag(
+          WireFormatLite::GetTagFieldNumber(tag),
+          WireFormatLite::WIRETYPE_END_GROUP))) {
+        return false;
+      }
+      return true;
+    }
+    case WireFormatLite::WIRETYPE_END_GROUP: {
+      return false;
+    }
+    case WireFormatLite::WIRETYPE_FIXED32: {
+      uint32 value;
+      if (!input->ReadLittleEndian32(&value)) return false;
+      output->WriteVarint32(tag);
+      output->WriteLittleEndian32(value);
+      return true;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
 bool WireFormatLite::SkipMessage(io::CodedInputStream* input) {
-  while(true) {
+  while (true) {
     uint32 tag = input->ReadTag();
     if (tag == 0) {
       // End of input.  This is a valid place to end, so return true.
@@ -172,6 +229,27 @@ bool WireFormatLite::SkipMessage(io::CodedInputStream* input) {
   }
 }
 
+bool WireFormatLite::SkipMessage(io::CodedInputStream* input,
+    io::CodedOutputStream* output) {
+  while (true) {
+    uint32 tag = input->ReadTag();
+    if (tag == 0) {
+      // End of input.  This is a valid place to end, so return true.
+      return true;
+    }
+
+    WireFormatLite::WireType wire_type = WireFormatLite::GetTagWireType(tag);
+
+    if (wire_type == WireFormatLite::WIRETYPE_END_GROUP) {
+      output->WriteVarint32(tag);
+      // Must be the end of the message.
+      return true;
+    }
+
+    if (!SkipField(input, tag, output)) return false;
+  }
+}
+
 bool FieldSkipper::SkipField(
     io::CodedInputStream* input, uint32 tag) {
   return WireFormatLite::SkipField(input, tag);
@@ -182,8 +260,23 @@ bool FieldSkipper::SkipMessage(io::CodedInputStream* input) {
 }
 
 void FieldSkipper::SkipUnknownEnum(
-    int field_number, int value) {
+    int /* field_number */, int /* value */) {
   // Nothing.
+}
+
+bool CodedOutputStreamFieldSkipper::SkipField(
+    io::CodedInputStream* input, uint32 tag) {
+  return WireFormatLite::SkipField(input, tag, unknown_fields_);
+}
+
+bool CodedOutputStreamFieldSkipper::SkipMessage(io::CodedInputStream* input) {
+  return WireFormatLite::SkipMessage(input, unknown_fields_);
+}
+
+void CodedOutputStreamFieldSkipper::SkipUnknownEnum(
+    int field_number, int value) {
+  unknown_fields_->WriteVarint32(field_number);
+  unknown_fields_->WriteVarint64(value);
 }
 
 bool WireFormatLite::ReadPackedEnumNoInline(io::CodedInputStream* input,
@@ -281,14 +374,33 @@ void WireFormatLite::WriteString(int field_number, const string& value,
                                  io::CodedOutputStream* output) {
   // String is for UTF-8 text only
   WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
+  GOOGLE_CHECK(value.size() <= kint32max);
   output->WriteVarint32(value.size());
   output->WriteString(value);
+}
+void WireFormatLite::WriteStringMaybeAliased(
+    int field_number, const string& value,
+    io::CodedOutputStream* output) {
+  // String is for UTF-8 text only
+  WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
+  GOOGLE_CHECK(value.size() <= kint32max);
+  output->WriteVarint32(value.size());
+  output->WriteRawMaybeAliased(value.data(), value.size());
 }
 void WireFormatLite::WriteBytes(int field_number, const string& value,
                                 io::CodedOutputStream* output) {
   WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
+  GOOGLE_CHECK(value.size() <= kint32max);
   output->WriteVarint32(value.size());
   output->WriteString(value);
+}
+void WireFormatLite::WriteBytesMaybeAliased(
+    int field_number, const string& value,
+    io::CodedOutputStream* output) {
+  WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
+  GOOGLE_CHECK(value.size() <= kint32max);
+  output->WriteVarint32(value.size());
+  output->WriteRawMaybeAliased(value.data(), value.size());
 }
 
 

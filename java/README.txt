@@ -101,7 +101,7 @@ extensions.
 To create a jar file for the runtime and run tests invoke
 "mvn package -P micro" from the <protobuf-root>/java
 directory. The generated jar file is
-<protobuf-root>java/target/protobuf-java-2.2.0-micro.jar.
+<protobuf-root>java/target/protobuf-java-2.6.0-micro.jar.
 
 If you wish to compile the MICRO_RUNTIME your self, place
 the 7 files below, in <root>/com/google/protobuf and
@@ -621,7 +621,7 @@ To use nano protobufs within the Android repo:
 To use nano protobufs outside of Android repo:
 
 - Link with the generated jar file
-  <protobuf-root>java/target/protobuf-java-2.3.0-nano.jar.
+  <protobuf-root>java/target/protobuf-java-2.6.0-nano.jar.
 - Invoke with --javanano_out, e.g.:
 
 ./protoc '--javanano_out=\
@@ -643,7 +643,7 @@ Please run the following steps to test:
 - cd ../../..
 - . build/envsetup.sh
 - lunch 1
-- "make -j12 aprotoc libprotobuf-java-2.3.0-nano aprotoc-test-nano-params NanoAndroidTest" and
+- "make -j12 aprotoc libprotobuf-java-nano aprotoc-test-nano-params NanoAndroidTest" and
   check for build errors.
 - Plug in an Android device or start an emulator.
 - adb install -r out/target/product/generic/data/app/NanoAndroidTest.apk

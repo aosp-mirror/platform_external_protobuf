@@ -31,14 +31,16 @@
 package com.google.protobuf;
 
 import com.google.protobuf.Descriptors.FieldDescriptor;
-import protobuf_unittest.UnittestProto.OneString;
-import protobuf_unittest.UnittestProto.TestAllTypes;
-import protobuf_unittest.UnittestProto.TestAllExtensions;
-import protobuf_unittest.UnittestProto.TestEmptyMessage;
-import protobuf_unittest.UnittestProto.TestAllTypes.NestedMessage;
+import com.google.protobuf.TextFormat.Parser.SingularOverwritePolicy;
 import protobuf_unittest.UnittestMset.TestMessageSet;
 import protobuf_unittest.UnittestMset.TestMessageSetExtension1;
 import protobuf_unittest.UnittestMset.TestMessageSetExtension2;
+import protobuf_unittest.UnittestProto.OneString;
+import protobuf_unittest.UnittestProto.TestAllExtensions;
+import protobuf_unittest.UnittestProto.TestAllTypes;
+import protobuf_unittest.UnittestProto.TestAllTypes.NestedMessage;
+import protobuf_unittest.UnittestProto.TestEmptyMessage;
+import protobuf_unittest.UnittestProto.TestOneof2;
 
 import junit.framework.TestCase;
 
@@ -60,11 +62,11 @@ public class TextFormatTest extends TestCase {
 
   // A representation of the above string with all the characters escaped.
   private final static String kEscapeTestStringEscaped =
-      "\"\\\"A string with \\' characters \\n and \\r newlines "
-          + "and \\t tabs and \\001 slashes \\\\\"";
+      "\\\"A string with \\' characters \\n and \\r newlines "
+          + "and \\t tabs and \\001 slashes \\\\";
 
   private static String allFieldsSetText = TestUtil.readTextFromFile(
-    "text_format_unittest_data.txt");
+    "text_format_unittest_data_oneof_implemented.txt");
   private static String allExtensionsSetText = TestUtil.readTextFromFile(
     "text_format_unittest_extensions_data.txt");
 
@@ -109,9 +111,38 @@ public class TextFormatTest extends TestCase {
     "  str: \"foo\"\n" +
     "}\n";
 
+  private String messageSetTextWithRepeatedExtension =
+      "[protobuf_unittest.TestMessageSetExtension1] {\n" +
+      "  i: 123\n" +
+      "}\n" +
+      "[protobuf_unittest.TestMessageSetExtension1] {\n" +
+      "  i: 456\n" +
+      "}\n";
+
+  private final TextFormat.Parser parserWithOverwriteForbidden =
+      TextFormat.Parser.newBuilder()
+          .setSingularOverwritePolicy(
+              SingularOverwritePolicy.FORBID_SINGULAR_OVERWRITES)
+          .build();
+
+  private final TextFormat.Parser defaultParser =
+      TextFormat.Parser.newBuilder().build();
+
   /** Print TestAllTypes and compare with golden file. */
   public void testPrintMessage() throws Exception {
     String javaText = TextFormat.printToString(TestUtil.getAllSet());
+
+    // Java likes to add a trailing ".0" to floats and doubles.  C printf
+    // (with %g format) does not.  Our golden files are used for both
+    // C++ and Java TextFormat classes, so we need to conform.
+    javaText = javaText.replace(".0\n", "\n");
+
+    assertEquals(allFieldsSetText, javaText);
+  }
+
+  /** Print TestAllTypes as Builder and compare with golden file. */
+  public void testPrintMessageBuilder() throws Exception {
+    String javaText = TextFormat.printToString(TestUtil.getAllSetBuilder());
 
     // Java likes to add a trailing ".0" to floats and doubles.  C printf
     // (with %g format) does not.  Our golden files are used for both
@@ -133,40 +164,44 @@ public class TextFormatTest extends TestCase {
     assertEquals(allExtensionsSetText, javaText);
   }
 
+  // Creates an example unknown field set.
+  private UnknownFieldSet makeUnknownFieldSet() {
+    return UnknownFieldSet.newBuilder()
+        .addField(5,
+            UnknownFieldSet.Field.newBuilder()
+            .addVarint(1)
+            .addFixed32(2)
+            .addFixed64(3)
+            .addLengthDelimited(ByteString.copyFromUtf8("4"))
+            .addGroup(
+                UnknownFieldSet.newBuilder()
+                .addField(10,
+                    UnknownFieldSet.Field.newBuilder()
+                    .addVarint(5)
+                    .build())
+                .build())
+            .build())
+        .addField(8,
+            UnknownFieldSet.Field.newBuilder()
+            .addVarint(1)
+            .addVarint(2)
+            .addVarint(3)
+            .build())
+        .addField(15,
+            UnknownFieldSet.Field.newBuilder()
+            .addVarint(0xABCDEF1234567890L)
+            .addFixed32(0xABCD1234)
+            .addFixed64(0xABCDEF1234567890L)
+            .build())
+        .build();
+  }
+
   public void testPrintUnknownFields() throws Exception {
     // Test printing of unknown fields in a message.
 
     TestEmptyMessage message =
       TestEmptyMessage.newBuilder()
-        .setUnknownFields(
-          UnknownFieldSet.newBuilder()
-            .addField(5,
-              UnknownFieldSet.Field.newBuilder()
-                .addVarint(1)
-                .addFixed32(2)
-                .addFixed64(3)
-                .addLengthDelimited(ByteString.copyFromUtf8("4"))
-                .addGroup(
-                  UnknownFieldSet.newBuilder()
-                    .addField(10,
-                      UnknownFieldSet.Field.newBuilder()
-                        .addVarint(5)
-                        .build())
-                    .build())
-                .build())
-            .addField(8,
-              UnknownFieldSet.Field.newBuilder()
-                .addVarint(1)
-                .addVarint(2)
-                .addVarint(3)
-                .build())
-            .addField(15,
-              UnknownFieldSet.Field.newBuilder()
-                .addVarint(0xABCDEF1234567890L)
-                .addFixed32(0xABCD1234)
-                .addFixed64(0xABCDEF1234567890L)
-                .build())
-            .build())
+        .setUnknownFields(makeUnknownFieldSet())
         .build();
 
     assertEquals(
@@ -234,8 +269,8 @@ public class TextFormatTest extends TestCase {
 
       .addRepeatedInt32 (1  << 31)
       .addRepeatedUint32(1  << 31)
-      .addRepeatedInt64 (1l << 63)
-      .addRepeatedUint64(1l << 63)
+      .addRepeatedInt64 (1L << 63)
+      .addRepeatedUint64(1L << 63)
 
       // Floats of various precisions and exponents.
       .addRepeatedDouble(123)
@@ -355,6 +390,40 @@ public class TextFormatTest extends TestCase {
       TestMessageSetExtension2.messageSetExtension));
     assertEquals("foo", messageSet.getExtension(
       TestMessageSetExtension2.messageSetExtension).getStr());
+
+    builder = TestMessageSet.newBuilder();
+    TextFormat.merge(messageSetTextWithRepeatedExtension, extensionRegistry,
+        builder);
+    messageSet = builder.build();
+    assertEquals(456, messageSet.getExtension(
+      TestMessageSetExtension1.messageSetExtension).getI());
+  }
+
+  public void testParseMessageSetWithOverwriteForbidden() throws Exception {
+    ExtensionRegistry extensionRegistry = ExtensionRegistry.newInstance();
+    extensionRegistry.add(TestMessageSetExtension1.messageSetExtension);
+    extensionRegistry.add(TestMessageSetExtension2.messageSetExtension);
+
+    TestMessageSet.Builder builder = TestMessageSet.newBuilder();
+    parserWithOverwriteForbidden.merge(
+        messageSetText, extensionRegistry, builder);
+    TestMessageSet messageSet = builder.build();
+    assertEquals(123, messageSet.getExtension(
+        TestMessageSetExtension1.messageSetExtension).getI());
+    assertEquals("foo", messageSet.getExtension(
+      TestMessageSetExtension2.messageSetExtension).getStr());
+
+    builder = TestMessageSet.newBuilder();
+    try {
+      parserWithOverwriteForbidden.merge(
+          messageSetTextWithRepeatedExtension, extensionRegistry, builder);
+      fail("expected parse exception");
+    } catch (TextFormat.ParseException e) {
+      assertEquals("6:1: Non-repeated field "
+          + "\"protobuf_unittest.TestMessageSetExtension1.message_set_extension\""
+          + " cannot be overwritten.",
+          e.getMessage());
+    }
   }
 
   public void testParseNumericEnum() throws Exception {
@@ -391,12 +460,32 @@ public class TextFormatTest extends TestCase {
     }
   }
 
+  private void assertParseErrorWithOverwriteForbidden(String error,
+      String text) {
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    try {
+      parserWithOverwriteForbidden.merge(
+          text, TestUtil.getExtensionRegistry(), builder);
+      fail("Expected parse exception.");
+    } catch (TextFormat.ParseException e) {
+      assertEquals(error, e.getMessage());
+    }
+  }
+
+  private TestAllTypes assertParseSuccessWithOverwriteForbidden(
+      String text) throws TextFormat.ParseException {
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    parserWithOverwriteForbidden.merge(
+        text, TestUtil.getExtensionRegistry(), builder);
+    return builder.build();
+  }
+
   public void testParseErrors() throws Exception {
     assertParseError(
       "1:16: Expected \":\".",
       "optional_int32 123");
     assertParseError(
-      "1:23: Expected identifier.",
+      "1:23: Expected identifier. Found '?'",
       "optional_nested_enum: ?");
     assertParseError(
       "1:18: Couldn't parse integer: Number must be positive: -1",
@@ -408,6 +497,9 @@ public class TextFormatTest extends TestCase {
     assertParseError(
       "1:16: Expected \"true\" or \"false\".",
       "optional_bool: maybe");
+    assertParseError(
+      "1:16: Expected \"true\" or \"false\".",
+      "optional_bool: 2");
     assertParseError(
       "1:18: Expected string.",
       "optional_string: 123");
@@ -450,10 +542,10 @@ public class TextFormatTest extends TestCase {
 
     // Delimiters must match.
     assertParseError(
-      "1:22: Expected identifier.",
+      "1:22: Expected identifier. Found '}'",
       "OptionalGroup < a: 1 }");
     assertParseError(
-      "1:22: Expected identifier.",
+      "1:22: Expected identifier. Found '>'",
       "OptionalGroup { a: 1 >");
   }
 
@@ -469,6 +561,10 @@ public class TextFormatTest extends TestCase {
       TextFormat.unescapeBytes("\\000\\001\\a\\b\\f\\n\\r\\t\\v\\\\\\'\\\""));
     assertEquals("\0\001\007\b\f\n\r\t\013\\\'\"",
       TextFormat.unescapeText("\\000\\001\\a\\b\\f\\n\\r\\t\\v\\\\\\'\\\""));
+    assertEquals(kEscapeTestStringEscaped,
+      TextFormat.escapeText(kEscapeTestString));
+    assertEquals(kEscapeTestString,
+      TextFormat.unescapeText(kEscapeTestStringEscaped));
 
     // Unicode handling.
     assertEquals("\\341\\210\\264", TextFormat.escapeText("\u1234"));
@@ -480,6 +576,11 @@ public class TextFormatTest extends TestCase {
     assertEquals("\u1234", TextFormat.unescapeText("\\xe1\\x88\\xb4"));
     assertEquals(bytes(0xe1, 0x88, 0xb4),
                  TextFormat.unescapeBytes("\\xe1\\x88\\xb4"));
+
+    // Handling of strings with unescaped Unicode characters > 255.
+    final String zh = "\u9999\u6e2f\u4e0a\u6d77\ud84f\udf80\u8c50\u9280\u884c";
+    ByteString zhByteString = ByteString.copyFromUtf8(zh);
+    assertEquals(zhByteString, TextFormat.unescapeBytes(zh));
 
     // Errors.
     try {
@@ -622,6 +723,13 @@ public class TextFormatTest extends TestCase {
     }
   }
 
+  public void testParseString() throws Exception {
+    final String zh = "\u9999\u6e2f\u4e0a\u6d77\ud84f\udf80\u8c50\u9280\u884c";
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    TextFormat.merge("optional_string: \"" + zh + "\"", builder);
+    assertEquals(zh, builder.getOptionalString());
+  }
+
   public void testParseLongString() throws Exception {
     String longText =
       "123456789012345678901234567890123456789012345678901234567890" +
@@ -650,9 +758,237 @@ public class TextFormatTest extends TestCase {
     assertEquals(longText, builder.getOptionalString());
   }
 
+  public void testParseBoolean() throws Exception {
+    String goodText =
+        "repeated_bool: t  repeated_bool : 0\n" +
+        "repeated_bool :f repeated_bool:1";
+    String goodTextCanonical =
+        "repeated_bool: true\n" +
+        "repeated_bool: false\n" +
+        "repeated_bool: false\n" +
+        "repeated_bool: true\n";
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    TextFormat.merge(goodText, builder);
+    assertEquals(goodTextCanonical, builder.build().toString());
+
+    try {
+      TestAllTypes.Builder badBuilder = TestAllTypes.newBuilder();
+      TextFormat.merge("optional_bool:2", badBuilder);
+      fail("Should have thrown an exception.");
+    } catch (TextFormat.ParseException e) {
+      // success
+    }
+    try {
+      TestAllTypes.Builder badBuilder = TestAllTypes.newBuilder();
+      TextFormat.merge("optional_bool: foo", badBuilder);
+      fail("Should have thrown an exception.");
+    } catch (TextFormat.ParseException e) {
+      // success
+    }
+  }
+
   public void testParseAdjacentStringLiterals() throws Exception {
     TestAllTypes.Builder builder = TestAllTypes.newBuilder();
     TextFormat.merge("optional_string: \"foo\" 'corge' \"grault\"", builder);
     assertEquals("foocorgegrault", builder.getOptionalString());
+  }
+
+  public void testPrintFieldValue() throws Exception {
+    assertPrintFieldValue("\"Hello\"", "Hello", "repeated_string");
+    assertPrintFieldValue("123.0",  123f, "repeated_float");
+    assertPrintFieldValue("123.0",  123d, "repeated_double");
+    assertPrintFieldValue("123",  123, "repeated_int32");
+    assertPrintFieldValue("123",  123L, "repeated_int64");
+    assertPrintFieldValue("true",  true, "repeated_bool");
+    assertPrintFieldValue("4294967295", 0xFFFFFFFF, "repeated_uint32");
+    assertPrintFieldValue("18446744073709551615",  0xFFFFFFFFFFFFFFFFL,
+        "repeated_uint64");
+    assertPrintFieldValue("\"\\001\\002\\003\"",
+        ByteString.copyFrom(new byte[] {1, 2, 3}), "repeated_bytes");
+  }
+
+  private void assertPrintFieldValue(String expect, Object value,
+      String fieldName) throws Exception {
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    StringBuilder sb = new StringBuilder();
+    TextFormat.printFieldValue(
+        TestAllTypes.getDescriptor().findFieldByName(fieldName),
+        value, sb);
+    assertEquals(expect, sb.toString());
+  }
+
+  public void testShortDebugString() {
+    assertEquals("optional_nested_message { bb: 42 } repeated_int32: 1"
+        + " repeated_uint32: 2",
+        TextFormat.shortDebugString(TestAllTypes.newBuilder()
+            .addRepeatedInt32(1)
+            .addRepeatedUint32(2)
+            .setOptionalNestedMessage(
+                NestedMessage.newBuilder().setBb(42).build())
+            .build()));
+  }
+
+  public void testShortDebugString_unknown() {
+    assertEquals("5: 1 5: 0x00000002 5: 0x0000000000000003 5: \"4\" 5 { 10: 5 }"
+        + " 8: 1 8: 2 8: 3 15: 12379813812177893520 15: 0xabcd1234 15:"
+        + " 0xabcdef1234567890",
+        TextFormat.shortDebugString(makeUnknownFieldSet()));
+  }
+
+  public void testPrintToUnicodeString() throws Exception {
+    assertEquals(
+        "optional_string: \"abc\u3042efg\"\n" +
+        "optional_bytes: \"\\343\\201\\202\"\n" +
+        "repeated_string: \"\u3093XYZ\"\n",
+        TextFormat.printToUnicodeString(TestAllTypes.newBuilder()
+            .setOptionalString("abc\u3042efg")
+            .setOptionalBytes(bytes(0xe3, 0x81, 0x82))
+            .addRepeatedString("\u3093XYZ")
+            .build()));
+
+    // Double quotes and backslashes should be escaped
+    assertEquals(
+        "optional_string: \"a\\\\bc\\\"ef\\\"g\"\n",
+        TextFormat.printToUnicodeString(TestAllTypes.newBuilder()
+            .setOptionalString("a\\bc\"ef\"g")
+            .build()));
+
+    // Test escaping roundtrip
+    TestAllTypes message = TestAllTypes.newBuilder()
+        .setOptionalString("a\\bc\\\"ef\"g")
+        .build();
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    TextFormat.merge(TextFormat.printToUnicodeString(message), builder);
+    assertEquals(message.getOptionalString(), builder.getOptionalString());
+  }
+  
+  public void testPrintToUnicodeStringWithNewlines() {
+    // No newlines at start and end
+    assertEquals("optional_string: \"test newlines\n\nin\nstring\"\n",
+        TextFormat.printToUnicodeString(TestAllTypes.newBuilder()
+            .setOptionalString("test newlines\n\nin\nstring")
+            .build()));
+
+    // Newlines at start and end
+    assertEquals("optional_string: \"\ntest\nnewlines\n\nin\nstring\n\"\n",
+        TextFormat.printToUnicodeString(TestAllTypes.newBuilder()
+            .setOptionalString("\ntest\nnewlines\n\nin\nstring\n")
+            .build()));
+
+    // Strings with 0, 1 and 2 newlines.
+    assertEquals("optional_string: \"\"\n",
+        TextFormat.printToUnicodeString(TestAllTypes.newBuilder()
+            .setOptionalString("")
+            .build()));
+    assertEquals("optional_string: \"\n\"\n",
+        TextFormat.printToUnicodeString(TestAllTypes.newBuilder()
+            .setOptionalString("\n")
+            .build()));
+    assertEquals("optional_string: \"\n\n\"\n",
+        TextFormat.printToUnicodeString(TestAllTypes.newBuilder()
+            .setOptionalString("\n\n")
+            .build()));
+  }
+
+  public void testPrintToUnicodeString_unknown() {
+    assertEquals(
+        "1: \"\\343\\201\\202\"\n",
+        TextFormat.printToUnicodeString(UnknownFieldSet.newBuilder()
+            .addField(1,
+                UnknownFieldSet.Field.newBuilder()
+                .addLengthDelimited(bytes(0xe3, 0x81, 0x82)).build())
+            .build()));
+  }
+
+  public void testParseNonRepeatedFields() throws Exception {
+    assertParseSuccessWithOverwriteForbidden(
+        "repeated_int32: 1\n" +
+        "repeated_int32: 2\n");
+    assertParseSuccessWithOverwriteForbidden(
+        "RepeatedGroup { a: 1 }\n" +
+        "RepeatedGroup { a: 2 }\n");
+    assertParseSuccessWithOverwriteForbidden(
+        "repeated_nested_message { bb: 1 }\n" +
+        "repeated_nested_message { bb: 2 }\n");
+    assertParseErrorWithOverwriteForbidden(
+        "3:17: Non-repeated field " +
+        "\"protobuf_unittest.TestAllTypes.optional_int32\" " +
+        "cannot be overwritten.",
+        "optional_int32: 1\n" +
+        "optional_bool: true\n" +
+        "optional_int32: 1\n");
+    assertParseErrorWithOverwriteForbidden(
+        "2:17: Non-repeated field " +
+        "\"protobuf_unittest.TestAllTypes.optionalgroup\" " +
+        "cannot be overwritten.",
+        "OptionalGroup { a: 1 }\n" +
+        "OptionalGroup { }\n");
+    assertParseErrorWithOverwriteForbidden(
+        "2:33: Non-repeated field " +
+        "\"protobuf_unittest.TestAllTypes.optional_nested_message\" " +
+        "cannot be overwritten.",
+        "optional_nested_message { }\n" +
+        "optional_nested_message { bb: 3 }\n");
+    assertParseErrorWithOverwriteForbidden(
+        "2:16: Non-repeated field " +
+        "\"protobuf_unittest.TestAllTypes.default_int32\" " +
+        "cannot be overwritten.",
+        "default_int32: 41\n" +  // the default value
+        "default_int32: 41\n");
+    assertParseErrorWithOverwriteForbidden(
+        "2:17: Non-repeated field " +
+        "\"protobuf_unittest.TestAllTypes.default_string\" " +
+        "cannot be overwritten.",
+        "default_string: \"zxcv\"\n" +
+        "default_string: \"asdf\"\n");
+  }
+
+  public void testParseShortRepeatedFormOfRepeatedFields() throws Exception {
+    assertParseSuccessWithOverwriteForbidden("repeated_foreign_enum: [FOREIGN_FOO, FOREIGN_BAR]");
+    assertParseSuccessWithOverwriteForbidden("repeated_int32: [ 1, 2 ]\n");
+    assertParseSuccessWithOverwriteForbidden("RepeatedGroup [{ a: 1 },{ a: 2 }]\n");
+    assertParseSuccessWithOverwriteForbidden("repeated_nested_message [{ bb: 1 }, { bb: 2 }]\n");
+  }
+
+  public void testParseShortRepeatedFormOfNonRepeatedFields() throws Exception {
+    assertParseErrorWithOverwriteForbidden(
+        "1:17: Couldn't parse integer: For input string: \"[\"",
+        "optional_int32: [1]\n");
+  }
+
+  // =======================================================================
+  // test oneof
+
+  public void testOneofTextFormat() throws Exception {
+    TestOneof2.Builder builder = TestOneof2.newBuilder();
+    TestUtil.setOneof(builder);
+    TestOneof2 message = builder.build();
+    TestOneof2.Builder dest = TestOneof2.newBuilder();
+    TextFormat.merge(TextFormat.printToUnicodeString(message), dest);
+    TestUtil.assertOneofSet(dest.build());
+  }
+
+  public void testOneofOverwriteForbidden() throws Exception {
+    String input = "foo_string: \"stringvalue\" foo_int: 123";
+    TestOneof2.Builder builder = TestOneof2.newBuilder();
+    try {
+      parserWithOverwriteForbidden.merge(
+          input, TestUtil.getExtensionRegistry(), builder);
+      fail("Expected parse exception.");
+    } catch (TextFormat.ParseException e) {
+      assertEquals("1:36: Field \"protobuf_unittest.TestOneof2.foo_int\""
+                   + " is specified along with field \"protobuf_unittest.TestOneof2.foo_string\","
+                   + " another member of oneof \"foo\".", e.getMessage());
+    }
+  }
+
+  public void testOneofOverwriteAllowed() throws Exception {
+    String input = "foo_string: \"stringvalue\" foo_int: 123";
+    TestOneof2.Builder builder = TestOneof2.newBuilder();
+    defaultParser.merge(input, TestUtil.getExtensionRegistry(), builder);
+    // Only the last value sticks.
+    TestOneof2 oneof = builder.build();
+    assertFalse(oneof.hasFooString());
+    assertTrue(oneof.hasFooInt());
   }
 }
