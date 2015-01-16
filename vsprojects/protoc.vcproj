@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="8.00"
+	Version="9.00"
 	Name="protoc"
 	ProjectGUID="{1738D5F6-ED1E-47E0-B2F0-456864B93C1E}"
 	Keyword="Win32Proj"

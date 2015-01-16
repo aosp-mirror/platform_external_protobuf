@@ -66,7 +66,7 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   // CodeGenerator methods.
   virtual bool Generate(const FileDescriptor* file,
                         const string& parameter,
-                        OutputDirectory* output_directory,
+                        GeneratorContext* generator_context,
                         string* error) const;
 
  private:
@@ -94,8 +94,11 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   void PrintNestedDescriptors(const Descriptor& containing_descriptor) const;
 
   void PrintMessages() const;
-  void PrintMessage(const Descriptor& message_descriptor) const;
-  void PrintNestedMessages(const Descriptor& containing_descriptor) const;
+  void PrintMessage(const Descriptor& message_descriptor, const string& prefix,
+                    vector<string>* to_register) const;
+  void PrintNestedMessages(const Descriptor& containing_descriptor,
+                           const string& prefix,
+                           vector<string>* to_register) const;
 
   void FixForeignFieldsInDescriptors() const;
   void FixForeignFieldsInDescriptor(
@@ -104,6 +107,9 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   void FixForeignFieldsInField(const Descriptor* containing_type,
                                const FieldDescriptor& field,
                                const string& python_dict_name) const;
+  void AddMessageToFileDescriptor(const Descriptor& descriptor) const;
+  void AddEnumToFileDescriptor(const EnumDescriptor& descriptor) const;
+  void AddExtensionToFileDescriptor(const FieldDescriptor& descriptor) const;
   string FieldReferencingExpression(const Descriptor* containing_type,
                                     const FieldDescriptor& field,
                                     const string& python_dict_name) const;
@@ -136,6 +142,11 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   template <typename DescriptorT, typename DescriptorProtoT>
   void PrintSerializedPbInterval(
       const DescriptorT& descriptor, DescriptorProtoT& proto) const;
+
+  void FixAllDescriptorOptions() const;
+  void FixOptionsForField(const FieldDescriptor& field) const;
+  void FixOptionsForEnum(const EnumDescriptor& descriptor) const;
+  void FixOptionsForMessage(const Descriptor& descriptor) const;
 
   // Very coarse-grained lock to ensure that Generate() is reentrant.
   // Guards file_, printer_ and file_descriptor_serialized_.

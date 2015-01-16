@@ -31,12 +31,15 @@
 package com.google.protobuf;
 
 import com.google.protobuf.DescriptorProtos.DescriptorProto;
+import com.google.protobuf.DescriptorProtos.EnumDescriptorProto;
+import com.google.protobuf.DescriptorProtos.EnumValueDescriptorProto;
 import com.google.protobuf.DescriptorProtos.FieldDescriptorProto;
 import com.google.protobuf.DescriptorProtos.FileDescriptorProto;
 import com.google.protobuf.Descriptors.DescriptorValidationException;
 import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
+import com.google.protobuf.Descriptors.OneofDescriptor;
 import com.google.protobuf.Descriptors.EnumDescriptor;
 import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Descriptors.ServiceDescriptor;
@@ -51,15 +54,19 @@ import protobuf_unittest.UnittestProto.ForeignMessage;
 import protobuf_unittest.UnittestProto.TestAllTypes;
 import protobuf_unittest.UnittestProto.TestAllExtensions;
 import protobuf_unittest.UnittestProto.TestExtremeDefaultValues;
+import protobuf_unittest.UnittestProto.TestMultipleExtensionRanges;
 import protobuf_unittest.UnittestProto.TestRequired;
 import protobuf_unittest.UnittestProto.TestService;
 import protobuf_unittest.UnittestCustomOptions;
+
+import protobuf_unittest.TestCustomOptions;
 
 
 import junit.framework.TestCase;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Unit test for {@link Descriptors}.
@@ -71,6 +78,7 @@ public class DescriptorsTest extends TestCase {
   // Regression test for bug where referencing a FieldDescriptor.Type value
   // before a FieldDescriptorProto.Type value would yield a
   // ExceptionInInitializerError.
+  @SuppressWarnings("unused")
   private static final Object STATIC_INIT_TEST = FieldDescriptor.Type.BOOL;
 
   public void testFieldTypeEnumMapping() throws Exception {
@@ -304,6 +312,7 @@ public class DescriptorsTest extends TestCase {
     EnumValueDescriptor value = ForeignEnum.FOREIGN_FOO.getValueDescriptor();
     assertEquals(value, enumType.getValues().get(0));
     assertEquals("FOREIGN_FOO", value.getName());
+    assertEquals("FOREIGN_FOO", value.toString());
     assertEquals(4, value.getNumber());
     assertEquals(value, enumType.findValueByName("FOREIGN_FOO"));
     assertEquals(value, enumType.findValueByNumber(4));
@@ -320,7 +329,6 @@ public class DescriptorsTest extends TestCase {
     assertEquals("protobuf_unittest.TestService", service.getFullName());
     assertEquals(UnittestProto.getDescriptor(), service.getFile());
 
-    assertEquals(2, service.getMethods().size());
 
     MethodDescriptor fooMethod = service.getMethods().get(0);
     assertEquals("Foo", fooMethod.getName());
@@ -347,8 +355,12 @@ public class DescriptorsTest extends TestCase {
 
 
   public void testCustomOptions() throws Exception {
+    // Get the descriptor indirectly from a dependent proto class. This is to
+    // ensure that when a proto class is loaded, custom options defined in its
+    // dependencies are also properly initialized.
     Descriptor descriptor =
-      UnittestCustomOptions.TestMessageWithCustomOptions.getDescriptor();
+        TestCustomOptions.TestMessageWithCustomOptionsContainer.getDescriptor()
+        .findFieldByName("field").getMessageType();
 
     assertTrue(
       descriptor.getOptions().hasExtension(UnittestCustomOptions.messageOpt1));
@@ -425,7 +437,7 @@ public class DescriptorsTest extends TestCase {
         UnittestEnormousDescriptor.getDescriptor()
           .toProto().getSerializedSize() > 65536);
   }
-  
+
   /**
    * Tests that the DescriptorValidationException works as intended.
    */
@@ -444,7 +456,7 @@ public class DescriptorsTest extends TestCase {
         .build())
       .build();
     try {
-      Descriptors.FileDescriptor.buildFrom(fileDescriptorProto, 
+      Descriptors.FileDescriptor.buildFrom(fileDescriptorProto,
           new FileDescriptor[0]);
       fail("DescriptorValidationException expected");
     } catch (DescriptorValidationException e) {
@@ -455,5 +467,242 @@ public class DescriptorsTest extends TestCase {
       assertTrue(e.getCause() instanceof NumberFormatException);
       assertTrue(e.getCause().getMessage().indexOf("invalid") != -1);
     }
+  }
+
+  /**
+   * Tests the translate/crosslink for an example where a message field's name
+   * and type name are the same.
+   */
+  public void testDescriptorComplexCrosslink() throws Exception {
+    FileDescriptorProto fileDescriptorProto = FileDescriptorProto.newBuilder()
+      .setName("foo.proto")
+      .addMessageType(DescriptorProto.newBuilder()
+        .setName("Foo")
+        .addField(FieldDescriptorProto.newBuilder()
+          .setLabel(FieldDescriptorProto.Label.LABEL_OPTIONAL)
+          .setType(FieldDescriptorProto.Type.TYPE_INT32)
+          .setName("foo")
+          .setNumber(1)
+          .build())
+        .build())
+      .addMessageType(DescriptorProto.newBuilder()
+        .setName("Bar")
+        .addField(FieldDescriptorProto.newBuilder()
+          .setLabel(FieldDescriptorProto.Label.LABEL_OPTIONAL)
+          .setTypeName("Foo")
+          .setName("Foo")
+          .setNumber(1)
+          .build())
+        .build())
+      .build();
+    // translate and crosslink
+    FileDescriptor file =
+      Descriptors.FileDescriptor.buildFrom(fileDescriptorProto, 
+          new FileDescriptor[0]);
+    // verify resulting descriptors
+    assertNotNull(file);
+    List<Descriptor> msglist = file.getMessageTypes();
+    assertNotNull(msglist);
+    assertTrue(msglist.size() == 2);
+    boolean barFound = false;
+    for (Descriptor desc : msglist) {
+      if (desc.getName().equals("Bar")) {
+        barFound = true;
+        assertNotNull(desc.getFields());
+        List<FieldDescriptor> fieldlist = desc.getFields();
+        assertNotNull(fieldlist);
+        assertTrue(fieldlist.size() == 1);
+        assertTrue(fieldlist.get(0).getType() == FieldDescriptor.Type.MESSAGE);
+        assertTrue(fieldlist.get(0).getMessageType().getName().equals("Foo"));
+      }
+    }
+    assertTrue(barFound);
+  }
+  
+  public void testDependencyOrder() throws Exception {
+    FileDescriptorProto fooProto = FileDescriptorProto.newBuilder()
+        .setName("foo.proto").build();
+    FileDescriptorProto barProto = FileDescriptorProto.newBuilder()
+        .setName("bar.proto")
+        .addDependency("foo.proto")
+        .build();
+    FileDescriptorProto bazProto = FileDescriptorProto.newBuilder()
+        .setName("baz.proto")
+        .addDependency("foo.proto")
+        .addDependency("bar.proto")
+        .addPublicDependency(0)
+        .addPublicDependency(1)
+        .build();
+    FileDescriptor fooFile = Descriptors.FileDescriptor.buildFrom(fooProto,
+        new FileDescriptor[0]);
+    FileDescriptor barFile = Descriptors.FileDescriptor.buildFrom(barProto,
+        new FileDescriptor[] {fooFile});
+    
+    // Items in the FileDescriptor array can be in any order. 
+    Descriptors.FileDescriptor.buildFrom(bazProto,
+        new FileDescriptor[] {fooFile, barFile});
+    Descriptors.FileDescriptor.buildFrom(bazProto,
+        new FileDescriptor[] {barFile, fooFile});
+  }
+  
+  public void testInvalidPublicDependency() throws Exception {
+    FileDescriptorProto fooProto = FileDescriptorProto.newBuilder()
+        .setName("foo.proto").build();
+    FileDescriptorProto barProto = FileDescriptorProto.newBuilder()
+        .setName("boo.proto")
+        .addDependency("foo.proto")
+        .addPublicDependency(1)  // Error, should be 0.
+        .build();
+    FileDescriptor fooFile = Descriptors.FileDescriptor.buildFrom(fooProto,
+        new FileDescriptor[0]);
+    try {
+      Descriptors.FileDescriptor.buildFrom(barProto,
+          new FileDescriptor[] {fooFile});
+      fail("DescriptorValidationException expected");
+    } catch (DescriptorValidationException e) {
+      assertTrue(
+          e.getMessage().indexOf("Invalid public dependency index.") != -1);
+    }
+  }
+
+  public void testHiddenDependency() throws Exception {
+    FileDescriptorProto barProto = FileDescriptorProto.newBuilder()
+        .setName("bar.proto")
+        .addMessageType(DescriptorProto.newBuilder().setName("Bar"))
+        .build();
+    FileDescriptorProto forwardProto = FileDescriptorProto.newBuilder()
+        .setName("forward.proto")
+        .addDependency("bar.proto")
+        .build();
+    FileDescriptorProto fooProto = FileDescriptorProto.newBuilder()
+        .setName("foo.proto")
+        .addDependency("forward.proto")
+        .addMessageType(DescriptorProto.newBuilder()
+            .setName("Foo")
+            .addField(FieldDescriptorProto.newBuilder()
+                .setLabel(FieldDescriptorProto.Label.LABEL_OPTIONAL)
+                .setTypeName("Bar")
+                .setName("bar")
+                .setNumber(1)))
+        .build();
+    FileDescriptor barFile = Descriptors.FileDescriptor.buildFrom(
+        barProto, new FileDescriptor[0]);
+    FileDescriptor forwardFile = Descriptors.FileDescriptor.buildFrom(
+        forwardProto, new FileDescriptor[] {barFile});
+
+    try {
+      Descriptors.FileDescriptor.buildFrom(
+          fooProto, new FileDescriptor[] {forwardFile});
+      fail("DescriptorValidationException expected");
+    } catch (DescriptorValidationException e) {
+      assertTrue(e.getMessage().indexOf("Bar") != -1);
+      assertTrue(e.getMessage().indexOf("is not defined") != -1);
+    }
+  }
+
+  public void testPublicDependency() throws Exception {
+    FileDescriptorProto barProto = FileDescriptorProto.newBuilder()
+        .setName("bar.proto")
+        .addMessageType(DescriptorProto.newBuilder().setName("Bar"))
+        .build();
+    FileDescriptorProto forwardProto = FileDescriptorProto.newBuilder()
+        .setName("forward.proto")
+        .addDependency("bar.proto")
+        .addPublicDependency(0)
+        .build();
+    FileDescriptorProto fooProto = FileDescriptorProto.newBuilder()
+        .setName("foo.proto")
+        .addDependency("forward.proto")
+        .addMessageType(DescriptorProto.newBuilder()
+            .setName("Foo")
+            .addField(FieldDescriptorProto.newBuilder()
+                .setLabel(FieldDescriptorProto.Label.LABEL_OPTIONAL)
+                .setTypeName("Bar")
+                .setName("bar")
+                .setNumber(1)))
+        .build();
+    FileDescriptor barFile = Descriptors.FileDescriptor.buildFrom(
+        barProto, new FileDescriptor[0]);
+    FileDescriptor forwardFile = Descriptors.FileDescriptor.buildFrom(
+        forwardProto, new FileDescriptor[]{barFile});
+    Descriptors.FileDescriptor.buildFrom(
+        fooProto, new FileDescriptor[] {forwardFile});
+  }
+  
+  /**
+   * Tests the translate/crosslink for an example with a more complex namespace
+   * referencing.
+   */
+  public void testComplexNamespacePublicDependency() throws Exception {
+    FileDescriptorProto fooProto = FileDescriptorProto.newBuilder()
+        .setName("bar.proto")
+        .setPackage("a.b.c.d.bar.shared")
+        .addEnumType(EnumDescriptorProto.newBuilder()
+            .setName("MyEnum")
+            .addValue(EnumValueDescriptorProto.newBuilder()
+                .setName("BLAH")
+                .setNumber(1)))
+        .build();
+    FileDescriptorProto barProto = FileDescriptorProto.newBuilder()
+        .setName("foo.proto")
+        .addDependency("bar.proto")
+        .setPackage("a.b.c.d.foo.shared")
+        .addMessageType(DescriptorProto.newBuilder()
+            .setName("MyMessage")
+            .addField(FieldDescriptorProto.newBuilder()
+                .setLabel(FieldDescriptorProto.Label.LABEL_REPEATED)
+                .setTypeName("bar.shared.MyEnum")
+                .setName("MyField")
+                .setNumber(1)))
+        .build();
+    // translate and crosslink
+    FileDescriptor fooFile = Descriptors.FileDescriptor.buildFrom(
+        fooProto, new FileDescriptor[0]);
+    FileDescriptor barFile = Descriptors.FileDescriptor.buildFrom(
+        barProto, new FileDescriptor[]{fooFile});
+    // verify resulting descriptors
+    assertNotNull(barFile);
+    List<Descriptor> msglist = barFile.getMessageTypes();
+    assertNotNull(msglist);
+    assertTrue(msglist.size() == 1);
+    Descriptor desc = msglist.get(0);
+    if (desc.getName().equals("MyMessage")) {
+      assertNotNull(desc.getFields());
+      List<FieldDescriptor> fieldlist = desc.getFields();
+      assertNotNull(fieldlist);
+      assertTrue(fieldlist.size() == 1);
+      FieldDescriptor field = fieldlist.get(0);
+      assertTrue(field.getType() == FieldDescriptor.Type.ENUM);
+      assertTrue(field.getEnumType().getName().equals("MyEnum"));
+      assertTrue(field.getEnumType().getFile().getName().equals("bar.proto"));
+      assertTrue(field.getEnumType().getFile().getPackage().equals(
+          "a.b.c.d.bar.shared"));
+    }   
+  }
+
+  public void testOneofDescriptor() throws Exception {
+    Descriptor messageType = TestAllTypes.getDescriptor();
+    FieldDescriptor field =
+        messageType.findFieldByName("oneof_nested_message");
+    OneofDescriptor oneofDescriptor = field.getContainingOneof();
+    assertNotNull(oneofDescriptor);
+    assertSame(oneofDescriptor, messageType.getOneofs().get(0));
+    assertEquals("oneof_field", oneofDescriptor.getName());
+
+    assertEquals(4, oneofDescriptor.getFieldCount());
+    assertSame(oneofDescriptor.getField(1), field);
+  }
+
+  public void testMessageDescriptorExtensions() throws Exception {
+    assertFalse(TestAllTypes.getDescriptor().isExtendable());
+    assertTrue(TestAllExtensions.getDescriptor().isExtendable());
+    assertTrue(TestMultipleExtensionRanges.getDescriptor().isExtendable());
+
+    assertFalse(TestAllTypes.getDescriptor().isExtensionNumber(3));
+    assertTrue(TestAllExtensions.getDescriptor().isExtensionNumber(3));
+    assertTrue(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(42));
+    assertFalse(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(43));
+    assertFalse(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(4142));
+    assertTrue(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(4143));
   }
 }

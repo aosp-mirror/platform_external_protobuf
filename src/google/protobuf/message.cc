@@ -32,7 +32,7 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <istream>
+#include <iostream>
 #include <stack>
 #include <google/protobuf/stubs/hash.h>
 
@@ -44,11 +44,12 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/generated_message_util.h>
 #include <google/protobuf/reflection_ops.h>
 #include <google/protobuf/wire_format.h>
 #include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/stubs/map-util.h>
-#include <google/protobuf/stubs/stl_util-inl.h>
+#include <google/protobuf/stubs/map_util.h>
+#include <google/protobuf/stubs/stl_util.h>
 
 namespace google {
 namespace protobuf {
@@ -74,7 +75,7 @@ void Message::CheckTypeAndMergeFrom(const MessageLite& other) {
 void Message::CopyFrom(const Message& from) {
   const Descriptor* descriptor = GetDescriptor();
   GOOGLE_CHECK_EQ(from.GetDescriptor(), descriptor)
-    << ": Tried to copy from a message with a different type."
+    << ": Tried to copy from a message with a different type. "
        "to: " << descriptor->full_name() << ", "
        "from:" << from.GetDescriptor()->full_name();
   ReflectionOps::Copy(from, this);
@@ -99,7 +100,7 @@ void Message::FindInitializationErrors(vector<string>* errors) const {
 string Message::InitializationErrorString() const {
   vector<string> errors;
   FindInitializationErrors(&errors);
-  return JoinStrings(errors, ", ");
+  return Join(errors, ", ");
 }
 
 void Message::CheckInitialized() const {
@@ -148,7 +149,7 @@ int Message::ByteSize() const {
   return size;
 }
 
-void Message::SetCachedSize(int size) const {
+void Message::SetCachedSize(int /* size */) const {
   GOOGLE_LOG(FATAL) << "Message class \"" << GetDescriptor()->full_name()
              << "\" implements neither SetCachedSize() nor ByteSize().  "
                 "Must implement one or the other.";
@@ -182,9 +183,46 @@ bool Message::SerializePartialToOstream(ostream* output) const {
 }
 
 
+// =============================================================================
+// Reflection and associated Template Specializations
+
 Reflection::~Reflection() {}
 
-// ===================================================================
+#define HANDLE_TYPE(TYPE, CPPTYPE, CTYPE)                             \
+template<>                                                            \
+const RepeatedField<TYPE>& Reflection::GetRepeatedField<TYPE>(        \
+    const Message& message, const FieldDescriptor* field) const {     \
+  return *static_cast<RepeatedField<TYPE>* >(                         \
+      MutableRawRepeatedField(const_cast<Message*>(&message),         \
+                          field, CPPTYPE, CTYPE, NULL));              \
+}                                                                     \
+                                                                      \
+template<>                                                            \
+RepeatedField<TYPE>* Reflection::MutableRepeatedField<TYPE>(          \
+    Message* message, const FieldDescriptor* field) const {           \
+  return static_cast<RepeatedField<TYPE>* >(                          \
+      MutableRawRepeatedField(message, field, CPPTYPE, CTYPE, NULL)); \
+}
+
+HANDLE_TYPE(int32,  FieldDescriptor::CPPTYPE_INT32,  -1);
+HANDLE_TYPE(int64,  FieldDescriptor::CPPTYPE_INT64,  -1);
+HANDLE_TYPE(uint32, FieldDescriptor::CPPTYPE_UINT32, -1);
+HANDLE_TYPE(uint64, FieldDescriptor::CPPTYPE_UINT64, -1);
+HANDLE_TYPE(float,  FieldDescriptor::CPPTYPE_FLOAT,  -1);
+HANDLE_TYPE(double, FieldDescriptor::CPPTYPE_DOUBLE, -1);
+HANDLE_TYPE(bool,   FieldDescriptor::CPPTYPE_BOOL,   -1);
+
+
+#undef HANDLE_TYPE
+
+void* Reflection::MutableRawRepeatedString(
+    Message* message, const FieldDescriptor* field, bool is_string) const {
+  return MutableRawRepeatedField(message, field,
+      FieldDescriptor::CPPTYPE_STRING, FieldOptions::STRING, NULL);
+}
+
+
+// =============================================================================
 // MessageFactory
 
 MessageFactory::~MessageFactory() {}
@@ -257,6 +295,7 @@ void GeneratedMessageFactory::RegisterType(const Descriptor* descriptor,
     GOOGLE_LOG(DFATAL) << "Type is already registered: " << descriptor->full_name();
   }
 }
+
 
 const Message* GeneratedMessageFactory::GetPrototype(const Descriptor* type) {
   {

@@ -40,10 +40,16 @@
 #define GOOGLE_PROTOBUF_MESSAGE_LITE_H__
 
 #include <google/protobuf/stubs/common.h>
-#include <google/protobuf/io/coded_stream.h>
 
 namespace google {
 namespace protobuf {
+
+namespace io {
+  class CodedInputStream;
+  class CodedOutputStream;
+  class ZeroCopyInputStream;
+  class ZeroCopyOutputStream;
+}
 
 // Interface to light weight protocol messages.
 //
@@ -103,7 +109,8 @@ class LIBPROTOBUF_EXPORT MessageLite {
 
   // Parsing ---------------------------------------------------------
   // Methods for parsing in protocol buffer format.  Most of these are
-  // just simple wrappers around MergeFromCodedStream().
+  // just simple wrappers around MergeFromCodedStream().  Clear() will be called
+  // before merging the input.
 
   // Fill the message with a protocol buffer parsed from the given input
   // stream.  Returns false on a read error or if the input is in the
@@ -157,6 +164,7 @@ class LIBPROTOBUF_EXPORT MessageLite {
   // MergeFromCodedStream() is just implemented as MergePartialFromCodedStream()
   // followed by IsInitialized().
   virtual bool MergePartialFromCodedStream(io::CodedInputStream* input) = 0;
+
 
   // Serialization ---------------------------------------------------
   // Methods for serializing in protocol buffer format.  Most of these

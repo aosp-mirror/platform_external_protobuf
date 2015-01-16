@@ -32,9 +32,10 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <vector>
-#include <math.h>
 #include <limits.h>
+#include <math.h>
+
+#include <vector>
 
 #include <google/protobuf/io/tokenizer.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
@@ -257,6 +258,7 @@ TEST_2D(TokenizerTest, SimpleTokens, kSimpleTokenCases, kBlockSizes) {
   EXPECT_EQ("", tokenizer.current().text);
   EXPECT_EQ(0, tokenizer.current().line);
   EXPECT_EQ(0, tokenizer.current().column);
+  EXPECT_EQ(0, tokenizer.current().end_column);
 
   // Parse the token.
   ASSERT_TRUE(tokenizer.Next());
@@ -268,6 +270,8 @@ TEST_2D(TokenizerTest, SimpleTokens, kSimpleTokenCases, kBlockSizes) {
   // Check that it is located at the beginning of the input
   EXPECT_EQ(0, tokenizer.current().line);
   EXPECT_EQ(0, tokenizer.current().column);
+  EXPECT_EQ(kSimpleTokenCases_case.input.size(),
+            tokenizer.current().end_column);
 
   // There should be no more input.
   EXPECT_FALSE(tokenizer.Next());
@@ -277,6 +281,8 @@ TEST_2D(TokenizerTest, SimpleTokens, kSimpleTokenCases, kBlockSizes) {
   EXPECT_EQ("", tokenizer.current().text);
   EXPECT_EQ(0, tokenizer.current().line);
   EXPECT_EQ(kSimpleTokenCases_case.input.size(), tokenizer.current().column);
+  EXPECT_EQ(kSimpleTokenCases_case.input.size(),
+            tokenizer.current().end_column);
 
   // There should be no errors.
   EXPECT_TRUE(error_collector.text_.empty());
@@ -339,76 +345,77 @@ MultiTokenCase kMultiTokenCases[] = {
 
   // Test all token types at the same time.
   { "foo 1 1.2 + 'bar'", {
-    { Tokenizer::TYPE_IDENTIFIER, "foo"  , 0,  0 },
-    { Tokenizer::TYPE_INTEGER   , "1"    , 0,  4 },
-    { Tokenizer::TYPE_FLOAT     , "1.2"  , 0,  6 },
-    { Tokenizer::TYPE_SYMBOL    , "+"    , 0, 10 },
-    { Tokenizer::TYPE_STRING    , "'bar'", 0, 12 },
-    { Tokenizer::TYPE_END       , ""     , 0, 17 },
+    { Tokenizer::TYPE_IDENTIFIER, "foo"  , 0,  0,  3 },
+    { Tokenizer::TYPE_INTEGER   , "1"    , 0,  4,  5 },
+    { Tokenizer::TYPE_FLOAT     , "1.2"  , 0,  6,  9 },
+    { Tokenizer::TYPE_SYMBOL    , "+"    , 0, 10, 11 },
+    { Tokenizer::TYPE_STRING    , "'bar'", 0, 12, 17 },
+    { Tokenizer::TYPE_END       , ""     , 0, 17, 17 },
   }},
 
   // Test that consecutive symbols are parsed as separate tokens.
   { "!@+%", {
-    { Tokenizer::TYPE_SYMBOL    , "!"    , 0, 0 },
-    { Tokenizer::TYPE_SYMBOL    , "@"    , 0, 1 },
-    { Tokenizer::TYPE_SYMBOL    , "+"    , 0, 2 },
-    { Tokenizer::TYPE_SYMBOL    , "%"    , 0, 3 },
-    { Tokenizer::TYPE_END       , ""     , 0, 4 },
+    { Tokenizer::TYPE_SYMBOL    , "!"    , 0, 0, 1 },
+    { Tokenizer::TYPE_SYMBOL    , "@"    , 0, 1, 2 },
+    { Tokenizer::TYPE_SYMBOL    , "+"    , 0, 2, 3 },
+    { Tokenizer::TYPE_SYMBOL    , "%"    , 0, 3, 4 },
+    { Tokenizer::TYPE_END       , ""     , 0, 4, 4 },
   }},
 
   // Test that newlines affect line numbers correctly.
   { "foo bar\nrab oof", {
-    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0 },
-    { Tokenizer::TYPE_IDENTIFIER, "bar", 0,  4 },
-    { Tokenizer::TYPE_IDENTIFIER, "rab", 1,  0 },
-    { Tokenizer::TYPE_IDENTIFIER, "oof", 1,  4 },
-    { Tokenizer::TYPE_END       , ""   , 1,  7 },
+    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0, 3 },
+    { Tokenizer::TYPE_IDENTIFIER, "bar", 0,  4, 7 },
+    { Tokenizer::TYPE_IDENTIFIER, "rab", 1,  0, 3 },
+    { Tokenizer::TYPE_IDENTIFIER, "oof", 1,  4, 7 },
+    { Tokenizer::TYPE_END       , ""   , 1,  7, 7 },
   }},
 
   // Test that tabs affect column numbers correctly.
   { "foo\tbar  \tbaz", {
-    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0 },
-    { Tokenizer::TYPE_IDENTIFIER, "bar", 0,  8 },
-    { Tokenizer::TYPE_IDENTIFIER, "baz", 0, 16 },
-    { Tokenizer::TYPE_END       , ""   , 0, 19 },
+    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0,  3 },
+    { Tokenizer::TYPE_IDENTIFIER, "bar", 0,  8, 11 },
+    { Tokenizer::TYPE_IDENTIFIER, "baz", 0, 16, 19 },
+    { Tokenizer::TYPE_END       , ""   , 0, 19, 19 },
+  }},
+
+  // Test that tabs in string literals affect column numbers correctly.
+  { "\"foo\tbar\" baz", {
+    { Tokenizer::TYPE_STRING    , "\"foo\tbar\"", 0,  0, 12 },
+    { Tokenizer::TYPE_IDENTIFIER, "baz"         , 0, 13, 16 },
+    { Tokenizer::TYPE_END       , ""            , 0, 16, 16 },
   }},
 
   // Test that line comments are ignored.
   { "foo // This is a comment\n"
     "bar // This is another comment", {
-    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0 },
-    { Tokenizer::TYPE_IDENTIFIER, "bar", 1,  0 },
-    { Tokenizer::TYPE_END       , ""   , 1, 30 },
+    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0,  3 },
+    { Tokenizer::TYPE_IDENTIFIER, "bar", 1,  0,  3 },
+    { Tokenizer::TYPE_END       , ""   , 1, 30, 30 },
   }},
 
   // Test that block comments are ignored.
   { "foo /* This is a block comment */ bar", {
-    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0 },
-    { Tokenizer::TYPE_IDENTIFIER, "bar", 0, 34 },
-    { Tokenizer::TYPE_END       , ""   , 0, 37 },
+    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0,  3 },
+    { Tokenizer::TYPE_IDENTIFIER, "bar", 0, 34, 37 },
+    { Tokenizer::TYPE_END       , ""   , 0, 37, 37 },
   }},
 
   // Test that sh-style comments are not ignored by default.
   { "foo # bar\n"
     "baz", {
-    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0 },
-    { Tokenizer::TYPE_SYMBOL    , "#"  , 0,  4 },
-    { Tokenizer::TYPE_IDENTIFIER, "bar", 0,  6 },
-    { Tokenizer::TYPE_IDENTIFIER, "baz", 1,  0 },
-    { Tokenizer::TYPE_END       , ""   , 1, 3 },
-  }},
-
-  // Bytes with the high-order bit set should not be seen as control characters.
-  { "\300", {
-    { Tokenizer::TYPE_SYMBOL, "\300", 0, 0 },
-    { Tokenizer::TYPE_END   , ""    , 0, 1 },
+    { Tokenizer::TYPE_IDENTIFIER, "foo", 0, 0, 3 },
+    { Tokenizer::TYPE_SYMBOL    , "#"  , 0, 4, 5 },
+    { Tokenizer::TYPE_IDENTIFIER, "bar", 0, 6, 9 },
+    { Tokenizer::TYPE_IDENTIFIER, "baz", 1, 0, 3 },
+    { Tokenizer::TYPE_END       , ""   , 1, 3, 3 },
   }},
 
   // Test all whitespace chars
   { "foo\n\t\r\v\fbar", {
-    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0 },
-    { Tokenizer::TYPE_IDENTIFIER, "bar", 1, 11 },
-    { Tokenizer::TYPE_END       , ""   , 1, 14 },
+    { Tokenizer::TYPE_IDENTIFIER, "foo", 0,  0,  3 },
+    { Tokenizer::TYPE_IDENTIFIER, "bar", 1, 11, 14 },
+    { Tokenizer::TYPE_END       , ""   , 1, 14, 14 },
   }},
 };
 
@@ -425,6 +432,7 @@ TEST_2D(TokenizerTest, MultipleTokens, kMultiTokenCases, kBlockSizes) {
   EXPECT_EQ("", tokenizer.current().text);
   EXPECT_EQ(0, tokenizer.current().line);
   EXPECT_EQ(0, tokenizer.current().column);
+  EXPECT_EQ(0, tokenizer.current().end_column);
 
   // Loop through all expected tokens.
   int i = 0;
@@ -434,6 +442,8 @@ TEST_2D(TokenizerTest, MultipleTokens, kMultiTokenCases, kBlockSizes) {
 
     SCOPED_TRACE(testing::Message() << "Token #" << i << ": " << token.text);
 
+    Tokenizer::Token previous = tokenizer.current();
+
     // Next() should only return false when it hits the end token.
     if (token.type != Tokenizer::TYPE_END) {
       ASSERT_TRUE(tokenizer.Next());
@@ -441,11 +451,19 @@ TEST_2D(TokenizerTest, MultipleTokens, kMultiTokenCases, kBlockSizes) {
       ASSERT_FALSE(tokenizer.Next());
     }
 
+    // Check that the previous token is set correctly.
+    EXPECT_EQ(previous.type, tokenizer.previous().type);
+    EXPECT_EQ(previous.text, tokenizer.previous().text);
+    EXPECT_EQ(previous.line, tokenizer.previous().line);
+    EXPECT_EQ(previous.column, tokenizer.previous().column);
+    EXPECT_EQ(previous.end_column, tokenizer.previous().end_column);
+
     // Check that the token matches the expected one.
     EXPECT_EQ(token.type, tokenizer.current().type);
     EXPECT_EQ(token.text, tokenizer.current().text);
     EXPECT_EQ(token.line, tokenizer.current().line);
     EXPECT_EQ(token.column, tokenizer.current().column);
+    EXPECT_EQ(token.end_column, tokenizer.current().end_column);
 
   } while (token.type != Tokenizer::TYPE_END);
 
@@ -491,6 +509,217 @@ TEST_1D(TokenizerTest, ShCommentStyle, kBlockSizes) {
 
 // -------------------------------------------------------------------
 
+// In each case, the input is expected to have two tokens named "prev" and
+// "next" with comments in between.
+struct DocCommentCase {
+  string input;
+
+  const char* prev_trailing_comments;
+  const char* detached_comments[10];
+  const char* next_leading_comments;
+};
+
+inline ostream& operator<<(ostream& out,
+                           const DocCommentCase& test_case) {
+  return out << CEscape(test_case.input);
+}
+
+DocCommentCase kDocCommentCases[] = {
+  {
+    "prev next",
+
+    "",
+    {},
+    ""
+      },
+
+        {
+      "prev /* ignored */ next",
+
+      "",
+      {},
+      ""
+        },
+
+          {
+        "prev // trailing comment\n"
+            "next",
+
+            " trailing comment\n",
+            {},
+            ""
+          },
+
+            {
+          "prev\n"
+              "// leading comment\n"
+              "// line 2\n"
+              "next",
+
+              "",
+              {},
+              " leading comment\n"
+              " line 2\n"
+            },
+
+              {
+            "prev\n"
+                "// trailing comment\n"
+                "// line 2\n"
+                "\n"
+                "next",
+
+                " trailing comment\n"
+                " line 2\n",
+                {},
+                ""
+              },
+
+                {
+              "prev // trailing comment\n"
+                  "// leading comment\n"
+                  "// line 2\n"
+                  "next",
+
+                  " trailing comment\n",
+                  {},
+                  " leading comment\n"
+                  " line 2\n"
+                },
+
+                  {
+                "prev /* trailing block comment */\n"
+                    "/* leading block comment\n"
+                    " * line 2\n"
+                    " * line 3 */"
+                    "next",
+
+                    " trailing block comment ",
+                    {},
+                    " leading block comment\n"
+                    " line 2\n"
+                    " line 3 "
+                  },
+
+                    {
+                  "prev\n"
+                      "/* trailing block comment\n"
+                      " * line 2\n"
+                      " * line 3\n"
+                      " */\n"
+                      "/* leading block comment\n"
+                      " * line 2\n"
+                      " * line 3 */"
+                      "next",
+
+                      " trailing block comment\n"
+                      " line 2\n"
+                      " line 3\n",
+                      {},
+                      " leading block comment\n"
+                      " line 2\n"
+                      " line 3 "
+                    },
+
+                      {
+                    "prev\n"
+                        "// trailing comment\n"
+                        "\n"
+                        "// detached comment\n"
+                        "// line 2\n"
+                        "\n"
+                        "// second detached comment\n"
+                        "/* third detached comment\n"
+                        " * line 2 */\n"
+                        "// leading comment\n"
+                        "next",
+
+                        " trailing comment\n",
+                        {
+                      " detached comment\n"
+                          " line 2\n",
+                          " second detached comment\n",
+                          " third detached comment\n"
+                          " line 2 "
+                        },
+                          " leading comment\n"
+                        },
+
+                          {
+                        "prev /**/\n"
+                            "\n"
+                            "// detached comment\n"
+                            "\n"
+                            "// leading comment\n"
+                            "next",
+
+                            "",
+                            {
+                          " detached comment\n"
+                            },
+                              " leading comment\n"
+                            },
+
+                              {
+                            "prev /**/\n"
+                                "// leading comment\n"
+                                "next",
+
+                                "",
+                                {},
+                                " leading comment\n"
+                              },
+                              };
+
+TEST_2D(TokenizerTest, DocComments, kDocCommentCases, kBlockSizes) {
+  // Set up the tokenizer.
+  TestInputStream input(kDocCommentCases_case.input.data(),
+                        kDocCommentCases_case.input.size(),
+                        kBlockSizes_case);
+  TestErrorCollector error_collector;
+  Tokenizer tokenizer(&input, &error_collector);
+
+  // Set up a second tokenizer where we'll pass all NULLs to NextWithComments().
+  TestInputStream input2(kDocCommentCases_case.input.data(),
+                        kDocCommentCases_case.input.size(),
+                        kBlockSizes_case);
+  Tokenizer tokenizer2(&input2, &error_collector);
+
+  tokenizer.Next();
+  tokenizer2.Next();
+
+  EXPECT_EQ("prev", tokenizer.current().text);
+  EXPECT_EQ("prev", tokenizer2.current().text);
+
+  string prev_trailing_comments;
+  vector<string> detached_comments;
+  string next_leading_comments;
+  tokenizer.NextWithComments(&prev_trailing_comments, &detached_comments,
+                             &next_leading_comments);
+  tokenizer2.NextWithComments(NULL, NULL, NULL);
+  EXPECT_EQ("next", tokenizer.current().text);
+  EXPECT_EQ("next", tokenizer2.current().text);
+
+  EXPECT_EQ(kDocCommentCases_case.prev_trailing_comments,
+            prev_trailing_comments);
+
+  for (int i = 0; i < detached_comments.size(); i++) {
+    ASSERT_LT(i, GOOGLE_ARRAYSIZE(kDocCommentCases));
+    ASSERT_TRUE(kDocCommentCases_case.detached_comments[i] != NULL);
+    EXPECT_EQ(kDocCommentCases_case.detached_comments[i],
+              detached_comments[i]);
+  }
+
+  // Verify that we matched all the detached comments.
+  EXPECT_EQ(NULL,
+      kDocCommentCases_case.detached_comments[detached_comments.size()]);
+
+  EXPECT_EQ(kDocCommentCases_case.next_leading_comments,
+            next_leading_comments);
+}
+
+// -------------------------------------------------------------------
+
 // Test parse helpers.  It's not really worth setting up a full data-driven
 // test here.
 TEST_F(TokenizerTest, ParseInteger) {
@@ -506,7 +735,7 @@ TEST_F(TokenizerTest, ParseInteger) {
   EXPECT_EQ(0, ParseInteger("0x"));
 
   uint64 i;
-#ifdef GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet
+#ifdef PROTOBUF_HAS_DEATH_TEST  // death tests do not work on Windows yet
   // Test invalid integers that will never be tokenized as integers.
   EXPECT_DEBUG_DEATH(Tokenizer::ParseInteger("zxy", kuint64max, &i),
     "passed text that could not have been tokenized as an integer");
@@ -518,7 +747,7 @@ TEST_F(TokenizerTest, ParseInteger) {
     "passed text that could not have been tokenized as an integer");
   EXPECT_DEBUG_DEATH(Tokenizer::ParseInteger("-1", kuint64max, &i),
     "passed text that could not have been tokenized as an integer");
-#endif  // GTEST_HAS_DEATH_TEST
+#endif  // PROTOBUF_HAS_DEATH_TEST
 
   // Test overflows.
   EXPECT_TRUE (Tokenizer::ParseInteger("0", 0, &i));
@@ -561,7 +790,7 @@ TEST_F(TokenizerTest, ParseFloat) {
   EXPECT_EQ(     0.0, Tokenizer::ParseFloat("1e-9999999999999999999999999999"));
   EXPECT_EQ(HUGE_VAL, Tokenizer::ParseFloat("1e+9999999999999999999999999999"));
 
-#ifdef GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet
+#ifdef PROTOBUF_HAS_DEATH_TEST  // death tests do not work on Windows yet
   // Test invalid integers that will never be tokenized as integers.
   EXPECT_DEBUG_DEATH(Tokenizer::ParseFloat("zxy"),
     "passed text that could not have been tokenized as a float");
@@ -569,7 +798,7 @@ TEST_F(TokenizerTest, ParseFloat) {
     "passed text that could not have been tokenized as a float");
   EXPECT_DEBUG_DEATH(Tokenizer::ParseFloat("-1.0"),
     "passed text that could not have been tokenized as a float");
-#endif  // GTEST_HAS_DEATH_TEST
+#endif  // PROTOBUF_HAS_DEATH_TEST
 }
 
 TEST_F(TokenizerTest, ParseString) {
@@ -591,11 +820,27 @@ TEST_F(TokenizerTest, ParseString) {
   Tokenizer::ParseString("'\\", &output);
   EXPECT_EQ("\\", output);
 
+  // Experiment with Unicode escapes. Here are one-, two- and three-byte Unicode
+  // characters.
+  Tokenizer::ParseString("'\\u0024\\u00a2\\u20ac\\U00024b62XX'", &output);
+  EXPECT_EQ("$¢€𤭢XX", output);
+  // Same thing encoded using UTF16.
+  Tokenizer::ParseString("'\\u0024\\u00a2\\u20ac\\ud852\\udf62XX'", &output);
+  EXPECT_EQ("$¢€𤭢XX", output);
+  // Here's some broken UTF16; there's a head surrogate with no tail surrogate.
+  // We just output this as if it were UTF8; it's not a defined code point, but
+  // it has a defined encoding.
+  Tokenizer::ParseString("'\\ud852XX'", &output);
+  EXPECT_EQ("\xed\xa1\x92XX", output);
+  // Malformed escape: Demons may fly out of the nose.
+  Tokenizer::ParseString("\\u0", &output);
+  EXPECT_EQ("u0", output);
+
   // Test invalid strings that will never be tokenized as strings.
-#ifdef GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet
+#ifdef PROTOBUF_HAS_DEATH_TEST  // death tests do not work on Windows yet
   EXPECT_DEBUG_DEATH(Tokenizer::ParseString("", &output),
     "passed text that could not have been tokenized as a string");
-#endif  // GTEST_HAS_DEATH_TEST
+#endif  // PROTOBUF_HAS_DEATH_TEST
 }
 
 TEST_F(TokenizerTest, ParseStringAppend) {
@@ -632,9 +877,15 @@ ErrorCase kErrorCases[] = {
   { "'\\x' foo", true,
     "0:3: Expected hex digits for escape sequence.\n" },
   { "'foo", false,
-    "0:4: String literals cannot cross line boundaries.\n" },
+    "0:4: Unexpected end of string.\n" },
   { "'bar\nfoo", true,
     "0:4: String literals cannot cross line boundaries.\n" },
+  { "'\\u01' foo", true,
+    "0:5: Expected four hex digits for \\u escape sequence.\n" },
+  { "'\\u01' foo", true,
+    "0:5: Expected four hex digits for \\u escape sequence.\n" },
+  { "'\\uXYZ' foo", true,
+    "0:3: Expected four hex digits for \\u escape sequence.\n" },
 
   // Integer errors.
   { "123foo", true,
@@ -694,6 +945,10 @@ ErrorCase kErrorCases[] = {
     "0:0: Invalid control characters encountered in text.\n" },
   { string("\0\0foo", 5), true,
     "0:0: Invalid control characters encountered in text.\n" },
+
+  // Check error from high order bits set
+  { "\300foo", true,
+    "0:0: Interpreting non ascii codepoint 192.\n" },
 };
 
 TEST_2D(TokenizerTest, Errors, kErrorCases, kBlockSizes) {
@@ -711,7 +966,7 @@ TEST_2D(TokenizerTest, Errors, kErrorCases, kBlockSizes) {
   }
 
   // Check that the errors match what was expected.
-  EXPECT_EQ(error_collector.text_, kErrorCases_case.errors);
+  EXPECT_EQ(kErrorCases_case.errors, error_collector.text_);
 
   // If the error was recoverable, make sure we saw "foo" after it.
   if (kErrorCases_case.recoverable) {
@@ -736,6 +991,7 @@ TEST_1D(TokenizerTest, BackUpOnDestruction, kBlockSizes) {
   // Only "foo" should have been read.
   EXPECT_EQ(strlen("foo"), input.ByteCount());
 }
+
 
 }  // namespace
 }  // namespace io

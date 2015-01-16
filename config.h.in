@@ -1,9 +1,9 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* the name of <hash_set> */
+/* the name of <hash_map> */
 #undef HASH_MAP_CLASS
 
-/* the location of <hash_map> */
+/* the location of <unordered_map> or <hash_map> */
 #undef HASH_MAP_H
 
 /* the namespace of hash_map/hash_set */
@@ -12,7 +12,7 @@
 /* the name of <hash_set> */
 #undef HASH_SET_CLASS
 
-/* the location of <hash_set> */
+/* the location of <unordered_set> or <hash_set> */
 #undef HASH_SET_H
 
 /* Define to 1 if you have the <dlfcn.h> header file. */

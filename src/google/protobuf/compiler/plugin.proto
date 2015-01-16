@@ -45,6 +45,8 @@
 // flag "--${NAME}_out" is passed to protoc.
 
 package google.protobuf.compiler;
+option java_package = "com.google.protobuf.compiler";
+option java_outer_classname = "PluginProtos";
 
 import "google/protobuf/descriptor.proto";
 
@@ -131,7 +133,7 @@ message CodeGeneratorResponse {
     // in order to work correctly in that context.
     //
     // The code generator that generates the initial file and the one which
-    // inserts into it must both run as part of a single invocatino of protoc.
+    // inserts into it must both run as part of a single invocation of protoc.
     // Code generators are executed in the order in which they appear on the
     // command line.
     //

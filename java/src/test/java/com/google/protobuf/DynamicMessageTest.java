@@ -30,8 +30,12 @@
 
 package com.google.protobuf;
 
-import protobuf_unittest.UnittestProto.TestAllTypes;
+import com.google.protobuf.Descriptors.FieldDescriptor;
+import com.google.protobuf.Descriptors.OneofDescriptor;
+
 import protobuf_unittest.UnittestProto.TestAllExtensions;
+import protobuf_unittest.UnittestProto.TestAllTypes;
+import protobuf_unittest.UnittestProto.TestEmptyMessage;
 import protobuf_unittest.UnittestProto.TestPackedTypes;
 
 import junit.framework.TestCase;
@@ -61,28 +65,44 @@ public class DynamicMessageTest extends TestCase {
     reflectionTester.assertAllFieldsSetViaReflection(message);
   }
 
-  public void testDoubleBuildError() throws Exception {
+  public void testSettersAfterBuild() throws Exception {
     Message.Builder builder =
       DynamicMessage.newBuilder(TestAllTypes.getDescriptor());
+    Message firstMessage = builder.build();
+    // double build()
     builder.build();
-    try {
-      builder.build();
-      fail("Should have thrown exception.");
-    } catch (IllegalStateException e) {
-      // Success.
-    }
+    // clear() after build()
+    builder.clear();
+    // setters after build()
+    reflectionTester.setAllFieldsViaReflection(builder);
+    Message message = builder.build();
+    reflectionTester.assertAllFieldsSetViaReflection(message);
+    // repeated setters after build()
+    reflectionTester.modifyRepeatedFieldsViaReflection(builder);
+    message = builder.build();
+    reflectionTester.assertRepeatedFieldsModifiedViaReflection(message);
+    // firstMessage shouldn't have been modified.
+    reflectionTester.assertClearViaReflection(firstMessage);
   }
 
-  public void testClearAfterBuildError() throws Exception {
+  public void testUnknownFields() throws Exception {
     Message.Builder builder =
-      DynamicMessage.newBuilder(TestAllTypes.getDescriptor());
-    builder.build();
-    try {
-      builder.clear();
-      fail("Should have thrown exception.");
-    } catch (IllegalStateException e) {
-      // Success.
-    }
+        DynamicMessage.newBuilder(TestEmptyMessage.getDescriptor());
+    builder.setUnknownFields(UnknownFieldSet.newBuilder()
+        .addField(1, UnknownFieldSet.Field.newBuilder().addVarint(1).build())
+        .addField(2, UnknownFieldSet.Field.newBuilder().addFixed32(1).build())
+        .build());
+    Message message = builder.build();
+    assertEquals(2, message.getUnknownFields().asMap().size());
+    // clone() with unknown fields
+    Message.Builder newBuilder = builder.clone();
+    assertEquals(2, newBuilder.getUnknownFields().asMap().size());
+    // clear() with unknown fields
+    newBuilder.clear();
+    assertTrue(newBuilder.getUnknownFields().asMap().isEmpty());
+    // serialize/parse with unknown fields
+    newBuilder.mergeFrom(message.toByteString());
+    assertEquals(2, newBuilder.getUnknownFields().asMap().size());
   }
 
   public void testDynamicMessageSettersRejectNull() throws Exception {
@@ -167,6 +187,23 @@ public class DynamicMessageTest extends TestCase {
     Message message2 =
       DynamicMessage.parseFrom(TestAllTypes.getDescriptor(), rawBytes);
     reflectionTester.assertAllFieldsSetViaReflection(message2);
+
+    // Test Parser interface.
+    Message message3 = message2.getParserForType().parseFrom(rawBytes);
+    reflectionTester.assertAllFieldsSetViaReflection(message3);
+  }
+
+  public void testDynamicMessageExtensionParsing() throws Exception {
+    ByteString rawBytes = TestUtil.getAllExtensionsSet().toByteString();
+    Message message = DynamicMessage.parseFrom(
+        TestAllExtensions.getDescriptor(), rawBytes,
+        TestUtil.getExtensionRegistry());
+    extensionsReflectionTester.assertAllFieldsSetViaReflection(message);
+
+    // Test Parser interface.
+    Message message2 = message.getParserForType().parseFrom(
+        rawBytes, TestUtil.getExtensionRegistry());
+    extensionsReflectionTester.assertAllFieldsSetViaReflection(message2);
   }
 
   public void testDynamicMessagePackedSerialization() throws Exception {
@@ -194,6 +231,10 @@ public class DynamicMessageTest extends TestCase {
     Message message2 =
       DynamicMessage.parseFrom(TestPackedTypes.getDescriptor(), rawBytes);
     packedReflectionTester.assertPackedFieldsSetViaReflection(message2);
+
+    // Test Parser interface.
+    Message message3 = message2.getParserForType().parseFrom(rawBytes);
+    packedReflectionTester.assertPackedFieldsSetViaReflection(message3);
   }
 
   public void testDynamicMessageCopy() throws Exception {
@@ -203,6 +244,19 @@ public class DynamicMessageTest extends TestCase {
 
     DynamicMessage copy = DynamicMessage.newBuilder(message).build();
     reflectionTester.assertAllFieldsSetViaReflection(copy);
+
+    // Test oneof behavior
+    FieldDescriptor bytesField =
+        TestAllTypes.getDescriptor().findFieldByName("oneof_bytes");
+    FieldDescriptor uint32Field =
+        TestAllTypes.getDescriptor().findFieldByName("oneof_uint32");
+    assertTrue(copy.hasField(bytesField));
+    assertFalse(copy.hasField(uint32Field));
+    DynamicMessage copy2 =
+        DynamicMessage.newBuilder(message).setField(uint32Field, 123).build();
+    assertFalse(copy2.hasField(bytesField));
+    assertTrue(copy2.hasField(uint32Field));
+    assertEquals(123, copy2.getField(uint32Field));
   }
 
   public void testToBuilder() throws Exception {
@@ -222,5 +276,35 @@ public class DynamicMessageTest extends TestCase {
     reflectionTester.assertAllFieldsSetViaReflection(derived);
     assertEquals(Arrays.asList(unknownFieldVal),
         derived.getUnknownFields().getField(unknownFieldNum).getVarintList());
+  }
+
+  public void testDynamicOneofMessage() throws Exception {
+    DynamicMessage.Builder builder =
+        DynamicMessage.newBuilder(TestAllTypes.getDescriptor());
+    OneofDescriptor oneof = TestAllTypes.getDescriptor().getOneofs().get(0);
+    assertFalse(builder.hasOneof(oneof));
+    assertSame(null, builder.getOneofFieldDescriptor(oneof));
+
+    reflectionTester.setAllFieldsViaReflection(builder);
+    assertTrue(builder.hasOneof(oneof));
+    FieldDescriptor field = oneof.getField(3);
+    assertSame(field, builder.getOneofFieldDescriptor(oneof));
+
+    DynamicMessage message = builder.buildPartial();
+    assertTrue(message.hasOneof(oneof));
+
+    DynamicMessage.Builder mergedBuilder =
+        DynamicMessage.newBuilder(TestAllTypes.getDescriptor());
+    FieldDescriptor mergedField = oneof.getField(0);
+    mergedBuilder.setField(mergedField, 123);
+    assertTrue(mergedBuilder.hasField(mergedField));
+    mergedBuilder.mergeFrom(message);
+    assertTrue(mergedBuilder.hasField(field));
+    assertFalse(mergedBuilder.hasField(mergedField));
+
+    builder.clearOneof(oneof);
+    assertSame(null, builder.getOneofFieldDescriptor(oneof));
+    message = builder.build();
+    assertSame(null, message.getOneofFieldDescriptor(oneof));
   }
 }
