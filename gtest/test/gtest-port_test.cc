@@ -33,10 +33,13 @@
 
 #include <gtest/internal/gtest-port.h>
 
+#include <stdio.h>
+
 #if GTEST_OS_MAC
-#include <pthread.h>
 #include <time.h>
 #endif  // GTEST_OS_MAC
+
+#include <utility>  // For std::pair and std::make_pair.
 
 #include <gtest/gtest.h>
 #include <gtest/gtest-spi.h>
@@ -50,8 +53,19 @@
 #include "src/gtest-internal-inl.h"
 #undef GTEST_IMPLEMENTATION_
 
+using std::make_pair;
+using std::pair;
+
 namespace testing {
 namespace internal {
+
+// Tests that the element_type typedef is available in scoped_ptr and refers
+// to the parameter type.
+TEST(ScopedPtrTest, DefinesElementType) {
+  StaticAssertTypeEq<int, ::testing::internal::scoped_ptr<int>::element_type>();
+}
+
+// TODO(vladl@google.com): Implement THE REST of scoped_ptr tests.
 
 TEST(GtestCheckSyntaxTest, BehavesLikeASingleStatement) {
   if (AlwaysFalse())
@@ -84,7 +98,7 @@ TEST(GtestCheckSyntaxTest, WorksWithSwitch) {
 
 #if GTEST_OS_MAC
 void* ThreadFunc(void* data) {
-  pthread_mutex_t* mutex = reinterpret_cast<pthread_mutex_t*>(data);
+  pthread_mutex_t* mutex = static_cast<pthread_mutex_t*>(data);
   pthread_mutex_lock(mutex);
   pthread_mutex_unlock(mutex);
   return NULL;
@@ -119,10 +133,7 @@ TEST(GetThreadCountTest, ReturnsCorrectValue) {
     if (GetThreadCount() == 1)
       break;
 
-    timespec time;
-    time.tv_sec = 0;
-    time.tv_nsec = 100L * 1000 * 1000;  // .1 seconds.
-    nanosleep(&time, NULL);
+    SleepMilliseconds(100);
   }
   EXPECT_EQ(1U, GetThreadCount());
   pthread_mutex_destroy(&mutex);
@@ -161,15 +172,15 @@ TEST(GtestCheckDeathTest, LivesSilentlyOnSuccess) {
 
 #if GTEST_USES_POSIX_RE
 
+#if GTEST_HAS_TYPED_TEST
+
 template <typename Str>
 class RETest : public ::testing::Test {};
 
 // Defines StringTypes as the list of all string types that class RE
 // supports.
 typedef testing::Types<
-#if GTEST_HAS_STD_STRING
     ::std::string,
-#endif  // GTEST_HAS_STD_STRING
 #if GTEST_HAS_GLOBAL_STRING
     ::string,
 #endif  // GTEST_HAS_GLOBAL_STRING
@@ -222,6 +233,8 @@ TYPED_TEST(RETest, PartialMatchWorks) {
   EXPECT_TRUE(RE::PartialMatch(TypeParam("azy"), re));
   EXPECT_FALSE(RE::PartialMatch(TypeParam("zza"), re));
 }
+
+#endif  // GTEST_HAS_TYPED_TEST
 
 #elif GTEST_USES_SIMPLE_RE
 
@@ -689,11 +702,317 @@ TEST(RETest, PartialMatchWorks) {
 
 #endif  // GTEST_USES_POSIX_RE
 
-TEST(CaptureStderrTest, CapturesStdErr) {
-  CaptureStderr();
-  fprintf(stderr, "abc");
-  ASSERT_STREQ("abc", GetCapturedStderr().c_str());
+#if !GTEST_OS_WINDOWS_MOBILE
+
+TEST(CaptureTest, CapturesStdout) {
+  CaptureStdout();
+  fprintf(stdout, "abc");
+  EXPECT_STREQ("abc", GetCapturedStdout().c_str());
+
+  CaptureStdout();
+  fprintf(stdout, "def%cghi", '\0');
+  EXPECT_EQ(::std::string("def\0ghi", 7), ::std::string(GetCapturedStdout()));
 }
+
+TEST(CaptureTest, CapturesStderr) {
+  CaptureStderr();
+  fprintf(stderr, "jkl");
+  EXPECT_STREQ("jkl", GetCapturedStderr().c_str());
+
+  CaptureStderr();
+  fprintf(stderr, "jkl%cmno", '\0');
+  EXPECT_EQ(::std::string("jkl\0mno", 7), ::std::string(GetCapturedStderr()));
+}
+
+// Tests that stdout and stderr capture don't interfere with each other.
+TEST(CaptureTest, CapturesStdoutAndStderr) {
+  CaptureStdout();
+  CaptureStderr();
+  fprintf(stdout, "pqr");
+  fprintf(stderr, "stu");
+  EXPECT_STREQ("pqr", GetCapturedStdout().c_str());
+  EXPECT_STREQ("stu", GetCapturedStderr().c_str());
+}
+
+TEST(CaptureDeathTest, CannotReenterStdoutCapture) {
+  CaptureStdout();
+  EXPECT_DEATH_IF_SUPPORTED(CaptureStdout();,
+                            "Only one stdout capturer can exist at a time");
+  GetCapturedStdout();
+
+  // We cannot test stderr capturing using death tests as they use it
+  // themselves.
+}
+
+#endif  // !GTEST_OS_WINDOWS_MOBILE
+
+TEST(ThreadLocalTest, DefaultConstructorInitializesToDefaultValues) {
+  ThreadLocal<int> t1;
+  EXPECT_EQ(0, t1.get());
+
+  ThreadLocal<void*> t2;
+  EXPECT_TRUE(t2.get() == NULL);
+}
+
+TEST(ThreadLocalTest, SingleParamConstructorInitializesToParam) {
+  ThreadLocal<int> t1(123);
+  EXPECT_EQ(123, t1.get());
+
+  int i = 0;
+  ThreadLocal<int*> t2(&i);
+  EXPECT_EQ(&i, t2.get());
+}
+
+class NoDefaultContructor {
+ public:
+  explicit NoDefaultContructor(const char*) {}
+  NoDefaultContructor(const NoDefaultContructor&) {}
+};
+
+TEST(ThreadLocalTest, ValueDefaultContructorIsNotRequiredForParamVersion) {
+  ThreadLocal<NoDefaultContructor> bar(NoDefaultContructor("foo"));
+  bar.pointer();
+}
+
+TEST(ThreadLocalTest, GetAndPointerReturnSameValue) {
+  ThreadLocal<String> thread_local;
+
+  EXPECT_EQ(thread_local.pointer(), &(thread_local.get()));
+
+  // Verifies the condition still holds after calling set.
+  thread_local.set("foo");
+  EXPECT_EQ(thread_local.pointer(), &(thread_local.get()));
+}
+
+TEST(ThreadLocalTest, PointerAndConstPointerReturnSameValue) {
+  ThreadLocal<String> thread_local;
+  const ThreadLocal<String>& const_thread_local = thread_local;
+
+  EXPECT_EQ(thread_local.pointer(), const_thread_local.pointer());
+
+  thread_local.set("foo");
+  EXPECT_EQ(thread_local.pointer(), const_thread_local.pointer());
+}
+
+#if GTEST_IS_THREADSAFE
+
+void AddTwo(int* param) { *param += 2; }
+
+TEST(ThreadWithParamTest, ConstructorExecutesThreadFunc) {
+  int i = 40;
+  ThreadWithParam<int*> thread(&AddTwo, &i, NULL);
+  thread.Join();
+  EXPECT_EQ(42, i);
+}
+
+TEST(MutexDeathTest, AssertHeldShouldAssertWhenNotLocked) {
+  // AssertHeld() is flaky only in the presence of multiple threads accessing
+  // the lock. In this case, the test is robust.
+  EXPECT_DEATH_IF_SUPPORTED({
+    Mutex m;
+    { MutexLock lock(&m); }
+    m.AssertHeld();
+  },
+  "thread .*hold");
+}
+
+TEST(MutexTest, AssertHeldShouldNotAssertWhenLocked) {
+  Mutex m;
+  MutexLock lock(&m);
+  m.AssertHeld();
+}
+
+class AtomicCounterWithMutex {
+ public:
+  explicit AtomicCounterWithMutex(Mutex* mutex) :
+    value_(0), mutex_(mutex), random_(42) {}
+
+  void Increment() {
+    MutexLock lock(mutex_);
+    int temp = value_;
+    {
+      // Locking a mutex puts up a memory barrier, preventing reads and
+      // writes to value_ rearranged when observed from other threads.
+      //
+      // We cannot use Mutex and MutexLock here or rely on their memory
+      // barrier functionality as we are testing them here.
+      pthread_mutex_t memory_barrier_mutex;
+      GTEST_CHECK_POSIX_SUCCESS_(
+          pthread_mutex_init(&memory_barrier_mutex, NULL));
+      GTEST_CHECK_POSIX_SUCCESS_(pthread_mutex_lock(&memory_barrier_mutex));
+
+      SleepMilliseconds(random_.Generate(30));
+
+      GTEST_CHECK_POSIX_SUCCESS_(pthread_mutex_unlock(&memory_barrier_mutex));
+    }
+    value_ = temp + 1;
+  }
+  int value() const { return value_; }
+
+ private:
+  volatile int value_;
+  Mutex* const mutex_;  // Protects value_.
+  Random       random_;
+};
+
+void CountingThreadFunc(pair<AtomicCounterWithMutex*, int> param) {
+  for (int i = 0; i < param.second; ++i)
+      param.first->Increment();
+}
+
+// Tests that the mutex only lets one thread at a time to lock it.
+TEST(MutexTest, OnlyOneThreadCanLockAtATime) {
+  Mutex mutex;
+  AtomicCounterWithMutex locked_counter(&mutex);
+
+  typedef ThreadWithParam<pair<AtomicCounterWithMutex*, int> > ThreadType;
+  const int kCycleCount = 20;
+  const int kThreadCount = 7;
+  scoped_ptr<ThreadType> counting_threads[kThreadCount];
+  Notification threads_can_start;
+  // Creates and runs kThreadCount threads that increment locked_counter
+  // kCycleCount times each.
+  for (int i = 0; i < kThreadCount; ++i) {
+    counting_threads[i].reset(new ThreadType(&CountingThreadFunc,
+                                             make_pair(&locked_counter,
+                                                       kCycleCount),
+                                             &threads_can_start));
+  }
+  threads_can_start.Notify();
+  for (int i = 0; i < kThreadCount; ++i)
+    counting_threads[i]->Join();
+
+  // If the mutex lets more than one thread to increment the counter at a
+  // time, they are likely to encounter a race condition and have some
+  // increments overwritten, resulting in the lower then expected counter
+  // value.
+  EXPECT_EQ(kCycleCount * kThreadCount, locked_counter.value());
+}
+
+template <typename T>
+void RunFromThread(void (func)(T), T param) {
+  ThreadWithParam<T> thread(func, param, NULL);
+  thread.Join();
+}
+
+void RetrieveThreadLocalValue(pair<ThreadLocal<String>*, String*> param) {
+  *param.second = param.first->get();
+}
+
+TEST(ThreadLocalTest, ParameterizedConstructorSetsDefault) {
+  ThreadLocal<String> thread_local("foo");
+  EXPECT_STREQ("foo", thread_local.get().c_str());
+
+  thread_local.set("bar");
+  EXPECT_STREQ("bar", thread_local.get().c_str());
+
+  String result;
+  RunFromThread(&RetrieveThreadLocalValue, make_pair(&thread_local, &result));
+  EXPECT_STREQ("foo", result.c_str());
+}
+
+// DestructorTracker keeps track of whether its instances have been
+// destroyed.
+static std::vector<bool> g_destroyed;
+
+class DestructorTracker {
+ public:
+  DestructorTracker() : index_(GetNewIndex()) {}
+  DestructorTracker(const DestructorTracker& /* rhs */)
+      : index_(GetNewIndex()) {}
+  ~DestructorTracker() {
+    // We never access g_destroyed concurrently, so we don't need to
+    // protect the write operation under a mutex.
+    g_destroyed[index_] = true;
+  }
+
+ private:
+  static int GetNewIndex() {
+    g_destroyed.push_back(false);
+    return g_destroyed.size() - 1;
+  }
+  const int index_;
+};
+
+typedef ThreadLocal<DestructorTracker>* ThreadParam;
+
+void CallThreadLocalGet(ThreadParam thread_local) {
+  thread_local->get();
+}
+
+// Tests that when a ThreadLocal object dies in a thread, it destroys
+// the managed object for that thread.
+TEST(ThreadLocalTest, DestroysManagedObjectForOwnThreadWhenDying) {
+  g_destroyed.clear();
+
+  {
+    // The next line default constructs a DestructorTracker object as
+    // the default value of objects managed by thread_local.
+    ThreadLocal<DestructorTracker> thread_local;
+    ASSERT_EQ(1U, g_destroyed.size());
+    ASSERT_FALSE(g_destroyed[0]);
+
+    // This creates another DestructorTracker object for the main thread.
+    thread_local.get();
+    ASSERT_EQ(2U, g_destroyed.size());
+    ASSERT_FALSE(g_destroyed[0]);
+    ASSERT_FALSE(g_destroyed[1]);
+  }
+
+  // Now thread_local has died.  It should have destroyed both the
+  // default value shared by all threads and the value for the main
+  // thread.
+  ASSERT_EQ(2U, g_destroyed.size());
+  EXPECT_TRUE(g_destroyed[0]);
+  EXPECT_TRUE(g_destroyed[1]);
+
+  g_destroyed.clear();
+}
+
+// Tests that when a thread exits, the thread-local object for that
+// thread is destroyed.
+TEST(ThreadLocalTest, DestroysManagedObjectAtThreadExit) {
+  g_destroyed.clear();
+
+  {
+    // The next line default constructs a DestructorTracker object as
+    // the default value of objects managed by thread_local.
+    ThreadLocal<DestructorTracker> thread_local;
+    ASSERT_EQ(1U, g_destroyed.size());
+    ASSERT_FALSE(g_destroyed[0]);
+
+    // This creates another DestructorTracker object in the new thread.
+    ThreadWithParam<ThreadParam> thread(
+        &CallThreadLocalGet, &thread_local, NULL);
+    thread.Join();
+
+    // Now the new thread has exited.  The per-thread object for it
+    // should have been destroyed.
+    ASSERT_EQ(2U, g_destroyed.size());
+    ASSERT_FALSE(g_destroyed[0]);
+    ASSERT_TRUE(g_destroyed[1]);
+  }
+
+  // Now thread_local has died.  The default value should have been
+  // destroyed too.
+  ASSERT_EQ(2U, g_destroyed.size());
+  EXPECT_TRUE(g_destroyed[0]);
+  EXPECT_TRUE(g_destroyed[1]);
+
+  g_destroyed.clear();
+}
+
+TEST(ThreadLocalTest, ThreadLocalMutationsAffectOnlyCurrentThread) {
+  ThreadLocal<String> thread_local;
+  thread_local.set("Foo");
+  EXPECT_STREQ("Foo", thread_local.get().c_str());
+
+  String result;
+  RunFromThread(&RetrieveThreadLocalValue, make_pair(&thread_local, &result));
+  EXPECT_TRUE(result.c_str() == NULL);
+}
+
+#endif  // GTEST_IS_THREADSAFE
 
 }  // namespace internal
 }  // namespace testing
