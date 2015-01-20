@@ -1,5 +1,7 @@
-# -*- Python -*-
-# Copyright 2008 Google Inc. All Rights Reserved.
+#!/bin/bash
+#
+# Copyright 2008, Google Inc.
+# All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -26,36 +28,35 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-# Author: joi@google.com (Joi Sigurdsson)
-# Author: vladl@google.com (Vlad Losev)
-#
-# Base build file for Google Test Tests.
-#
-# Usage:
-#   cd to the directory with this file, then
-#   ./scons.py [OPTIONS]
-#
-# where frequently used command-line options include:
-#     -h               print usage help.
-#     BUILD=all        build all build types.
-#     BUILD=win-opt    build the given build type.
 
-EnsurePythonVersion(2, 3)
+# Executes the samples and tests for the Google Test Framework.
 
-sconstruct_helper = SConscript('SConstruct.common')
+# Help the dynamic linker find the path to the libraries.
+export DYLD_FRAMEWORK_PATH=$BUILT_PRODUCTS_DIR
+export DYLD_LIBRARY_PATH=$BUILT_PRODUCTS_DIR
 
-sconstruct_helper.Initialize(build_root_path='..',
-                             support_multiple_win_builds=False)
+# Create some executables.
+test_executables=$@
 
-win_base = sconstruct_helper.MakeWinBaseEnvironment()
+# Now execute each one in turn keeping track of how many succeeded and failed.
+succeeded=0
+failed=0
+failed_list=()
+for test in ${test_executables[*]}; do
+  "$test"
+  result=$?
+  if [ $result -eq 0 ]; then
+    succeeded=$(( $succeeded + 1 ))
+  else
+    failed=$(( failed + 1 ))
+    failed_list="$failed_list $test"
+  fi
+done
 
-if win_base.get('MSVS_VERSION', None) == '7.1':
-  sconstruct_helper.AllowVc71StlWithoutExceptions(win_base)
-
-sconstruct_helper.MakeWinDebugEnvironment(win_base, 'win-dbg')
-sconstruct_helper.MakeWinOptimizedEnvironment(win_base, 'win-opt')
-
-sconstruct_helper.ConfigureGccEnvironments()
-
-sconstruct_helper.BuildSelectedEnvironments()
+# Report the successes and failures to the console.
+echo "Tests complete with $succeeded successes and $failed failures."
+if [ $failed -ne 0 ]; then
+  echo "The following tests failed:"
+  echo $failed_list
+fi
+exit $failed
