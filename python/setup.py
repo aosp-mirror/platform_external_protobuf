@@ -156,7 +156,7 @@ if __name__ == '__main__':
         ))
 
   setup(name = 'protobuf',
-        version = '2.6.0',
+        version = '2.6.1',
         packages = [ 'google' ],
         namespace_packages = [ 'google' ],
         test_suite = 'setup.MakeTestSuite',
@@ -180,6 +180,7 @@ if __name__ == '__main__':
           'google.protobuf.descriptor_database',
           'google.protobuf.descriptor_pool',
           'google.protobuf.message_factory',
+          'google.protobuf.pyext.cpp_message',
           'google.protobuf.reflection',
           'google.protobuf.service',
           'google.protobuf.service_reflection',
@@ -190,7 +191,7 @@ if __name__ == '__main__':
         install_requires = ['setuptools'],
         setup_requires = ['google-apputils'],
         ext_modules = ext_module_list,
-        url = 'http://code.google.com/p/protobuf/',
+        url = 'https://developers.google.com/protocol-buffers/',
         maintainer = maintainer_email,
         maintainer_email = 'protobuf@googlegroups.com',
         license = 'New BSD License',
