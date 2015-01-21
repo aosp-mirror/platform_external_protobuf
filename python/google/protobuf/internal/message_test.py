@@ -2,7 +2,7 @@
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# http://code.google.com/p/protobuf/
+# https://developers.google.com/protocol-buffers/
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -634,7 +634,12 @@ class MessageTest(basetest.TestCase):
     self.assertTrue(m.HasField('oneof_uint32'))
     self.assertEqual('oneof_uint32', m.WhichOneof('oneof_field'))
 
-
+  def testOneofDeserialize(self):
+    m = unittest_pb2.TestAllTypes()
+    m.oneof_uint32 = 11
+    m2 = unittest_pb2.TestAllTypes()
+    m2.ParseFromString(m.SerializeToString())
+    self.assertEqual('oneof_uint32', m2.WhichOneof('oneof_field'))
 
   def testSortEmptyRepeatedCompositeContainer(self):
     """Exercise a scenario that has led to segfaults in the past.

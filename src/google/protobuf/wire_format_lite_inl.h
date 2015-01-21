@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -390,7 +390,7 @@ inline bool WireFormatLite::ReadPackedFixedSizePrimitive(
     // safely allocate.  We read as much as we can into *values
     // without pre-allocating "length" bytes.
     CType value;
-    for (int i = 0; i < new_entries; ++i) {
+    for (uint32 i = 0; i < new_entries; ++i) {
       if (!ReadPrimitive<CType, DeclaredType>(input, &value)) return false;
       values->Add(value);
     }

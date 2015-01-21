@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -239,9 +239,9 @@ class LIBPROTOBUF_EXPORT WireFormatLite {
   // that file to use these.
 
 // Avoid ugly line wrapping
-#define input  io::CodedInputStream*  input
-#define output io::CodedOutputStream* output
-#define field_number int field_number
+#define input  io::CodedInputStream*  input_arg
+#define output io::CodedOutputStream* output_arg
+#define field_number int field_number_arg
 #define INL GOOGLE_ATTRIBUTE_ALWAYS_INLINE
 
   // Read fields, not including tags.  The assumption is that you already

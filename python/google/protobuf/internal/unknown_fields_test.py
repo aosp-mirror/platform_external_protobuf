@@ -3,7 +3,7 @@
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# http://code.google.com/p/protobuf/
+# https://developers.google.com/protocol-buffers/
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -62,7 +62,7 @@ class UnknownFieldsTest(basetest.TestCase):
     result_dict = {}
     for tag_bytes, value in self.unknown_fields:
       if tag_bytes == field_tag:
-        decoder = unittest_pb2.TestAllTypes._decoders_by_tag[tag_bytes]
+        decoder = unittest_pb2.TestAllTypes._decoders_by_tag[tag_bytes][0]
         decoder(value, 0, len(value), self.all_fields, result_dict)
     return result_dict[field_descriptor]
 
@@ -204,7 +204,7 @@ class UnknownFieldsTest(basetest.TestCase):
     for tag_bytes, value in self.unknown_fields:
       if tag_bytes == field_tag:
         decoder = missing_enum_values_pb2.TestEnumValues._decoders_by_tag[
-          tag_bytes]
+          tag_bytes][0]
         decoder(value, 0, len(value), self.message, result_dict)
     return result_dict[field_descriptor]
 
