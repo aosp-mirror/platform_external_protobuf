@@ -1,5 +1,4 @@
-// Protocol Buffers - Google's data interchange format
-// Copyright 2012 Google Inc.  All rights reserved.
+// Copyright 2014 Google Inc. All rights reserved.
 // https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
@@ -30,79 +29,58 @@
 
 // This file is an internal atomic implementation, use atomicops.h instead.
 
-#ifndef GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_ARM_QNX_H_
-#define GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_ARM_QNX_H_
+#ifndef GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_SPARC_GCC_H_
+#define GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_SPARC_GCC_H_
 
-// For _smp_cmpxchg()
-#include <pthread.h>
+#include <atomic.h>
 
 namespace google {
 namespace protobuf {
 namespace internal {
 
-inline Atomic32 QNXCmpxchg(Atomic32 old_value,
-                           Atomic32 new_value,
-                           volatile Atomic32* ptr) {
-  return static_cast<Atomic32>(
-      _smp_cmpxchg((volatile unsigned *)ptr,
-                   (unsigned)old_value,
-                   (unsigned)new_value));
-}
-
-
 inline Atomic32 NoBarrier_CompareAndSwap(volatile Atomic32* ptr,
                                          Atomic32 old_value,
                                          Atomic32 new_value) {
-  Atomic32 prev_value = *ptr;
-  do {
-    if (!QNXCmpxchg(old_value, new_value,
-                    const_cast<Atomic32*>(ptr))) {
-      return old_value;
-    }
-    prev_value = *ptr;
-  } while (prev_value == old_value);
-  return prev_value;
+  return (Atomic32)atomic_cas_32((volatile uint32_t*)ptr, (uint32_t)old_value, (uint32_t)new_value);
 }
 
 inline Atomic32 NoBarrier_AtomicExchange(volatile Atomic32* ptr,
                                          Atomic32 new_value) {
-  Atomic32 old_value;
-  do {
-    old_value = *ptr;
-  } while (QNXCmpxchg(old_value, new_value,
-                      const_cast<Atomic32*>(ptr)));
-  return old_value;
+  return (Atomic32)atomic_swap_32((volatile uint32_t*)ptr, (uint32_t)new_value);
 }
 
 inline Atomic32 NoBarrier_AtomicIncrement(volatile Atomic32* ptr,
                                           Atomic32 increment) {
-  return Barrier_AtomicIncrement(ptr, increment);
+  return (Atomic32)atomic_add_32_nv((volatile uint32_t*)ptr, (uint32_t)increment);
+}
+
+inline void MemoryBarrier(void) {
+	membar_producer();
+	membar_consumer();
 }
 
 inline Atomic32 Barrier_AtomicIncrement(volatile Atomic32* ptr,
                                         Atomic32 increment) {
-  for (;;) {
-    // Atomic exchange the old value with an incremented one.
-    Atomic32 old_value = *ptr;
-    Atomic32 new_value = old_value + increment;
-    if (QNXCmpxchg(old_value, new_value,
-                   const_cast<Atomic32*>(ptr)) == 0) {
-      // The exchange took place as expected.
-      return new_value;
-    }
-    // Otherwise, *ptr changed mid-loop and we need to retry.
-  }
+  MemoryBarrier();
+  Atomic32 ret = NoBarrier_AtomicIncrement(ptr, increment);
+  MemoryBarrier();
+
+  return ret;
 }
 
 inline Atomic32 Acquire_CompareAndSwap(volatile Atomic32* ptr,
                                        Atomic32 old_value,
                                        Atomic32 new_value) {
-  return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
+  Atomic32 ret = NoBarrier_CompareAndSwap(ptr, old_value, new_value);
+  MemoryBarrier();
+
+  return ret;
 }
 
 inline Atomic32 Release_CompareAndSwap(volatile Atomic32* ptr,
                                        Atomic32 old_value,
                                        Atomic32 new_value) {
+  MemoryBarrier();
   return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
 }
 
@@ -110,17 +88,13 @@ inline void NoBarrier_Store(volatile Atomic32* ptr, Atomic32 value) {
   *ptr = value;
 }
 
-inline void MemoryBarrier() {
-  __sync_synchronize();
-}
-
 inline void Acquire_Store(volatile Atomic32* ptr, Atomic32 value) {
   *ptr = value;
-  MemoryBarrier();
+  membar_producer();
 }
 
 inline void Release_Store(volatile Atomic32* ptr, Atomic32 value) {
-  MemoryBarrier();
+  membar_consumer();
   *ptr = value;
 }
 
@@ -129,18 +103,86 @@ inline Atomic32 NoBarrier_Load(volatile const Atomic32* ptr) {
 }
 
 inline Atomic32 Acquire_Load(volatile const Atomic32* ptr) {
-  Atomic32 value = *ptr;
-  MemoryBarrier();
-  return value;
+  Atomic32 val = *ptr;
+  membar_consumer();
+  return val;
 }
 
 inline Atomic32 Release_Load(volatile const Atomic32* ptr) {
-  MemoryBarrier();
+  membar_producer();
   return *ptr;
 }
+
+#ifdef GOOGLE_PROTOBUF_ARCH_64_BIT
+inline Atomic64 NoBarrier_CompareAndSwap(volatile Atomic64* ptr,
+                                         Atomic64 old_value,
+                                         Atomic64 new_value) {
+  return atomic_cas_64((volatile uint64_t*)ptr, (uint64_t)old_value, (uint64_t)new_value);
+}
+
+inline Atomic64 NoBarrier_AtomicExchange(volatile Atomic64* ptr, Atomic64 new_value) {
+  return atomic_swap_64((volatile uint64_t*)ptr, (uint64_t)new_value);
+}
+
+inline Atomic64 NoBarrier_AtomicIncrement(volatile Atomic64* ptr, Atomic64 increment) {
+  return atomic_add_64_nv((volatile uint64_t*)ptr, increment);
+}
+
+inline Atomic64 Barrier_AtomicIncrement(volatile Atomic64* ptr, Atomic64 increment) {
+  MemoryBarrier();
+  Atomic64 ret = atomic_add_64_nv((volatile uint64_t*)ptr, increment);
+  MemoryBarrier();
+  return ret;
+}
+
+inline Atomic64 Acquire_CompareAndSwap(volatile Atomic64* ptr,
+                                       Atomic64 old_value,
+                                       Atomic64 new_value) {
+  Atomic64 ret = NoBarrier_CompareAndSwap(ptr, old_value, new_value);
+  MemoryBarrier();
+  return ret;
+}
+
+inline Atomic64 Release_CompareAndSwap(volatile Atomic64* ptr,
+                                       Atomic64 old_value,
+                                       Atomic64 new_value) {
+  MemoryBarrier();
+  return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
+}
+
+inline void NoBarrier_Store(volatile Atomic64* ptr, Atomic64 value) {
+  *ptr = value;
+}
+
+inline void Acquire_Store(volatile Atomic64* ptr, Atomic64 value) {
+  *ptr = value;
+  membar_producer();
+}
+
+inline void Release_Store(volatile Atomic64* ptr, Atomic64 value) {
+  membar_consumer();
+  *ptr = value;
+}
+
+inline Atomic64 NoBarrier_Load(volatile const Atomic64* ptr) {
+  return *ptr;
+}
+
+inline Atomic64 Acquire_Load(volatile const Atomic64* ptr) {
+  Atomic64 ret = *ptr;
+  membar_consumer();
+  return ret;
+}
+
+inline Atomic64 Release_Load(volatile const Atomic64* ptr) {
+  membar_producer();
+  return *ptr;
+}
+#endif
 
 }  // namespace internal
 }  // namespace protobuf
 }  // namespace google
 
-#endif  // GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_ARM_QNX_H_
+#endif  // GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_SPARC_GCC_H_
+

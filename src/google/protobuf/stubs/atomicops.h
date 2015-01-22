@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2012 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -66,9 +66,10 @@ typedef int32 Atomic32;
 #ifdef GOOGLE_PROTOBUF_ARCH_64_BIT
 // We need to be able to go between Atomic64 and AtomicWord implicitly.  This
 // means Atomic64 and AtomicWord should be the same type on 64-bit.
-#if defined(__ILP32__) || defined(GOOGLE_PROTOBUF_OS_NACL)
+#if defined(__ILP32__) || defined(GOOGLE_PROTOBUF_OS_NACL) || defined(GOOGLE_PROTOBUF_ARCH_SPARC)
 // NaCl's intptr_t is not actually 64-bits on 64-bit!
 // http://code.google.com/p/nativeclient/issues/detail?id=1162
+// sparcv9's pointer type is 32bits
 typedef int64 Atomic64;
 #else
 typedef intptr_t Atomic64;
@@ -174,6 +175,10 @@ Atomic64 Release_Load(volatile const Atomic64* ptr);
 GOOGLE_PROTOBUF_ATOMICOPS_ERROR
 #endif
 
+// Solaris
+#elif defined(GOOGLE_PROTOBUF_OS_SOLARIS)
+#include <google/protobuf/stubs/atomicops_internals_solaris.h>
+
 // Apple.
 #elif defined(GOOGLE_PROTOBUF_OS_APPLE)
 #include <google/protobuf/stubs/atomicops_internals_macosx.h>
@@ -194,6 +199,12 @@ GOOGLE_PROTOBUF_ATOMICOPS_ERROR
 #include <google/protobuf/stubs/atomicops_internals_pnacl.h>
 #elif (((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7)) || (__GNUC__ > 4))
 #include <google/protobuf/stubs/atomicops_internals_generic_gcc.h>
+#elif defined(__clang__)
+#if __has_extension(c_atomic)
+#include <google/protobuf/stubs/atomicops_internals_generic_gcc.h>
+#else
+GOOGLE_PROTOBUF_ATOMICOPS_ERROR
+#endif
 #else
 GOOGLE_PROTOBUF_ATOMICOPS_ERROR
 #endif
