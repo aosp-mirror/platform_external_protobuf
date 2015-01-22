@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -704,5 +704,32 @@ public class DescriptorsTest extends TestCase {
     assertFalse(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(43));
     assertFalse(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(4142));
     assertTrue(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(4143));
+  }
+
+  public void testPackedEnumField() throws Exception {
+    FileDescriptorProto fileDescriptorProto = FileDescriptorProto.newBuilder()
+        .setName("foo.proto")
+        .addEnumType(EnumDescriptorProto.newBuilder()
+          .setName("Enum")
+          .addValue(EnumValueDescriptorProto.newBuilder()
+            .setName("FOO")
+            .setNumber(1)
+            .build())
+          .build())
+        .addMessageType(DescriptorProto.newBuilder()
+          .setName("Message")
+          .addField(FieldDescriptorProto.newBuilder()
+            .setName("foo")
+            .setTypeName("Enum")
+            .setNumber(1)
+            .setLabel(FieldDescriptorProto.Label.LABEL_REPEATED)
+            .setOptions(DescriptorProtos.FieldOptions.newBuilder()
+              .setPacked(true)
+              .build())
+            .build())
+          .build())
+        .build();
+    Descriptors.FileDescriptor.buildFrom(
+        fileDescriptorProto, new FileDescriptor[0]);
   }
 }

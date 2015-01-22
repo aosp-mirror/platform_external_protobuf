@@ -2,7 +2,7 @@
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# http://code.google.com/p/protobuf/
+# https://developers.google.com/protocol-buffers/
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -586,6 +586,13 @@ class TextFormatTest(basetest.TestCase):
     message = unittest_pb2.TestAllTypes()
     test_util.SetAllFields(message)
     self.assertEqual(message, parsed_message)
+
+  def testParseOneof(self):
+    m = unittest_pb2.TestAllTypes()
+    m.oneof_uint32 = 11
+    m2 = unittest_pb2.TestAllTypes()
+    text_format.Parse(text_format.MessageToString(m), m2)
+    self.assertEqual('oneof_uint32', m2.WhichOneof('oneof_field'))
 
 
 class TokenizerTest(basetest.TestCase):

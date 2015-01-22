@@ -12,7 +12,7 @@ AC_PREREQ(2.59)
 # In the SVN trunk, the version should always be the next anticipated release
 # version with the "-pre" suffix.  (We used to use "-SNAPSHOT" but this pushed
 # the size of one file name in the dist tarfile over the 99-char limit.)
-AC_INIT([Protocol Buffers],[2.6.0],[protobuf@googlegroups.com],[protobuf])
+AC_INIT([Protocol Buffers],[2.6.1],[protobuf@googlegroups.com],[protobuf])
 
 AM_MAINTAINER_MODE([enable])
 
@@ -138,6 +138,15 @@ AM_CONDITIONAL([USE_EXTERNAL_PROTOC], [test "$with_protoc" != "no"])
 
 ACX_PTHREAD
 AC_CXX_STL_HASH
+
+case "$target_os" in
+  mingw* | cygwin* | win*)
+    ;;
+  *)
+    # Need to link against rt on Solaris
+    AC_SEARCH_LIBS([sched_yield], [rt], [], [AC_MSG_FAILURE([sched_yield was not found on your system])])
+    ;;
+esac
 
 # HACK:  Make gtest's configure script pick up our copy of CFLAGS and CXXFLAGS,
 #   since the flags added by ACX_CHECK_SUNCC must be used when compiling gtest
