@@ -407,9 +407,9 @@ LOCAL_MODULE := aprotoc
 LOCAL_MODULE_CLASS := EXECUTABLES
 LOCAL_MODULE_TAGS := optional
 
-# Build aprotoc as a standalone binary because we copy it to
+# Use the system's libstdc++ (libc++ on mac) because we copy aprotoc to
 # unbundled projects where libc++.so may not be available.
-LOCAL_CXX_STL := libc++_static
+LOCAL_CXX_STL := libstdc++
 
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := $(COMPILER_SRC_FILES)
