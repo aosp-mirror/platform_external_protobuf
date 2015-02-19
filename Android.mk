@@ -462,6 +462,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := android-nano-test-parcelable
 LOCAL_MODULE_TAGS := tests
 LOCAL_SDK_VERSION := current
+# Only needed at compile-time.
+LOCAL_JAVA_LIBRARIES := android-support-annotations
 
 LOCAL_PROTOC_OPTIMIZE_TYPE := nano
 
@@ -470,7 +472,8 @@ LOCAL_SRC_FILES := src/google/protobuf/unittest_simple_nano.proto
 LOCAL_PROTOC_FLAGS := --proto_path=$(LOCAL_PATH)/src
 
 LOCAL_PROTO_JAVA_OUTPUT_PARAMS := \
-        parcelable_messages = true
+        parcelable_messages = true, \
+        generate_intdefs = true
 
 include $(BUILD_STATIC_JAVA_LIBRARY)
 
@@ -480,6 +483,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := android-nano-test-parcelable-extendable
 LOCAL_MODULE_TAGS := tests
 LOCAL_SDK_VERSION := current
+# Only needed at compile-time.
+LOCAL_JAVA_LIBRARIES := android-support-annotations
 
 LOCAL_PROTOC_OPTIMIZE_TYPE := nano
 
@@ -489,6 +494,7 @@ LOCAL_PROTOC_FLAGS := --proto_path=$(LOCAL_PATH)/src
 
 LOCAL_PROTO_JAVA_OUTPUT_PARAMS := \
         parcelable_messages = true, \
+        generate_intdefs = true, \
         store_unknown_fields = true
 
 include $(BUILD_STATIC_JAVA_LIBRARY)
