@@ -66,6 +66,12 @@ JAVA_LITE_SRC_FILES := \
     java/src/main/java/com/google/protobuf/SmallSortedMap.java \
     java/src/main/java/com/google/protobuf/Utf8.java
 
+# This contains more source files than needed for the full version, but the
+# additional files should not create any conflict.
+JAVA_FULL_SRC_FILES := \
+    $(call all-java-files-under, java/src/main/java) \
+    src/google/protobuf/descriptor.proto
+
 COMPILER_SRC_FILES :=  \
     src/google/protobuf/descriptor.cc \
     src/google/protobuf/descriptor.pb.cc \
@@ -227,6 +233,17 @@ LOCAL_MODULE := host-libprotobuf-java-lite
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := $(JAVA_LITE_SRC_FILES)
+
+include $(BUILD_HOST_JAVA_LIBRARY)
+
+# Java full library (for host-side users)
+# =======================================================
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := host-libprotobuf-java-full
+LOCAL_MODULE_TAGS := optional
+
+LOCAL_SRC_FILES := $(JAVA_FULL_SRC_FILES)
 
 include $(BUILD_HOST_JAVA_LIBRARY)
 
