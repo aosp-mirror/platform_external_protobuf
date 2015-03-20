@@ -351,7 +351,10 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/src
 
 LOCAL_STATIC_LIBRARIES += libz
+
+ifneq ($(HOST_OS),windows)
 LOCAL_LDLIBS := -lpthread
+endif
 
 LOCAL_CFLAGS := $(IGNORED_WARNINGS)
 
