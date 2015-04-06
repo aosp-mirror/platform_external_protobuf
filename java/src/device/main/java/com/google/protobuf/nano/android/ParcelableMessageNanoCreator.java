@@ -1,5 +1,5 @@
 // Protocol Buffers - Google's data interchange format
-// Copyright 2014 Google Inc.  All rights reserved.
+// Copyright 2015 Google Inc.  All rights reserved.
 // http://code.google.com/p/protobuf/
 //
 // Redistribution and use in source and binary forms, with or without
@@ -31,16 +31,27 @@
 package com.google.protobuf.nano.android;
 
 import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.Log;
 
 import com.google.protobuf.nano.InvalidProtocolBufferNanoException;
 import com.google.protobuf.nano.MessageNano;
 
-final class ParcelingUtil {
-    private static final String TAG = "ParcelingUtil";
+import java.lang.reflect.Array;
+
+public final class ParcelableMessageNanoCreator<T extends MessageNano>
+        implements Parcelable.Creator<T> {
+    private static final String TAG = "PMNCreator";
+
+    private final Class<T> mClazz;
+
+    public ParcelableMessageNanoCreator(Class<T> clazz) {
+        mClazz = clazz;
+    }
 
     @SuppressWarnings("unchecked")
-    static <T extends MessageNano> T createFromParcel(Parcel in) {
+    @Override
+    public T createFromParcel(Parcel in) {
         String className = in.readString();
         byte[] data = in.createByteArray();
 
@@ -62,6 +73,12 @@ final class ParcelingUtil {
         }
 
         return proto;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public T[] newArray(int i) {
+        return (T[]) Array.newInstance(mClazz, i);
     }
 
     static <T extends MessageNano> void writeToParcel(Class<T> clazz, MessageNano message,

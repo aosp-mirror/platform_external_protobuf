@@ -40,21 +40,6 @@ import com.google.protobuf.nano.MessageNano;
  */
 public abstract class ParcelableMessageNano extends MessageNano implements Parcelable {
 
-    // Used by Parcelable
-    @SuppressWarnings("unused")
-    public static final Creator<ParcelableMessageNano> CREATOR =
-            new Creator<ParcelableMessageNano>() {
-        @Override
-        public ParcelableMessageNano createFromParcel(Parcel in) {
-            return ParcelingUtil.createFromParcel(in);
-        }
-
-        @Override
-        public ParcelableMessageNano[] newArray(int size) {
-            return new ParcelableMessageNano[size];
-        }
-    };
-
     @Override
     public int describeContents() {
         return 0;
@@ -62,6 +47,6 @@ public abstract class ParcelableMessageNano extends MessageNano implements Parce
 
     @Override
     public void writeToParcel(Parcel out, int flags) {
-        ParcelingUtil.writeToParcel(getClass(), this, out);
+        ParcelableMessageNanoCreator.writeToParcel(getClass(), this, out);
     }
 }
