@@ -243,6 +243,8 @@ public final class CodedInputStreamMicro {
       final ByteStringMicro result = ByteStringMicro.copyFrom(buffer, bufferPos, size);
       bufferPos += size;
       return result;
+    } else if (size == 0) {
+      return ByteStringMicro.EMPTY;
     } else {
       // Slow path:  Build a byte array first then copy it.
       return ByteStringMicro.copyFrom(readRawBytes(size));
