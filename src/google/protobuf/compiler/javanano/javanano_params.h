@@ -68,6 +68,7 @@ class Params {
   bool generate_clear_;
   bool generate_clone_;
   bool generate_intdefs_;
+  bool bytes_offset_length_;
 
  public:
   Params(const string & base_name) :
@@ -85,7 +86,8 @@ class Params {
     reftypes_primitive_enums_(false),
     generate_clear_(true),
     generate_clone_(false),
-    generate_intdefs_(false) {
+    generate_intdefs_(false),
+    bytes_offset_length_(false) {
   }
 
   const string& base_name() const {
@@ -248,6 +250,24 @@ class Params {
   }
   bool generate_intdefs() const {
     return generate_intdefs_;
+  }
+
+  // An advanced setting which uses buffer/offset/length tuples for each
+  // non-repeated bytes field, instead of a byte array which is serialized
+  // directly.
+  // The field is considered present iff the offset is not equal to the default
+  // value of -1; the value of the buffer has no relevance otherwise.
+  // In serialization, the [fieldName]Buffer array will be serialized starting
+  // at [fieldName]Offset and with length [fieldName]Length.
+  // In deserialization, the underlying byte array will be the same instance
+  // backing the underlying CodedInputByteBufferNano for all bytes fields, with
+  // appropriate offsets and lengths.
+  // Use with caution! This feature comes with no SLA.
+  void set_bytes_offset_length(bool value) {
+    bytes_offset_length_ = value;
+  }
+  bool bytes_offset_length() const {
+    return bytes_offset_length_;
   }
 };
 
