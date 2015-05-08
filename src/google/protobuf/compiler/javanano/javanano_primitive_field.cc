@@ -267,8 +267,16 @@ GenerateMembers(io::Printer* printer, bool lazy_init) const {
     }
   }
 
-  printer->Print(variables_,
-    "public $type$ $name$;\n");
+  JavaType java_type = GetJavaType(descriptor_);
+  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
+    printer->Print(variables_,
+      "public $type$ $name$Buffer;\n"
+      "public int $name$Offset;\n"
+      "public int $name$Length;\n");
+  } else {
+    printer->Print(variables_,
+      "public $type$ $name$;\n");
+  }
 
   if (params_.generate_has()) {
     printer->Print(variables_,
@@ -278,8 +286,16 @@ GenerateMembers(io::Printer* printer, bool lazy_init) const {
 
 void PrimitiveFieldGenerator::
 GenerateClearCode(io::Printer* printer) const {
-  printer->Print(variables_,
-    "$name$ = $default_copy_if_needed$;\n");
+  JavaType java_type = GetJavaType(descriptor_);
+  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
+    printer->Print(variables_,
+      "$name$Buffer = $default_copy_if_needed$;\n"
+      "$name$Offset = -1;\n"
+      "$name$Length = 0;\n");
+  } else {
+    printer->Print(variables_,
+      "$name$ = $default_copy_if_needed$;\n");
+  }
 
   if (params_.generate_has()) {
     printer->Print(variables_,
@@ -289,8 +305,17 @@ GenerateClearCode(io::Printer* printer) const {
 
 void PrimitiveFieldGenerator::
 GenerateMergingCode(io::Printer* printer) const {
-  printer->Print(variables_,
-    "this.$name$ = input.read$capitalized_type$();\n");
+  JavaType java_type = GetJavaType(descriptor_);
+  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
+    printer->Print(variables_,
+      "this.$name$Buffer = input.getBuffer();\n"
+      "this.$name$Length = input.readRawVarint32();\n"
+      "this.$name$Offset = input.getAbsolutePosition();\n"
+      "input.skipRawBytes(this.$name$Length);\n");
+  } else {
+    printer->Print(variables_,
+      "this.$name$ = input.read$capitalized_type$();\n");
+  }
 
   if (params_.generate_has()) {
     printer->Print(variables_,
@@ -315,7 +340,10 @@ GenerateSerializationConditional(io::Printer* printer) const {
       "if (");
   }
   JavaType java_type = GetJavaType(descriptor_);
-  if (IsArrayType(java_type)) {
+  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
+    printer->Print(variables_,
+      "this.$name$Offset != -1) {\n");
+  } else if (IsArrayType(java_type)) {
     printer->Print(variables_,
       "!java.util.Arrays.equals(this.$name$, $default$)) {\n");
   } else if (IsReferenceType(java_type)) {
@@ -339,28 +367,53 @@ void PrimitiveFieldGenerator::
 GenerateSerializationCode(io::Printer* printer) const {
   if (descriptor_->is_required() && !params_.generate_has()) {
     // Always serialize a required field if we don't have the 'has' signal.
-    printer->Print(variables_,
-      "output.write$capitalized_type$($number$, this.$name$);\n");
+    GenerateWriteCode(printer);
   } else {
     GenerateSerializationConditional(printer);
+    printer->Indent();
+    GenerateWriteCode(printer);
+    printer->Outdent();
+    printer->Print("}\n");
+  }
+}
+
+void PrimitiveFieldGenerator::
+GenerateWriteCode(io::Printer* printer) const {
+  JavaType java_type = GetJavaType(descriptor_);
+  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
     printer->Print(variables_,
-      "  output.write$capitalized_type$($number$, this.$name$);\n"
-      "}\n");
+      "output.write$capitalized_type$($number$, this.$name$Buffer,\n"
+      "    this.$name$Offset, this.$name$Length);\n");
+  } else {
+    printer->Print(variables_,
+      "output.write$capitalized_type$($number$, this.$name$);\n");
   }
 }
 
 void PrimitiveFieldGenerator::
 GenerateSerializedSizeCode(io::Printer* printer) const {
   if (descriptor_->is_required() && !params_.generate_has()) {
+    GenerateComputeSizeCode(printer);
+  } else {
+    GenerateSerializationConditional(printer);
+    printer->Indent();
+    GenerateComputeSizeCode(printer);
+    printer->Outdent();
+    printer->Print("}\n");
+  }
+}
+
+void PrimitiveFieldGenerator::
+GenerateComputeSizeCode(io::Printer* printer) const {
+  JavaType java_type = GetJavaType(descriptor_);
+  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
+    printer->Print(variables_,
+      "size += com.google.protobuf.nano.CodedOutputByteBufferNano\n"
+      "    .compute$capitalized_type$Size($number$, this.$name$Length);\n");
+  } else {
     printer->Print(variables_,
       "size += com.google.protobuf.nano.CodedOutputByteBufferNano\n"
       "    .compute$capitalized_type$Size($number$, this.$name$);\n");
-  } else {
-    GenerateSerializationConditional(printer);
-    printer->Print(variables_,
-      "  size += com.google.protobuf.nano.CodedOutputByteBufferNano\n"
-      "      .compute$capitalized_type$Size($number$, this.$name$);\n"
-      "}\n");
   }
 }
 

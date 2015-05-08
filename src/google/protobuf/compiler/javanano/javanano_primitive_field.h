@@ -63,6 +63,8 @@ class PrimitiveFieldGenerator : public FieldGenerator {
 
  private:
   void GenerateSerializationConditional(io::Printer* printer) const;
+  void GenerateWriteCode(io::Printer* printer) const;
+  void GenerateComputeSizeCode(io::Printer* printer) const;
 
   const FieldDescriptor* descriptor_;
   map<string, string> variables_;
