@@ -30,6 +30,7 @@
 
 package com.google.protobuf;
 
+import com.google.protobuf.nano.BytesOffsetLengthTestNanoOuterClass.BytesOffsetLengthTestNano;
 import com.google.protobuf.nano.CodedInputByteBufferNano;
 import com.google.protobuf.nano.CodedOutputByteBufferNano;
 import com.google.protobuf.nano.EnumClassNanoMultiple;
@@ -3850,6 +3851,28 @@ public class NanoTest extends TestCase {
     // original.
     clone.integers[1] = 100;
     assertFalse(clone.equals(anotherMessage));
+  }
+
+  public void testBytesOffsetLength() throws Exception {
+    BytesOffsetLengthTestNano msg = new BytesOffsetLengthTestNano();
+    msg.fooBuffer = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    msg.fooOffset = 2;
+    msg.fooLength = 3;
+    msg.barBuffer = msg.fooBuffer;
+    msg.barOffset = 7;
+    msg.barLength = 1;
+
+    byte[] bytes = MessageNano.toByteArray(msg);
+    // Two tags + two lengths + the arrays
+    assertEquals("Unexpected size of encoded proto", 8, bytes.length);
+
+    msg = BytesOffsetLengthTestNano.parseFrom(bytes);
+    byte[] foo = new byte[msg.fooLength];
+    System.arraycopy(msg.fooBuffer, msg.fooOffset, foo, 0, msg.fooLength);
+    assertTrue("foo was not deserialized correctly", Arrays.equals(new byte[] { 2, 3, 4 }, foo));
+    byte[] bar = new byte[msg.barLength];
+    System.arraycopy(msg.barBuffer, msg.barOffset, bar, 0, msg.barLength);
+    assertTrue("bar was not deserialized correctly", Arrays.equals(new byte[] { 7 }, bar));
   }
 
   private void assertHasWireData(MessageNano message, boolean expected) {
