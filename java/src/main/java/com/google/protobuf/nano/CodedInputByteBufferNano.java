@@ -543,6 +543,20 @@ public final class CodedInputByteBufferNano {
   }
 
   /**
+   * Get current (absolute) position in buffer.
+   */
+  public int getAbsolutePosition() {
+    return bufferPos;
+  }
+
+  /**
+   * Return the raw underlying data in the buffer, directly.
+   */
+  public byte[] getBuffer() {
+    return buffer;
+  }
+
+  /**
    * Retrieves a subset of data in the buffer. The returned array is not backed by the original
    * buffer array.
    *
