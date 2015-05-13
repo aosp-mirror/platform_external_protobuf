@@ -174,6 +174,14 @@ public final class CodedOutputByteBufferNano {
     writeBytesNoTag(value);
   }
 
+  /** Write a {@code bytes} field, including tag, to the stream. */
+  public void writeBytes(final int fieldNumber, final byte[] value,
+                         final int offset, final int length)
+                         throws IOException {
+    writeTag(fieldNumber, WireFormatNano.WIRETYPE_LENGTH_DELIMITED);
+    writeBytesNoTag(value, offset, length);
+  }
+
   /** Write a {@code uint32} field, including tag, to the stream. */
   public void writeUInt32(final int fieldNumber, final int value)
                           throws IOException {
@@ -517,6 +525,13 @@ public final class CodedOutputByteBufferNano {
     writeRawBytes(value);
   }
 
+  /** Write a {@code bytes} field to the stream. */
+  public void writeBytesNoTag(final byte[] value, final int offset, final int length)
+                              throws IOException {
+    writeRawVarint32(length);
+    writeRawBytes(value, offset, length);
+  }
+
   /** Write a {@code uint32} field to the stream. */
   public void writeUInt32NoTag(final int value) throws IOException {
     writeRawVarint32(value);
@@ -654,6 +669,15 @@ public final class CodedOutputByteBufferNano {
   public static int computeBytesSize(final int fieldNumber,
                                      final byte[] value) {
     return computeTagSize(fieldNumber) + computeBytesSizeNoTag(value);
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
+   * {@code bytes} field of the given length, including tag.
+   */
+  public static int computeBytesSize(final int fieldNumber,
+                                     final int length) {
+    return computeTagSize(fieldNumber) + computeBytesSizeNoTag(length);
   }
 
   /**
@@ -834,6 +858,14 @@ public final class CodedOutputByteBufferNano {
    */
   public static int computeBytesSizeNoTag(final byte[] value) {
     return computeRawVarint32Size(value.length) + value.length;
+  }
+
+  /**
+   * Compute the number of bytes that would be needed to encode a
+   * {@code bytes} field of the given length.
+   */
+  public static int computeBytesSizeNoTag(final int length) {
+    return computeRawVarint32Size(length) + length;
   }
 
   /**

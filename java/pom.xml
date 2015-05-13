@@ -231,6 +231,12 @@
                   <arg value="--proto_path=src/test/java" />
                   <arg value="../src/google/protobuf/unittest_reference_types_nano.proto" />
                 </exec>
+                <exec executable="../src/protoc">
+                  <arg value="--javanano_out=bytes_offset_length=true:target/generated-test-sources" />
+                  <arg value="--proto_path=../src" />
+                  <arg value="--proto_path=src/test/java" />
+                  <arg value="../src/google/protobuf/unittest_bytes_offset_length_nano.proto" />
+                </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
             </configuration>
