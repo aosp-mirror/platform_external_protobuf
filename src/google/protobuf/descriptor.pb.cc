@@ -286,7 +286,7 @@ void protobuf_AssignDesc_google_2fprotobuf_2fdescriptor_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(MethodDescriptorProto));
   FileOptions_descriptor_ = file->message_type(9);
-  static const int FileOptions_offsets_[12] = {
+  static const int FileOptions_offsets_[13] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, java_package_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, java_outer_classname_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, java_multiple_files_),
@@ -298,6 +298,7 @@ void protobuf_AssignDesc_google_2fprotobuf_2fdescriptor_2eproto() {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, java_generic_services_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, py_generic_services_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, deprecated_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, javanano_use_deprecated_package_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FileOptions, uninterpreted_option_),
   };
   FileOptions_reflection_ =
@@ -655,7 +656,7 @@ void protobuf_AddDesc_google_2fprotobuf_2fdescriptor_2eproto() {
     "ethodDescriptorProto\022\014\n\004name\030\001 \001(\t\022\022\n\nin"
     "put_type\030\002 \001(\t\022\023\n\013output_type\030\003 \001(\t\022/\n\007o"
     "ptions\030\004 \001(\0132\036.google.protobuf.MethodOpt"
-    "ions\"\253\004\n\013FileOptions\022\024\n\014java_package\030\001 \001"
+    "ions\"\324\004\n\013FileOptions\022\024\n\014java_package\030\001 \001"
     "(\t\022\034\n\024java_outer_classname\030\010 \001(\t\022\"\n\023java"
     "_multiple_files\030\n \001(\010:\005false\022,\n\035java_gen"
     "erate_equals_and_hash\030\024 \001(\010:\005false\022%\n\026ja"
@@ -665,50 +666,51 @@ void protobuf_AddDesc_google_2fprotobuf_2fdescriptor_2eproto() {
     "\013 \001(\t\022\"\n\023cc_generic_services\030\020 \001(\010:\005fals"
     "e\022$\n\025java_generic_services\030\021 \001(\010:\005false\022"
     "\"\n\023py_generic_services\030\022 \001(\010:\005false\022\031\n\nd"
-    "eprecated\030\027 \001(\010:\005false\022C\n\024uninterpreted_"
-    "option\030\347\007 \003(\0132$.google.protobuf.Uninterp"
-    "retedOption\":\n\014OptimizeMode\022\t\n\005SPEED\020\001\022\r"
-    "\n\tCODE_SIZE\020\002\022\020\n\014LITE_RUNTIME\020\003*\t\010\350\007\020\200\200\200"
-    "\200\002\"\323\001\n\016MessageOptions\022&\n\027message_set_wir"
-    "e_format\030\001 \001(\010:\005false\022.\n\037no_standard_des"
-    "criptor_accessor\030\002 \001(\010:\005false\022\031\n\ndepreca"
-    "ted\030\003 \001(\010:\005false\022C\n\024uninterpreted_option"
-    "\030\347\007 \003(\0132$.google.protobuf.UninterpretedO"
-    "ption*\t\010\350\007\020\200\200\200\200\002\"\276\002\n\014FieldOptions\022:\n\005cty"
-    "pe\030\001 \001(\0162#.google.protobuf.FieldOptions."
-    "CType:\006STRING\022\016\n\006packed\030\002 \001(\010\022\023\n\004lazy\030\005 "
-    "\001(\010:\005false\022\031\n\ndeprecated\030\003 \001(\010:\005false\022\034\n"
-    "\024experimental_map_key\030\t \001(\t\022\023\n\004weak\030\n \001("
-    "\010:\005false\022C\n\024uninterpreted_option\030\347\007 \003(\0132"
-    "$.google.protobuf.UninterpretedOption\"/\n"
-    "\005CType\022\n\n\006STRING\020\000\022\010\n\004CORD\020\001\022\020\n\014STRING_P"
-    "IECE\020\002*\t\010\350\007\020\200\200\200\200\002\"\215\001\n\013EnumOptions\022\023\n\013all"
-    "ow_alias\030\002 \001(\010\022\031\n\ndeprecated\030\003 \001(\010:\005fals"
-    "e\022C\n\024uninterpreted_option\030\347\007 \003(\0132$.googl"
-    "e.protobuf.UninterpretedOption*\t\010\350\007\020\200\200\200\200"
-    "\002\"}\n\020EnumValueOptions\022\031\n\ndeprecated\030\001 \001("
-    "\010:\005false\022C\n\024uninterpreted_option\030\347\007 \003(\0132"
-    "$.google.protobuf.UninterpretedOption*\t\010"
-    "\350\007\020\200\200\200\200\002\"{\n\016ServiceOptions\022\031\n\ndeprecated"
-    "\030! \001(\010:\005false\022C\n\024uninterpreted_option\030\347\007"
-    " \003(\0132$.google.protobuf.UninterpretedOpti"
-    "on*\t\010\350\007\020\200\200\200\200\002\"z\n\rMethodOptions\022\031\n\ndeprec"
-    "ated\030! \001(\010:\005false\022C\n\024uninterpreted_optio"
+    "eprecated\030\027 \001(\010:\005false\022\'\n\037javanano_use_d"
+    "eprecated_package\030& \001(\010\022C\n\024uninterpreted"
+    "_option\030\347\007 \003(\0132$.google.protobuf.Uninter"
+    "pretedOption\":\n\014OptimizeMode\022\t\n\005SPEED\020\001\022"
+    "\r\n\tCODE_SIZE\020\002\022\020\n\014LITE_RUNTIME\020\003*\t\010\350\007\020\200\200"
+    "\200\200\002\"\323\001\n\016MessageOptions\022&\n\027message_set_wi"
+    "re_format\030\001 \001(\010:\005false\022.\n\037no_standard_de"
+    "scriptor_accessor\030\002 \001(\010:\005false\022\031\n\ndeprec"
+    "ated\030\003 \001(\010:\005false\022C\n\024uninterpreted_optio"
     "n\030\347\007 \003(\0132$.google.protobuf.Uninterpreted"
-    "Option*\t\010\350\007\020\200\200\200\200\002\"\236\002\n\023UninterpretedOptio"
-    "n\022;\n\004name\030\002 \003(\0132-.google.protobuf.Uninte"
-    "rpretedOption.NamePart\022\030\n\020identifier_val"
-    "ue\030\003 \001(\t\022\032\n\022positive_int_value\030\004 \001(\004\022\032\n\022"
-    "negative_int_value\030\005 \001(\003\022\024\n\014double_value"
-    "\030\006 \001(\001\022\024\n\014string_value\030\007 \001(\014\022\027\n\017aggregat"
-    "e_value\030\010 \001(\t\0323\n\010NamePart\022\021\n\tname_part\030\001"
-    " \002(\t\022\024\n\014is_extension\030\002 \002(\010\"\261\001\n\016SourceCod"
-    "eInfo\022:\n\010location\030\001 \003(\0132(.google.protobu"
-    "f.SourceCodeInfo.Location\032c\n\010Location\022\020\n"
-    "\004path\030\001 \003(\005B\002\020\001\022\020\n\004span\030\002 \003(\005B\002\020\001\022\030\n\020lea"
-    "ding_comments\030\003 \001(\t\022\031\n\021trailing_comments"
-    "\030\004 \001(\tB)\n\023com.google.protobufB\020Descripto"
-    "rProtosH\001", 4449);
+    "Option*\t\010\350\007\020\200\200\200\200\002\"\276\002\n\014FieldOptions\022:\n\005ct"
+    "ype\030\001 \001(\0162#.google.protobuf.FieldOptions"
+    ".CType:\006STRING\022\016\n\006packed\030\002 \001(\010\022\023\n\004lazy\030\005"
+    " \001(\010:\005false\022\031\n\ndeprecated\030\003 \001(\010:\005false\022\034"
+    "\n\024experimental_map_key\030\t \001(\t\022\023\n\004weak\030\n \001"
+    "(\010:\005false\022C\n\024uninterpreted_option\030\347\007 \003(\013"
+    "2$.google.protobuf.UninterpretedOption\"/"
+    "\n\005CType\022\n\n\006STRING\020\000\022\010\n\004CORD\020\001\022\020\n\014STRING_"
+    "PIECE\020\002*\t\010\350\007\020\200\200\200\200\002\"\215\001\n\013EnumOptions\022\023\n\013al"
+    "low_alias\030\002 \001(\010\022\031\n\ndeprecated\030\003 \001(\010:\005fal"
+    "se\022C\n\024uninterpreted_option\030\347\007 \003(\0132$.goog"
+    "le.protobuf.UninterpretedOption*\t\010\350\007\020\200\200\200"
+    "\200\002\"}\n\020EnumValueOptions\022\031\n\ndeprecated\030\001 \001"
+    "(\010:\005false\022C\n\024uninterpreted_option\030\347\007 \003(\013"
+    "2$.google.protobuf.UninterpretedOption*\t"
+    "\010\350\007\020\200\200\200\200\002\"{\n\016ServiceOptions\022\031\n\ndeprecate"
+    "d\030! \001(\010:\005false\022C\n\024uninterpreted_option\030\347"
+    "\007 \003(\0132$.google.protobuf.UninterpretedOpt"
+    "ion*\t\010\350\007\020\200\200\200\200\002\"z\n\rMethodOptions\022\031\n\ndepre"
+    "cated\030! \001(\010:\005false\022C\n\024uninterpreted_opti"
+    "on\030\347\007 \003(\0132$.google.protobuf.Uninterprete"
+    "dOption*\t\010\350\007\020\200\200\200\200\002\"\236\002\n\023UninterpretedOpti"
+    "on\022;\n\004name\030\002 \003(\0132-.google.protobuf.Unint"
+    "erpretedOption.NamePart\022\030\n\020identifier_va"
+    "lue\030\003 \001(\t\022\032\n\022positive_int_value\030\004 \001(\004\022\032\n"
+    "\022negative_int_value\030\005 \001(\003\022\024\n\014double_valu"
+    "e\030\006 \001(\001\022\024\n\014string_value\030\007 \001(\014\022\027\n\017aggrega"
+    "te_value\030\010 \001(\t\0323\n\010NamePart\022\021\n\tname_part\030"
+    "\001 \002(\t\022\024\n\014is_extension\030\002 \002(\010\"\261\001\n\016SourceCo"
+    "deInfo\022:\n\010location\030\001 \003(\0132(.google.protob"
+    "uf.SourceCodeInfo.Location\032c\n\010Location\022\020"
+    "\n\004path\030\001 \003(\005B\002\020\001\022\020\n\004span\030\002 \003(\005B\002\020\001\022\030\n\020le"
+    "ading_comments\030\003 \001(\t\022\031\n\021trailing_comment"
+    "s\030\004 \001(\tB)\n\023com.google.protobufB\020Descript"
+    "orProtosH\001", 4490);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "google/protobuf/descriptor.proto", &protobuf_RegisterTypes);
   FileDescriptorSet::default_instance_ = new FileDescriptorSet();
@@ -4890,6 +4892,7 @@ const int FileOptions::kCcGenericServicesFieldNumber;
 const int FileOptions::kJavaGenericServicesFieldNumber;
 const int FileOptions::kPyGenericServicesFieldNumber;
 const int FileOptions::kDeprecatedFieldNumber;
+const int FileOptions::kJavananoUseDeprecatedPackageFieldNumber;
 const int FileOptions::kUninterpretedOptionFieldNumber;
 #endif  // !_MSC_VER
 
@@ -4923,6 +4926,7 @@ void FileOptions::SharedCtor() {
   java_generic_services_ = false;
   py_generic_services_ = false;
   deprecated_ = false;
+  javanano_use_deprecated_package_ = false;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -4997,7 +5001,7 @@ void FileOptions::Clear() {
       }
     }
   }
-  ZR_(java_generic_services_, deprecated_);
+  ZR_(java_generic_services_, javanano_use_deprecated_package_);
 
 #undef OFFSET_OF_FIELD_
 #undef ZR_
@@ -5188,6 +5192,21 @@ bool FileOptions::MergePartialFromCodedStream(
         } else {
           goto handle_unusual;
         }
+        if (input->ExpectTag(304)) goto parse_javanano_use_deprecated_package;
+        break;
+      }
+
+      // optional bool javanano_use_deprecated_package = 38;
+      case 38: {
+        if (tag == 304) {
+         parse_javanano_use_deprecated_package:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
+                 input, &javanano_use_deprecated_package_)));
+          set_has_javanano_use_deprecated_package();
+        } else {
+          goto handle_unusual;
+        }
         if (input->ExpectTag(7994)) goto parse_uninterpreted_option;
         break;
       }
@@ -5307,6 +5326,11 @@ void FileOptions::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteBool(27, this->java_string_check_utf8(), output);
   }
 
+  // optional bool javanano_use_deprecated_package = 38;
+  if (has_javanano_use_deprecated_package()) {
+    ::google::protobuf::internal::WireFormatLite::WriteBool(38, this->javanano_use_deprecated_package(), output);
+  }
+
   // repeated .google.protobuf.UninterpretedOption uninterpreted_option = 999;
   for (int i = 0; i < this->uninterpreted_option_size(); i++) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
@@ -5401,6 +5425,11 @@ void FileOptions::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(27, this->java_string_check_utf8(), target);
   }
 
+  // optional bool javanano_use_deprecated_package = 38;
+  if (has_javanano_use_deprecated_package()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(38, this->javanano_use_deprecated_package(), target);
+  }
+
   // repeated .google.protobuf.UninterpretedOption uninterpreted_option = 999;
   for (int i = 0; i < this->uninterpreted_option_size(); i++) {
     target = ::google::protobuf::internal::WireFormatLite::
@@ -5488,6 +5517,11 @@ int FileOptions::ByteSize() const {
       total_size += 2 + 1;
     }
 
+    // optional bool javanano_use_deprecated_package = 38;
+    if (has_javanano_use_deprecated_package()) {
+      total_size += 2 + 1;
+    }
+
   }
   // repeated .google.protobuf.UninterpretedOption uninterpreted_option = 999;
   total_size += 2 * this->uninterpreted_option_size();
@@ -5561,6 +5595,9 @@ void FileOptions::MergeFrom(const FileOptions& from) {
     if (from.has_deprecated()) {
       set_deprecated(from.deprecated());
     }
+    if (from.has_javanano_use_deprecated_package()) {
+      set_javanano_use_deprecated_package(from.javanano_use_deprecated_package());
+    }
   }
   _extensions_.MergeFrom(from._extensions_);
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
@@ -5598,6 +5635,7 @@ void FileOptions::Swap(FileOptions* other) {
     std::swap(java_generic_services_, other->java_generic_services_);
     std::swap(py_generic_services_, other->py_generic_services_);
     std::swap(deprecated_, other->deprecated_);
+    std::swap(javanano_use_deprecated_package_, other->javanano_use_deprecated_package_);
     uninterpreted_option_.Swap(&other->uninterpreted_option_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
