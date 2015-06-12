@@ -331,6 +331,9 @@ message FileOptions {
   // least, this is a formalization for deprecating files.
   optional bool deprecated = 23 [default=false];
 
+  // Whether the nano proto compiler should generate in the deprecated non-nano
+  // suffixed package.
+  optional bool javanano_use_deprecated_package = 38;
 
   // The parser stores options it doesn't recognize here. See above.
   repeated UninterpretedOption uninterpreted_option = 999;
