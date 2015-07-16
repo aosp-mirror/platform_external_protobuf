@@ -285,6 +285,8 @@ LOCAL_SDK_VERSION := 9
 endif
 LOCAL_NDK_STL_VARIANT := stlport_static
 
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
+
 include $(BUILD_STATIC_LIBRARY)
 
 # C++ lite library (libc++ flavored for the platform)
@@ -303,6 +305,8 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/src
 
 LOCAL_CFLAGS := -DGOOGLE_PROTOBUF_NO_RTTI $(IGNORED_WARNINGS)
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -371,6 +375,8 @@ LOCAL_SDK_VERSION := 9
 endif
 LOCAL_NDK_STL_VARIANT := stlport_static
 
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
+
 include $(BUILD_STATIC_LIBRARY)
 
 # C++ full library - Gnustl+rtti version
@@ -390,6 +396,8 @@ LOCAL_CFLAGS := -frtti $(IGNORED_WARNINGS)
 LOCAL_SDK_VERSION := 14
 LOCAL_NDK_STL_VARIANT := gnustl_static
 
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
+
 include $(BUILD_STATIC_LIBRARY)
 
 # C++ full library - libc++ version for the platform
@@ -407,6 +415,8 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_CFLAGS := -DGOOGLE_PROTOBUF_NO_RTTI $(IGNORED_WARNINGS)
 LOCAL_SHARED_LIBRARIES := libz
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
 include $(BUILD_SHARED_LIBRARY)
 
