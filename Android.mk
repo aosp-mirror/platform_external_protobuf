@@ -434,9 +434,9 @@ LOCAL_MODULE := aprotoc
 LOCAL_MODULE_CLASS := EXECUTABLES
 LOCAL_MODULE_TAGS := optional
 
-# Use the system's libstdc++ (libc++ on mac) because we copy aprotoc to
-# unbundled projects where libc++.so may not be available.
-LOCAL_CXX_STL := libstdc++
+# Statically link libc++ because we copy aprotoc to unbundled projects where
+# libc++.so may not be available.
+LOCAL_CXX_STL := libc++_static
 
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := $(COMPILER_SRC_FILES)
