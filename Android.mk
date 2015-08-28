@@ -435,8 +435,10 @@ LOCAL_MODULE_CLASS := EXECUTABLES
 LOCAL_MODULE_TAGS := optional
 
 # Statically link libc++ because we copy aprotoc to unbundled projects where
-# libc++.so may not be available.
-LOCAL_CXX_STL := libc++_static
+# libc++.so may not be available. Just use mingw's libstdc++ for Windows.
+ifneq ($(HOST_OS),windows)
+    LOCAL_CXX_STL := libc++_static
+endif
 
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := $(COMPILER_SRC_FILES)
