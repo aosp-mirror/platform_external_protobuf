@@ -384,7 +384,7 @@ void MessageGenerator::GenerateMergeFromMethods(io::Printer* printer) {
   printer->Indent();
   if (params_.store_unknown_fields()) {
     printer->Print(
-        "if (!storeUnknownField(input, tag)) {\n"
+        "if (!super.storeUnknownField(input, tag)) {\n"
         "  return this;\n"
         "}\n");
   } else {
