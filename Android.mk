@@ -431,28 +431,23 @@ protobuf_cc_full_src_files :=
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := aprotoc
-LOCAL_MODULE_CLASS := EXECUTABLES
-LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_HOST_OS := darwin linux windows
 
 # Statically link libc++ because we copy aprotoc to unbundled projects where
-# libc++.so may not be available. Just use mingw's libstdc++ for Windows.
-ifneq ($(HOST_OS),windows)
-    LOCAL_CXX_STL := libc++_static
-endif
+# libc++.so may not be available.
+LOCAL_CXX_STL := libc++_static
 
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := $(COMPILER_SRC_FILES)
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/android \
-    external/zlib \
     $(LOCAL_PATH)/src
 
 LOCAL_STATIC_LIBRARIES += libz
 
-ifneq ($(HOST_OS),windows)
-LOCAL_LDLIBS := -lpthread
-endif
+LOCAL_LDLIBS_darwin := -lpthread
+LOCAL_LDLIBS_linux := -lpthread
 
 LOCAL_CFLAGS := $(IGNORED_WARNINGS)
 
