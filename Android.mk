@@ -544,3 +544,20 @@ LOCAL_DEX_PREOPT := false
 
 include $(BUILD_PACKAGE)
 
+# Aliases for old NDK protobuf names so we can transition other branches without
+# intermediate build breakages.
+# TODO(danalbert): Remove these once master is fixed.
+include $(CLEAR_VARS)
+LOCAL_MODULE := libprotobuf-cpp-lite-ndk
+LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-lite
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := libprotobuf-cpp-full-ndk
+LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-full
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := libprotobuf-cpp-full-ndk-gnustl-rtti
+LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-full-gnustl-rtti
+include $(BUILD_STATIC_LIBRARY)
