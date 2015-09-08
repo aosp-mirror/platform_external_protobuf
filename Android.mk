@@ -247,12 +247,11 @@ LOCAL_SRC_FILES := $(JAVA_FULL_SRC_FILES)
 
 include $(BUILD_HOST_JAVA_LIBRARY)
 
-# C++ lite library
+# C++ lite library for the NDK.
 # =======================================================
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := libprotobuf-cpp-lite
-LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE := libprotobuf-cpp-lite-ndk
 
 LOCAL_CPP_EXTENSION := .cc
 
@@ -276,7 +275,7 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_CFLAGS := -DGOOGLE_PROTOBUF_NO_RTTI $(IGNORED_WARNINGS)
 
-# These are the minimum versions and don't need to be update.
+# These are the minimum versions and don't need to be updated.
 ifeq ($(TARGET_ARCH),arm)
 LOCAL_SDK_VERSION := 8
 else
@@ -289,12 +288,11 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
 include $(BUILD_STATIC_LIBRARY)
 
-# C++ lite library (libc++ flavored for the platform)
+# C++ lite library for the platform.
 # =======================================================
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libprotobuf-cpp-lite
-LOCAL_MODULE_TAGS := optional
 
 LOCAL_CPP_EXTENSION := .cc
 
@@ -339,12 +337,11 @@ protobuf_cc_full_src_files := \
     src/google/protobuf/compiler/importer.cc                         \
     src/google/protobuf/compiler/parser.cc
 
-# C++ full library - stlport version
+# C++ full library for the NDK.
 # =======================================================
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := libprotobuf-cpp-full
-LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE := libprotobuf-cpp-full-ndk
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := $(protobuf_cc_full_src_files)
 LOCAL_C_INCLUDES := \
@@ -366,7 +363,7 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_CFLAGS := -DGOOGLE_PROTOBUF_NO_RTTI $(IGNORED_WARNINGS)
 
-# These are the minimum versions and don't need to be update.
+# These are the minimum versions and don't need to be updated.
 ifeq ($(TARGET_ARCH),arm)
 LOCAL_SDK_VERSION := 8
 else
@@ -379,11 +376,11 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
 include $(BUILD_STATIC_LIBRARY)
 
-# C++ full library - Gnustl+rtti version
+# C++ full library for the NDK, Gnustl+rtti version.
 # =======================================================
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := libprotobuf-cpp-full-gnustl-rtti
+LOCAL_MODULE := libprotobuf-cpp-full-ndk-gnustl-rtti
 LOCAL_MODULE_TAGS := optional
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES := $(protobuf_cc_full_src_files)
@@ -400,7 +397,7 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
 include $(BUILD_STATIC_LIBRARY)
 
-# C++ full library - libc++ version for the platform
+# C++ full library for the platform.
 # =======================================================
 include $(CLEAR_VARS)
 
@@ -543,21 +540,3 @@ LOCAL_STATIC_JAVA_LIBRARIES := libprotobuf-java-nano \
 LOCAL_DEX_PREOPT := false
 
 include $(BUILD_PACKAGE)
-
-# Aliases for old NDK protobuf names so we can transition other branches without
-# intermediate build breakages.
-# TODO(danalbert): Remove these once master is fixed.
-include $(CLEAR_VARS)
-LOCAL_MODULE := libprotobuf-cpp-lite-ndk
-LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-lite
-include $(BUILD_STATIC_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := libprotobuf-cpp-full-ndk
-LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-full
-include $(BUILD_STATIC_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := libprotobuf-cpp-full-ndk-gnustl-rtti
-LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-full-gnustl-rtti
-include $(BUILD_STATIC_LIBRARY)
