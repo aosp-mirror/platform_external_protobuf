@@ -310,6 +310,28 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
 include $(BUILD_SHARED_LIBRARY)
 
+# C++ lite library + rtti (libc++ flavored for the platform)
+# =======================================================
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := libprotobuf-cpp-lite-rtti
+LOCAL_MODULE_TAGS := optional
+
+LOCAL_CPP_EXTENSION := .cc
+
+LOCAL_SRC_FILES := $(CC_LITE_SRC_FILES)
+
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/android \
+    $(LOCAL_PATH)/src
+
+LOCAL_RTTI_FLAG := -frtti
+LOCAL_CFLAGS := $(IGNORED_WARNINGS)
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
+
+include $(BUILD_SHARED_LIBRARY)
+
 # C++ full library
 # =======================================================
 protobuf_cc_full_src_files := \
