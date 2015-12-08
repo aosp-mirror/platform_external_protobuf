@@ -232,6 +232,10 @@ void MessageGenerator::Generate(io::Printer* printer) {
         printer, lazy_init);
   }
 
+  // Insertion point for proto compiler plugins
+  printer->Print("\n// @@protoc_insertion_point(class_scope:$classname$)\n",
+                 "classname", descriptor_->full_name());
+
   // Constructor, with lazy init code if needed
   if (lazy_init && field_generators_.saved_defaults_needed()) {
     printer->Print(
