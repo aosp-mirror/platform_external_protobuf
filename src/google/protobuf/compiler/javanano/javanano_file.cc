@@ -171,6 +171,8 @@ void FileGenerator::Generate(io::Printer* printer) {
       "package", java_package_);
   }
 
+  printer->Print("\n// @@protoc_insertion_point(imports_scope)\n");
+
   // Note: constants (from enums, emitted in the loop below) may have the same names as constants
   // in the nested classes. This causes Java warnings, but is not fatal, so we suppress those
   // warnings here in the top-most class declaration.
