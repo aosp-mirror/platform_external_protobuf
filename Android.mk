@@ -23,18 +23,13 @@ CC_LITE_SRC_FILES := \
     src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc        \
     src/google/protobuf/stubs/common.cc                              \
     src/google/protobuf/stubs/once.cc                                \
-    src/google/protobuf/stubs/hash.h                                 \
-    src/google/protobuf/stubs/map_util.h                             \
-    src/google/protobuf/stubs/shared_ptr.h                           \
     src/google/protobuf/stubs/stringprintf.cc                        \
-    src/google/protobuf/stubs/stringprintf.h                         \
     src/google/protobuf/extension_set.cc                             \
     src/google/protobuf/generated_message_util.cc                    \
     src/google/protobuf/message_lite.cc                              \
     src/google/protobuf/repeated_field.cc                            \
     src/google/protobuf/wire_format_lite.cc                          \
     src/google/protobuf/io/coded_stream.cc                           \
-    src/google/protobuf/io/coded_stream_inl.h                        \
     src/google/protobuf/io/zero_copy_stream.cc                       \
     src/google/protobuf/io/zero_copy_stream_impl_lite.cc
 
@@ -261,18 +256,6 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/android \
     $(LOCAL_PATH)/src
 
-# Define the header files to be copied
-#LOCAL_COPY_HEADERS := \
-#    src/google/protobuf/stubs/once.h \
-#    src/google/protobuf/stubs/common.h \
-#    src/google/protobuf/io/coded_stream.h \
-#    src/google/protobuf/generated_message_util.h \
-#    src/google/protobuf/repeated_field.h \
-#    src/google/protobuf/extension_set.h \
-#    src/google/protobuf/wire_format_lite_inl.h
-#
-#LOCAL_COPY_HEADERS_TO := $(LOCAL_MODULE)
-
 LOCAL_CFLAGS := -DGOOGLE_PROTOBUF_NO_RTTI $(IGNORED_WARNINGS)
 
 # These are the minimum versions and don't need to be updated.
@@ -377,9 +360,7 @@ include $(BUILD_HOST_SHARED_LIBRARY)
 protobuf_cc_full_src_files := \
     $(CC_LITE_SRC_FILES)                                             \
     src/google/protobuf/stubs/strutil.cc                             \
-    src/google/protobuf/stubs/strutil.h                              \
     src/google/protobuf/stubs/substitute.cc                          \
-    src/google/protobuf/stubs/substitute.h                           \
     src/google/protobuf/stubs/structurally_valid.cc                  \
     src/google/protobuf/descriptor.cc                                \
     src/google/protobuf/descriptor.pb.cc                             \
@@ -412,18 +393,6 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/android \
     external/zlib \
     $(LOCAL_PATH)/src
-
-# Define the header files to be copied
-#LOCAL_COPY_HEADERS := \
-#    src/google/protobuf/stubs/once.h \
-#    src/google/protobuf/stubs/common.h \
-#    src/google/protobuf/io/coded_stream.h \
-#    src/google/protobuf/generated_message_util.h \
-#    src/google/protobuf/repeated_field.h \
-#    src/google/protobuf/extension_set.h \
-#    src/google/protobuf/wire_format_lite_inl.h
-#
-#LOCAL_COPY_HEADERS_TO := $(LOCAL_MODULE)
 
 LOCAL_CFLAGS := -DGOOGLE_PROTOBUF_NO_RTTI $(IGNORED_WARNINGS)
 
