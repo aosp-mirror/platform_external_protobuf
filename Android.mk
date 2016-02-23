@@ -172,6 +172,7 @@ LOCAL_SDK_VERSION := 8
 LOCAL_SRC_FILES := $(call all-java-files-under, java/src/main/java/com/google/protobuf/nano)
 LOCAL_SRC_FILES += $(call all-java-files-under, java/src/device/main/java/com/google/protobuf/nano)
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_STATIC_JAVA_LIBRARY)
 
 # Java nano library (for host-side users)
@@ -183,6 +184,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := $(call all-java-files-under, java/src/main/java/com/google/protobuf/nano)
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_HOST_JAVA_LIBRARY)
 
 # Java micro library (for device-side users)
@@ -195,6 +197,7 @@ LOCAL_SDK_VERSION := 8
 
 LOCAL_SRC_FILES := $(call all-java-files-under, java/src/main/java/com/google/protobuf/micro)
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_STATIC_JAVA_LIBRARY)
 
 # Java micro library (for host-side users)
@@ -206,6 +209,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := $(call all-java-files-under, java/src/main/java/com/google/protobuf/micro)
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_HOST_JAVA_LIBRARY)
 
 # Java lite library (for device-side users)
@@ -218,6 +222,7 @@ LOCAL_SDK_VERSION := 9
 
 LOCAL_SRC_FILES := $(JAVA_LITE_SRC_FILES)
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_STATIC_JAVA_LIBRARY)
 
 # Java lite library (for host-side users)
@@ -229,6 +234,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := $(JAVA_LITE_SRC_FILES)
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_HOST_JAVA_LIBRARY)
 
 # Java full library (for host-side users)
@@ -240,6 +246,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := $(JAVA_FULL_SRC_FILES)
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_HOST_JAVA_LIBRARY)
 
 # C++ lite library for the NDK.
@@ -568,6 +575,7 @@ LOCAL_PROTO_JAVA_OUTPUT_PARAMS := \
         java_package = $(LOCAL_PATH)/src/google/protobuf/unittest_import_nano.proto|com.google.protobuf.nano, \
         java_outer_classname = $(LOCAL_PATH)/src/google/protobuf/unittest_import_nano.proto|UnittestImportNano
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_STATIC_JAVA_LIBRARY)
 
 # To test Android-specific nanoproto features.
@@ -613,6 +621,7 @@ LOCAL_PROTO_JAVA_OUTPUT_PARAMS := \
         generate_intdefs = true, \
         store_unknown_fields = true
 
+LOCAL_JAVA_LANGUAGE_VERSION := 1.7
 include $(BUILD_STATIC_JAVA_LIBRARY)
 
 include $(CLEAR_VARS)
