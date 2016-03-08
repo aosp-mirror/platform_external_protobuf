@@ -61,6 +61,8 @@ import com.google.protobuf.nano.UnittestMultipleNano;
 import com.google.protobuf.nano.UnittestRecursiveNano.RecursiveMessageNano;
 import com.google.protobuf.nano.UnittestSimpleNano.SimpleMessageNano;
 import com.google.protobuf.nano.UnittestSingleNano.SingleMessageNano;
+import com.google.protobuf.nano.UnknownEnumValuesNanoOuterClass.StandardVersion;
+import com.google.protobuf.nano.UnknownEnumValuesNanoOuterClass.VersionWithoutVal3;
 import com.google.protobuf.nano.testext.Extensions;
 import com.google.protobuf.nano.testext.Extensions.AnotherMessage;
 import com.google.protobuf.nano.testext.Extensions.MessageWithGroup;
@@ -3873,6 +3875,67 @@ public class NanoTest extends TestCase {
     byte[] bar = new byte[msg.barLength];
     System.arraycopy(msg.barBuffer, msg.barOffset, bar, 0, msg.barLength);
     assertTrue("bar was not deserialized correctly", Arrays.equals(new byte[] { 7 }, bar));
+  }
+
+  public void testUnknownOptionalEnumValue() throws Exception {
+    StandardVersion standardMsg = new StandardVersion();
+    standardMsg.optionalField = StandardVersion.VAL_3;
+    byte[] standardMsgBytes = MessageNano.toByteArray(standardMsg);
+
+    // When parsing and reading, the unknown value appears as UNKNOWN.
+    VersionWithoutVal3 withoutVal3Msg = new VersionWithoutVal3();
+    MessageNano.mergeFrom(withoutVal3Msg, standardMsgBytes);
+    assertEquals(VersionWithoutVal3.UNKNOWN, withoutVal3Msg.optionalField);
+
+    // When serializing and reparsing as the standard version, the old, unknown value wins out (even
+    // if a new one is set).
+    withoutVal3Msg.optionalField = VersionWithoutVal3.VAL_2;
+    byte[] withoutVal3MsgBytes = MessageNano.toByteArray(withoutVal3Msg);
+    StandardVersion standardMsgFromWithoutVal3Msg = new StandardVersion();
+    MessageNano.mergeFrom(standardMsgFromWithoutVal3Msg, withoutVal3MsgBytes);
+    assertEquals(StandardVersion.VAL_3, standardMsgFromWithoutVal3Msg.optionalField);
+  }
+
+  public void testUnknownRepeatedEnumValue() throws Exception {
+    StandardVersion standardMsg = new StandardVersion();
+    standardMsg.repeatedField = new int[] { StandardVersion.VAL_3, StandardVersion.VAL_2 };
+    byte[] standardMsgBytes = MessageNano.toByteArray(standardMsg);
+
+    // When parsing and reading, the unknown value is stripped out.
+    VersionWithoutVal3 withoutVal3Msg = new VersionWithoutVal3();
+    MessageNano.mergeFrom(withoutVal3Msg, standardMsgBytes);
+    assertTrue(Arrays.equals(new int[] { VersionWithoutVal3.VAL_2 }, withoutVal3Msg.repeatedField));
+
+    // When serializing and reparsing as the standard version, the old, unknown value reappears, but
+    // at the end of all entries (including any newly added ones).
+    withoutVal3Msg.repeatedField = new int[] { VersionWithoutVal3.VAL_2, VersionWithoutVal3.VAL_1 };
+    byte[] withoutVal3MsgBytes = MessageNano.toByteArray(withoutVal3Msg);
+    StandardVersion standardMsgFromWithoutVal3Msg = new StandardVersion();
+    MessageNano.mergeFrom(standardMsgFromWithoutVal3Msg, withoutVal3MsgBytes);
+    assertTrue(Arrays.equals(
+            new int[] { StandardVersion.VAL_2, StandardVersion.VAL_1, StandardVersion.VAL_3 },
+            standardMsgFromWithoutVal3Msg.repeatedField));
+  }
+
+  public void testUnknownRepeatedPackedEnumValue() throws Exception {
+    StandardVersion standardMsg = new StandardVersion();
+    standardMsg.packedField = new int[] { StandardVersion.VAL_3, StandardVersion.VAL_2 };
+    byte[] standardMsgBytes = MessageNano.toByteArray(standardMsg);
+
+    // When parsing and reading, the unknown value is stripped out.
+    VersionWithoutVal3 withoutVal3Msg = new VersionWithoutVal3();
+    MessageNano.mergeFrom(withoutVal3Msg, standardMsgBytes);
+    assertTrue(Arrays.equals(new int[] { VersionWithoutVal3.VAL_2 }, withoutVal3Msg.packedField));
+
+    // When serializing and reparsing as the standard version, the old, unknown value reappears, but
+    // at the end of all entries (including any newly added ones).
+    withoutVal3Msg.packedField = new int[] { VersionWithoutVal3.VAL_2, VersionWithoutVal3.VAL_1 };
+    byte[] withoutVal3MsgBytes = MessageNano.toByteArray(withoutVal3Msg);
+    StandardVersion standardMsgFromWithoutVal3Msg = new StandardVersion();
+    MessageNano.mergeFrom(standardMsgFromWithoutVal3Msg, withoutVal3MsgBytes);
+    assertTrue(Arrays.equals(
+            new int[] { StandardVersion.VAL_2, StandardVersion.VAL_1, StandardVersion.VAL_3 },
+            standardMsgFromWithoutVal3Msg.packedField));
   }
 
   private void assertHasWireData(MessageNano message, boolean expected) {
