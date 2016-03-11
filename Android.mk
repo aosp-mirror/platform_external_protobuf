@@ -298,11 +298,11 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
 include $(BUILD_SHARED_LIBRARY)
 
-# C++ lite library for the host.
+# C++ lite static library for host tools.
 # =======================================================
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := libprotobuf-cpp-lite
+LOCAL_MODULE := libprotobuf-cpp-lite_static
 
 LOCAL_CPP_EXTENSION := .cc
 
@@ -313,6 +313,18 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/src
 
 LOCAL_CFLAGS := -DGOOGLE_PROTOBUF_NO_RTTI $(IGNORED_WARNINGS)
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
+
+include $(BUILD_HOST_STATIC_LIBRARY)
+
+# C++ lite library for the host.
+# =======================================================
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := libprotobuf-cpp-lite
+
+LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-lite_static
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/src
 
