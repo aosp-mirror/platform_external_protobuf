@@ -304,6 +304,8 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := libprotobuf-cpp-lite_static
 
+LOCAL_MODULE_HOST_OS := darwin linux windows
+
 LOCAL_CPP_EXTENSION := .cc
 
 LOCAL_SRC_FILES := $(CC_LITE_SRC_FILES)
@@ -323,6 +325,8 @@ include $(BUILD_HOST_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libprotobuf-cpp-lite
+
+LOCAL_MODULE_HOST_OS := darwin linux windows
 
 LOCAL_WHOLE_STATIC_LIBRARIES := libprotobuf-cpp-lite_static
 
