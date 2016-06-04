@@ -42,20 +42,27 @@
 #endif
 #include <string>
 
-
 namespace google {
 namespace protobuf {
 
 class Message;
 class Reflection;
 class FieldDescriptor;
+class Descriptor;
+class DescriptorPool;
+class MessageFactory;
 
+#ifdef _SHARED_PTR_H
+using std::shared_ptr;
+using ::std::string;
+#else
 using internal::shared_ptr;
+#endif
 
 namespace python {
 
-struct CFieldDescriptor;
 struct ExtensionDict;
+struct PyDescriptorPool;
 
 typedef struct CMessage {
   PyObject_HEAD;
@@ -79,13 +86,11 @@ typedef struct CMessage {
   // to use this pointer will result in a crash.
   struct CMessage* parent;
 
-  // Weak reference to the parent's descriptor that describes this submessage.
+  // Pointer to the parent's descriptor that describes this submessage.
   // Used together with the parent's message when making a default message
   // instance mutable.
-  // TODO(anuraag): With a bit of work on the Python/C++ layer, it should be
-  // possible to make this a direct pointer to a C++ FieldDescriptor, this would
-  // be easier if this implementation replaces upstream.
-  CFieldDescriptor* parent_field;
+  // The pointer is owned by the global DescriptorPool.
+  const FieldDescriptor* parent_field_descriptor;
 
   // Pointer to the C++ Message object for this CMessage.  The
   // CMessage does not own this pointer.
@@ -111,49 +116,91 @@ typedef struct CMessage {
 
 extern PyTypeObject CMessage_Type;
 
+
+// The (meta) type of all Messages classes.
+// It allows us to cache some C++ pointers in the class object itself, they are
+// faster to extract than from the type's dictionary.
+
+struct CMessageClass {
+  // This is how CPython subclasses C structures: the base structure must be
+  // the first member of the object.
+  PyHeapTypeObject super;
+
+  // C++ descriptor of this message.
+  const Descriptor* message_descriptor;
+
+  // Owned reference, used to keep the pointer above alive.
+  PyObject* py_message_descriptor;
+
+  // The Python DescriptorPool used to create the class. It is needed to resolve
+  // fields descriptors, including extensions fields; its C++ MessageFactory is
+  // used to instantiate submessages.
+  // This can be different from DESCRIPTOR.file.pool, in the case of a custom
+  // DescriptorPool which defines new extensions.
+  // We own the reference, because it's important to keep the descriptors and
+  // factory alive.
+  PyDescriptorPool* py_descriptor_pool;
+
+  PyObject* AsPyObject() {
+    return reinterpret_cast<PyObject*>(this);
+  }
+};
+
+
 namespace cmessage {
 
-// Create a new empty message that can be populated by the parent.
-PyObject* NewEmpty(PyObject* type);
+// Internal function to create a new empty Message Python object, but with empty
+// pointers to the C++ objects.
+// The caller must fill self->message, self->owner and eventually self->parent.
+CMessage* NewEmptyMessage(CMessageClass* type);
 
 // Release a submessage from its proto tree, making it a new top-level messgae.
 // A new message will be created if this is a read-only default instance.
 //
 // Corresponds to reflection api method ReleaseMessage.
-int ReleaseSubMessage(google::protobuf::Message* message,
-                      const google::protobuf::FieldDescriptor* field_descriptor,
+int ReleaseSubMessage(CMessage* self,
+                      const FieldDescriptor* field_descriptor,
                       CMessage* child_cmessage);
+
+// Retrieves the C++ descriptor of a Python Extension descriptor.
+// On error, return NULL with an exception set.
+const FieldDescriptor* GetExtensionDescriptor(PyObject* extension);
 
 // Initializes a new CMessage instance for a submessage. Only called once per
 // submessage as the result is cached in composite_fields.
 //
 // Corresponds to reflection api method GetMessage.
-PyObject* InternalGetSubMessage(CMessage* self,
-                                CFieldDescriptor* cfield_descriptor);
+PyObject* InternalGetSubMessage(
+    CMessage* self, const FieldDescriptor* field_descriptor);
 
 // Deletes a range of C++ submessages in a repeated field (following a
 // removal in a RepeatedCompositeContainer).
 //
 // Releases messages to the provided cmessage_list if it is not NULL rather
 // than just removing them from the underlying proto. This cmessage_list must
-// have a CMessage for each underlying submessage. The CMessages refered to
+// have a CMessage for each underlying submessage. The CMessages referred to
 // by slice will be removed from cmessage_list by this function.
 //
 // Corresponds to reflection api method RemoveLast.
-int InternalDeleteRepeatedField(google::protobuf::Message* message,
-                                const google::protobuf::FieldDescriptor* field_descriptor,
+int InternalDeleteRepeatedField(CMessage* self,
+                                const FieldDescriptor* field_descriptor,
                                 PyObject* slice, PyObject* cmessage_list);
 
 // Sets the specified scalar value to the message.
 int InternalSetScalar(CMessage* self,
-                      const google::protobuf::FieldDescriptor* field_descriptor,
+                      const FieldDescriptor* field_descriptor,
                       PyObject* value);
+
+// Sets the specified scalar value to the message.  Requires it is not a Oneof.
+int InternalSetNonOneofScalar(Message* message,
+                              const FieldDescriptor* field_descriptor,
+                              PyObject* arg);
 
 // Retrieves the specified scalar value from the message.
 //
 // Returns a new python reference.
-PyObject* InternalGetScalar(CMessage* self,
-                            const google::protobuf::FieldDescriptor* field_descriptor);
+PyObject* InternalGetScalar(const Message* message,
+                            const FieldDescriptor* field_descriptor);
 
 // Clears the message, removing all contained data. Extension dictionary and
 // submessages are released first if there are remaining external references.
@@ -169,8 +216,7 @@ PyObject* Clear(CMessage* self);
 //
 // Corresponds to reflection api method ClearField.
 PyObject* ClearFieldByDescriptor(
-    CMessage* self,
-    const google::protobuf::FieldDescriptor* descriptor);
+    CMessage* self, const FieldDescriptor* descriptor);
 
 // Clears the data for the given field name. The message is released if there
 // are any external references.
@@ -183,17 +229,15 @@ PyObject* ClearField(CMessage* self, PyObject* arg);
 //
 // Corresponds to reflection api method HasField
 PyObject* HasFieldByDescriptor(
-    CMessage* self, const google::protobuf::FieldDescriptor* field_descriptor);
+    CMessage* self, const FieldDescriptor* field_descriptor);
 
 // Checks if the message has the named field.
 //
 // Corresponds to reflection api method HasField.
 PyObject* HasField(CMessage* self, PyObject* arg);
 
-// Initializes constants/enum values on a message. This is called by
-// RepeatedCompositeContainer and ExtensionDict after calling the constructor.
-// TODO(anuraag): Make it always called from within the constructor since it can
-int InitAttributes(CMessage* self, PyObject* descriptor, PyObject* kwargs);
+// Initializes values of fields on a newly constructed message.
+int InitAttributes(CMessage* self, PyObject* kwargs);
 
 PyObject* MergeFrom(CMessage* self, PyObject* arg);
 
@@ -216,16 +260,23 @@ int SetOwner(CMessage* self, const shared_ptr<Message>& new_owner);
 
 int AssureWritable(CMessage* self);
 
+// Returns the "best" DescriptorPool for the given message.
+// This is often equivalent to message.DESCRIPTOR.pool, but not always, when
+// the message class was created from a MessageFactory using a custom pool which
+// uses the generated pool as an underlay.
+//
+// The returned pool is suitable for finding fields and building submessages,
+// even in the case of extensions.
+PyDescriptorPool* GetDescriptorPoolForMessage(CMessage* message);
+
 }  // namespace cmessage
+
 
 /* Is 64bit */
 #define IS_64BIT (SIZEOF_LONG == 8)
 
-#define FIELD_BELONGS_TO_MESSAGE(field_descriptor, message) \
-    ((message)->GetDescriptor() == (field_descriptor)->containing_type())
-
 #define FIELD_IS_REPEATED(field_descriptor)                 \
-    ((field_descriptor)->label() == google::protobuf::FieldDescriptor::LABEL_REPEATED)
+    ((field_descriptor)->label() == FieldDescriptor::LABEL_REPEATED)
 
 #define GOOGLE_CHECK_GET_INT32(arg, value, err)                        \
     int32 value;                                            \
@@ -278,7 +329,7 @@ extern PyObject* kint64min_py;
 extern PyObject* kint64max_py;
 extern PyObject* kuint64max_py;
 
-#define C(str) const_cast<char*>(str)
+#define FULL_MODULE_NAME "google.protobuf.pyext._message"
 
 void FormatTypeError(PyObject* arg, char* expected_types);
 template<class T>
@@ -287,14 +338,19 @@ bool CheckAndGetInteger(
 bool CheckAndGetDouble(PyObject* arg, double* value);
 bool CheckAndGetFloat(PyObject* arg, float* value);
 bool CheckAndGetBool(PyObject* arg, bool* value);
+PyObject* CheckString(PyObject* arg, const FieldDescriptor* descriptor);
 bool CheckAndSetString(
-    PyObject* arg, google::protobuf::Message* message,
-    const google::protobuf::FieldDescriptor* descriptor,
-    const google::protobuf::Reflection* reflection,
+    PyObject* arg, Message* message,
+    const FieldDescriptor* descriptor,
+    const Reflection* reflection,
     bool append,
     int index);
-PyObject* ToStringObject(
-    const google::protobuf::FieldDescriptor* descriptor, string value);
+PyObject* ToStringObject(const FieldDescriptor* descriptor, string value);
+
+// Check if the passed field descriptor belongs to the given message.
+// If not, return false and set a Python exception (a KeyError)
+bool CheckFieldBelongsToMessage(const FieldDescriptor* field_descriptor,
+                                const Message* message);
 
 extern PyObject* PickleError_class;
 

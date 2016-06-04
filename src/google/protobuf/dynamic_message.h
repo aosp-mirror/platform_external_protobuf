@@ -39,9 +39,13 @@
 #define GOOGLE_PROTOBUF_DYNAMIC_MESSAGE_H__
 
 #include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
 
 #include <google/protobuf/message.h>
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/mutex.h>
 
 namespace google {
 namespace protobuf {
@@ -123,7 +127,7 @@ class LIBPROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
   // public header (for good reason), but dynamic_message.h is, and public
   // headers may only #include other public headers.
   struct PrototypeMap;
-  scoped_ptr<PrototypeMap> prototypes_;
+  google::protobuf::scoped_ptr<PrototypeMap> prototypes_;
   mutable Mutex prototypes_mutex_;
 
   friend class DynamicMessage;
