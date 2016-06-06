@@ -32,8 +32,8 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_FIELD_H__
-#define GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_FIELD_H__
+#ifndef GOOGLE_PROTOBUF_COMPILER_JAVANANO_MESSAGE_FIELD_H__
+#define GOOGLE_PROTOBUF_COMPILER_JAVANANO_MESSAGE_FIELD_H__
 
 #include <map>
 #include <string>
@@ -58,12 +58,36 @@ class MessageFieldGenerator : public FieldGenerator {
   void GenerateSerializedSizeCode(io::Printer* printer) const;
   void GenerateEqualsCode(io::Printer* printer) const;
   void GenerateHashCodeCode(io::Printer* printer) const;
+  void GenerateFixClonedCode(io::Printer* printer) const;
 
  private:
   const FieldDescriptor* descriptor_;
   map<string, string> variables_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(MessageFieldGenerator);
+};
+
+class MessageOneofFieldGenerator : public FieldGenerator {
+ public:
+  explicit MessageOneofFieldGenerator(const FieldDescriptor* descriptor,
+                                      const Params& params);
+  ~MessageOneofFieldGenerator();
+
+  // implements FieldGenerator ---------------------------------------
+  void GenerateMembers(io::Printer* printer, bool lazy_init) const;
+  void GenerateClearCode(io::Printer* printer) const;
+  void GenerateMergingCode(io::Printer* printer) const;
+  void GenerateSerializationCode(io::Printer* printer) const;
+  void GenerateSerializedSizeCode(io::Printer* printer) const;
+  void GenerateEqualsCode(io::Printer* printer) const;
+  void GenerateHashCodeCode(io::Printer* printer) const;
+  void GenerateFixClonedCode(io::Printer* printer) const;
+
+ private:
+  const FieldDescriptor* descriptor_;
+  map<string, string> variables_;
+
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(MessageOneofFieldGenerator);
 };
 
 class RepeatedMessageFieldGenerator : public FieldGenerator {
@@ -80,6 +104,7 @@ class RepeatedMessageFieldGenerator : public FieldGenerator {
   void GenerateSerializedSizeCode(io::Printer* printer) const;
   void GenerateEqualsCode(io::Printer* printer) const;
   void GenerateHashCodeCode(io::Printer* printer) const;
+  void GenerateFixClonedCode(io::Printer* printer) const;
 
  private:
   const FieldDescriptor* descriptor_;
@@ -93,4 +118,4 @@ class RepeatedMessageFieldGenerator : public FieldGenerator {
 }  // namespace protobuf
 
 }  // namespace google
-#endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_FIELD_H__
+#endif  // GOOGLE_PROTOBUF_COMPILER_JAVANANO_MESSAGE_FIELD_H__

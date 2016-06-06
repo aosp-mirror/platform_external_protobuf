@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -46,7 +46,6 @@
 //   "parametized tests" so that one set of tests can be used on all the
 //   implementations.
 
-#include "config.h"
 
 #ifdef _MSC_VER
 #include <io.h>
@@ -58,8 +57,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
 #include <sstream>
 
+#include <google/protobuf/testing/file.h>
+#include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #if HAVE_ZLIB
@@ -67,6 +72,7 @@
 #endif
 
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/testing/googletest.h>
 #include <google/protobuf/testing/file.h>
 #include <gtest/gtest.h>
@@ -195,7 +201,7 @@ void IoTest::WriteString(ZeroCopyOutputStream* output, const string& str) {
 }
 
 void IoTest::ReadString(ZeroCopyInputStream* input, const string& str) {
-  scoped_array<char> buffer(new char[str.size() + 1]);
+  google::protobuf::scoped_array<char> buffer(new char[str.size() + 1]);
   buffer[str.size()] = '\0';
   EXPECT_EQ(ReadFromInput(input, buffer.get(), str.size()), str.size());
   EXPECT_STREQ(str.c_str(), buffer.get());
@@ -285,6 +291,57 @@ TEST_F(IoTest, ArrayIo) {
   }
 }
 
+TEST_F(IoTest, TwoSessionWrite) {
+  // Test that two concatenated write sessions read correctly
+
+  static const char* strA = "0123456789";
+  static const char* strB = "WhirledPeas";
+  const int kBufferSize = 2*1024;
+  uint8* buffer = new uint8[kBufferSize];
+  char* temp_buffer = new char[40];
+
+  for (int i = 0; i < kBlockSizeCount; i++) {
+    for (int j = 0; j < kBlockSizeCount; j++) {
+      ArrayOutputStream* output =
+          new ArrayOutputStream(buffer, kBufferSize, kBlockSizes[i]);
+      CodedOutputStream* coded_output = new CodedOutputStream(output);
+      coded_output->WriteVarint32(strlen(strA));
+      coded_output->WriteRaw(strA, strlen(strA));
+      delete coded_output;  // flush
+      int64 pos = output->ByteCount();
+      delete output;
+      output = new ArrayOutputStream(
+          buffer + pos, kBufferSize - pos, kBlockSizes[i]);
+      coded_output = new CodedOutputStream(output);
+      coded_output->WriteVarint32(strlen(strB));
+      coded_output->WriteRaw(strB, strlen(strB));
+      delete coded_output;  // flush
+      int64 size = pos + output->ByteCount();
+      delete output;
+
+      ArrayInputStream* input =
+          new ArrayInputStream(buffer, size, kBlockSizes[j]);
+      CodedInputStream* coded_input = new CodedInputStream(input);
+      uint32 insize;
+      EXPECT_TRUE(coded_input->ReadVarint32(&insize));
+      EXPECT_EQ(strlen(strA), insize);
+      EXPECT_TRUE(coded_input->ReadRaw(temp_buffer, insize));
+      EXPECT_EQ(0, memcmp(temp_buffer, strA, insize));
+
+      EXPECT_TRUE(coded_input->ReadVarint32(&insize));
+      EXPECT_EQ(strlen(strB), insize);
+      EXPECT_TRUE(coded_input->ReadRaw(temp_buffer, insize));
+      EXPECT_EQ(0, memcmp(temp_buffer, strB, insize));
+
+      delete coded_input;
+      delete input;
+    }
+  }
+
+  delete [] temp_buffer;
+  delete [] buffer;
+}
+
 #if HAVE_ZLIB
 TEST_F(IoTest, GzipIo) {
   const int kBufferSize = 2*1024;
@@ -296,8 +353,12 @@ TEST_F(IoTest, GzipIo) {
         int size;
         {
           ArrayOutputStream output(buffer, kBufferSize, kBlockSizes[i]);
-          GzipOutputStream gzout(
-              &output, GzipOutputStream::GZIP, gzip_buffer_size);
+          GzipOutputStream::Options options;
+          options.format = GzipOutputStream::GZIP;
+          if (gzip_buffer_size != -1) {
+            options.buffer_size = gzip_buffer_size;
+          }
+          GzipOutputStream gzout(&output, options);
           WriteStuff(&gzout);
           gzout.Close();
           size = output.ByteCount();
@@ -314,6 +375,100 @@ TEST_F(IoTest, GzipIo) {
   delete [] buffer;
 }
 
+TEST_F(IoTest, GzipIoWithFlush) {
+  const int kBufferSize = 2*1024;
+  uint8* buffer = new uint8[kBufferSize];
+  // We start with i = 4 as we want a block size > 6. With block size <= 6
+  // Flush() fills up the entire 2K buffer with flush markers and the test
+  // fails. See documentation for Flush() for more detail.
+  for (int i = 4; i < kBlockSizeCount; i++) {
+    for (int j = 0; j < kBlockSizeCount; j++) {
+      for (int z = 0; z < kBlockSizeCount; z++) {
+        int gzip_buffer_size = kBlockSizes[z];
+        int size;
+        {
+          ArrayOutputStream output(buffer, kBufferSize, kBlockSizes[i]);
+          GzipOutputStream::Options options;
+          options.format = GzipOutputStream::GZIP;
+          if (gzip_buffer_size != -1) {
+            options.buffer_size = gzip_buffer_size;
+          }
+          GzipOutputStream gzout(&output, options);
+          WriteStuff(&gzout);
+          EXPECT_TRUE(gzout.Flush());
+          gzout.Close();
+          size = output.ByteCount();
+        }
+        {
+          ArrayInputStream input(buffer, size, kBlockSizes[j]);
+          GzipInputStream gzin(
+              &input, GzipInputStream::GZIP, gzip_buffer_size);
+          ReadStuff(&gzin);
+        }
+      }
+    }
+  }
+  delete [] buffer;
+}
+
+TEST_F(IoTest, GzipIoContiguousFlushes) {
+  const int kBufferSize = 2*1024;
+  uint8* buffer = new uint8[kBufferSize];
+
+  int block_size = kBlockSizes[4];
+  int gzip_buffer_size = block_size;
+  int size;
+
+  ArrayOutputStream output(buffer, kBufferSize, block_size);
+  GzipOutputStream::Options options;
+  options.format = GzipOutputStream::GZIP;
+  if (gzip_buffer_size != -1) {
+    options.buffer_size = gzip_buffer_size;
+  }
+  GzipOutputStream gzout(&output, options);
+  WriteStuff(&gzout);
+  EXPECT_TRUE(gzout.Flush());
+  EXPECT_TRUE(gzout.Flush());
+  gzout.Close();
+  size = output.ByteCount();
+
+  ArrayInputStream input(buffer, size, block_size);
+  GzipInputStream gzin(
+      &input, GzipInputStream::GZIP, gzip_buffer_size);
+  ReadStuff(&gzin);
+
+  delete [] buffer;
+}
+
+TEST_F(IoTest, GzipIoReadAfterFlush) {
+  const int kBufferSize = 2*1024;
+  uint8* buffer = new uint8[kBufferSize];
+
+  int block_size = kBlockSizes[4];
+  int gzip_buffer_size = block_size;
+  int size;
+  ArrayOutputStream output(buffer, kBufferSize, block_size);
+  GzipOutputStream::Options options;
+  options.format = GzipOutputStream::GZIP;
+  if (gzip_buffer_size != -1) {
+    options.buffer_size = gzip_buffer_size;
+  }
+
+  GzipOutputStream gzout(&output, options);
+  WriteStuff(&gzout);
+  EXPECT_TRUE(gzout.Flush());
+  size = output.ByteCount();
+
+  ArrayInputStream input(buffer, size, block_size);
+  GzipInputStream gzin(
+      &input, GzipInputStream::GZIP, gzip_buffer_size);
+  ReadStuff(&gzin);
+
+  gzout.Close();
+
+  delete [] buffer;
+}
+
 TEST_F(IoTest, ZlibIo) {
   const int kBufferSize = 2*1024;
   uint8* buffer = new uint8[kBufferSize];
@@ -324,8 +479,12 @@ TEST_F(IoTest, ZlibIo) {
         int size;
         {
           ArrayOutputStream output(buffer, kBufferSize, kBlockSizes[i]);
-          GzipOutputStream gzout(
-              &output, GzipOutputStream::ZLIB, gzip_buffer_size);
+          GzipOutputStream::Options options;
+          options.format = GzipOutputStream::ZLIB;
+          if (gzip_buffer_size != -1) {
+            options.buffer_size = gzip_buffer_size;
+          }
+          GzipOutputStream gzout(&output, options);
           WriteStuff(&gzout);
           gzout.Close();
           size = output.ByteCount();
@@ -348,7 +507,9 @@ TEST_F(IoTest, ZlibIoInputAutodetect) {
   int size;
   {
     ArrayOutputStream output(buffer, kBufferSize);
-    GzipOutputStream gzout(&output, GzipOutputStream::ZLIB);
+    GzipOutputStream::Options options;
+    options.format = GzipOutputStream::ZLIB;
+    GzipOutputStream gzout(&output, options);
     WriteStuff(&gzout);
     gzout.Close();
     size = output.ByteCount();
@@ -360,7 +521,9 @@ TEST_F(IoTest, ZlibIoInputAutodetect) {
   }
   {
     ArrayOutputStream output(buffer, kBufferSize);
-    GzipOutputStream gzout(&output, GzipOutputStream::GZIP);
+    GzipOutputStream::Options options;
+    options.format = GzipOutputStream::GZIP;
+    GzipOutputStream gzout(&output, options);
     WriteStuff(&gzout);
     gzout.Close();
     size = output.ByteCount();
@@ -402,9 +565,10 @@ TEST_F(IoTest, CompressionOptions) {
   // Some ad-hoc testing of compression options.
 
   string golden;
-  File::ReadFileToStringOrDie(
-    TestSourceDir() + "/google/protobuf/testdata/golden_message",
-    &golden);
+  GOOGLE_CHECK_OK(File::GetContents(
+      TestSourceDir() +
+          "/google/protobuf/testdata/golden_message",
+      &golden, true));
 
   GzipOutputStream::Options options;
   string gzip_compressed = Compress(golden, options);
@@ -431,6 +595,108 @@ TEST_F(IoTest, CompressionOptions) {
   EXPECT_TRUE(Uncompress(not_compressed) == golden);
   EXPECT_TRUE(Uncompress(gzip_compressed) == golden);
   EXPECT_TRUE(Uncompress(zlib_compressed) == golden);
+}
+
+TEST_F(IoTest, TwoSessionWriteGzip) {
+  // Test that two concatenated gzip streams can be read correctly
+
+  static const char* strA = "0123456789";
+  static const char* strB = "QuickBrownFox";
+  const int kBufferSize = 2*1024;
+  uint8* buffer = new uint8[kBufferSize];
+  char* temp_buffer = new char[40];
+
+  for (int i = 0; i < kBlockSizeCount; i++) {
+    for (int j = 0; j < kBlockSizeCount; j++) {
+      ArrayOutputStream* output =
+          new ArrayOutputStream(buffer, kBufferSize, kBlockSizes[i]);
+      GzipOutputStream* gzout = new GzipOutputStream(output);
+      CodedOutputStream* coded_output = new CodedOutputStream(gzout);
+      int32 outlen = strlen(strA) + 1;
+      coded_output->WriteVarint32(outlen);
+      coded_output->WriteRaw(strA, outlen);
+      delete coded_output;  // flush
+      delete gzout;  // flush
+      int64 pos = output->ByteCount();
+      delete output;
+      output = new ArrayOutputStream(
+          buffer + pos, kBufferSize - pos, kBlockSizes[i]);
+      gzout = new GzipOutputStream(output);
+      coded_output = new CodedOutputStream(gzout);
+      outlen = strlen(strB) + 1;
+      coded_output->WriteVarint32(outlen);
+      coded_output->WriteRaw(strB, outlen);
+      delete coded_output;  // flush
+      delete gzout;  // flush
+      int64 size = pos + output->ByteCount();
+      delete output;
+
+      ArrayInputStream* input =
+          new ArrayInputStream(buffer, size, kBlockSizes[j]);
+      GzipInputStream* gzin = new GzipInputStream(input);
+      CodedInputStream* coded_input = new CodedInputStream(gzin);
+      uint32 insize;
+      EXPECT_TRUE(coded_input->ReadVarint32(&insize));
+      EXPECT_EQ(strlen(strA) + 1, insize);
+      EXPECT_TRUE(coded_input->ReadRaw(temp_buffer, insize));
+      EXPECT_EQ(0, memcmp(temp_buffer, strA, insize))
+          << "strA=" << strA << " in=" << temp_buffer;
+
+      EXPECT_TRUE(coded_input->ReadVarint32(&insize));
+      EXPECT_EQ(strlen(strB) + 1, insize);
+      EXPECT_TRUE(coded_input->ReadRaw(temp_buffer, insize));
+      EXPECT_EQ(0, memcmp(temp_buffer, strB, insize))
+          << " out_block_size=" << kBlockSizes[i]
+          << " in_block_size=" << kBlockSizes[j]
+          << " pos=" << pos
+          << " size=" << size
+          << " strB=" << strB << " in=" << temp_buffer;
+
+      delete coded_input;
+      delete gzin;
+      delete input;
+    }
+  }
+
+  delete [] temp_buffer;
+  delete [] buffer;
+}
+
+TEST_F(IoTest, GzipInputByteCountAfterClosed) {
+  string golden = "abcdefghijklmnopqrstuvwxyz";
+  string compressed = Compress(golden, GzipOutputStream::Options());
+
+  for (int i = 0; i < kBlockSizeCount; i++) {
+    ArrayInputStream arr_input(compressed.data(), compressed.size(),
+                               kBlockSizes[i]);
+    GzipInputStream gz_input(&arr_input);
+    const void* buffer;
+    int size;
+    while (gz_input.Next(&buffer, &size)) {
+      EXPECT_LE(gz_input.ByteCount(), golden.size());
+    }
+    EXPECT_EQ(golden.size(), gz_input.ByteCount());
+  }
+}
+
+TEST_F(IoTest, GzipInputByteCountAfterClosedConcatenatedStreams) {
+  string golden1 = "abcdefghijklmnopqrstuvwxyz";
+  string golden2 = "the quick brown fox jumps over the lazy dog";
+  const size_t total_size = golden1.size() + golden2.size();
+  string compressed = Compress(golden1, GzipOutputStream::Options()) +
+                      Compress(golden2, GzipOutputStream::Options());
+
+  for (int i = 0; i < kBlockSizeCount; i++) {
+    ArrayInputStream arr_input(compressed.data(), compressed.size(),
+                               kBlockSizes[i]);
+    GzipInputStream gz_input(&arr_input);
+    const void* buffer;
+    int size;
+    while (gz_input.Next(&buffer, &size)) {
+      EXPECT_LE(gz_input.ByteCount(), total_size);
+    }
+    EXPECT_EQ(total_size, gz_input.ByteCount());
+  }
 }
 #endif
 
@@ -698,6 +964,26 @@ TEST_F(IoTest, LimitingInputStream) {
   LimitingInputStream input(&array_input, output.ByteCount());
 
   ReadStuff(&input);
+}
+
+// Checks that ByteCount works correctly for LimitingInputStreams where the
+// underlying stream has already been read.
+TEST_F(IoTest, LimitingInputStreamByteCount) {
+  const int kHalfBufferSize = 128;
+  const int kBufferSize = kHalfBufferSize * 2;
+  uint8 buffer[kBufferSize];
+
+  // Set up input. Only allow half to be read at once.
+  ArrayInputStream array_input(buffer, kBufferSize, kHalfBufferSize);
+  const void* data;
+  int size;
+  EXPECT_TRUE(array_input.Next(&data, &size));
+  EXPECT_EQ(kHalfBufferSize, array_input.ByteCount());
+  // kHalfBufferSize - 1 to test limiting logic as well.
+  LimitingInputStream input(&array_input, kHalfBufferSize - 1);
+  EXPECT_EQ(0, input.ByteCount());
+  EXPECT_TRUE(input.Next(&data, &size));
+  EXPECT_EQ(kHalfBufferSize - 1 , input.ByteCount());
 }
 
 // Check that a zero-size array doesn't confuse the code.

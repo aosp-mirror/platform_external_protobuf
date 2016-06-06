@@ -32,8 +32,8 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_H__
-#define GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_H__
+#ifndef GOOGLE_PROTOBUF_COMPILER_JAVANANO_MESSAGE_H__
+#define GOOGLE_PROTOBUF_COMPILER_JAVANANO_MESSAGE_H__
 
 #include <string>
 #include <google/protobuf/compiler/javanano/javanano_helpers.h>
@@ -77,8 +77,10 @@ class MessageGenerator {
                                  const FieldDescriptor* field);
 
   void GenerateClear(io::Printer* printer);
+  void GenerateFieldInitializers(io::Printer* printer);
   void GenerateEquals(io::Printer* printer);
   void GenerateHashCode(io::Printer* printer);
+  void GenerateClone(io::Printer* printer);
 
   const Params& params_;
   const Descriptor* descriptor_;
@@ -92,4 +94,4 @@ class MessageGenerator {
 }  // namespace protobuf
 
 }  // namespace google
-#endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_H__
+#endif  // GOOGLE_PROTOBUF_COMPILER_JAVANANO_MESSAGE_H__
