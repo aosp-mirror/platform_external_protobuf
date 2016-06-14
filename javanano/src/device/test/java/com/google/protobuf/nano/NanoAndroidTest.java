@@ -34,8 +34,8 @@ import android.os.Parcel;
 
 import com.google.protobuf.nano.UnittestSimpleNano.SimpleMessageNano;
 import com.google.protobuf.nano.UnittestSimpleNano.SimpleMessageNano.NestedMessage;
-import com.google.protobuf.nano.testext.Extensions.ContainerMessage;
-import com.google.protobuf.nano.testext.Extensions.ExtendableMessage;
+import com.google.protobuf.nano.testext.nano.Extensions.ContainerMessage;
+import com.google.protobuf.nano.testext.nano.Extensions.ExtendableMessage;
 
 import junit.framework.TestCase;
 
