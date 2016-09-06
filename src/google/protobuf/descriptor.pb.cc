@@ -1755,7 +1755,7 @@ void DescriptorProto_ExtensionRange::Clear() {
 #define ZR_(first, last) do {                              \
     size_t f = OFFSET_OF_FIELD_(first);                    \
     size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \
-    ::memset(&first, 0, n);                                \
+    ::memset(&(first), 0, n);                              \
   } while (0)
 
   ZR_(start_, end_);
@@ -4979,7 +4979,7 @@ void FileOptions::Clear() {
 #define ZR_(first, last) do {                              \
     size_t f = OFFSET_OF_FIELD_(first);                    \
     size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \
-    ::memset(&first, 0, n);                                \
+    ::memset(&(first), 0, n);                              \
   } while (0)
 
   if (_has_bits_[0 / 32] & 255) {
@@ -5726,7 +5726,7 @@ void MessageOptions::Clear() {
 #define ZR_(first, last) do {                              \
     size_t f = OFFSET_OF_FIELD_(first);                    \
     size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \
-    ::memset(&first, 0, n);                                \
+    ::memset(&(first), 0, n);                              \
   } while (0)
 
   ZR_(message_set_wire_format_, deprecated_);
@@ -6124,7 +6124,7 @@ void FieldOptions::Clear() {
 #define ZR_(first, last) do {                              \
     size_t f = OFFSET_OF_FIELD_(first);                    \
     size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \
-    ::memset(&first, 0, n);                                \
+    ::memset(&(first), 0, n);                              \
   } while (0)
 
   if (_has_bits_[0 / 32] & 63) {
@@ -6619,7 +6619,7 @@ void EnumOptions::Clear() {
 #define ZR_(first, last) do {                              \
     size_t f = OFFSET_OF_FIELD_(first);                    \
     size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \
-    ::memset(&first, 0, n);                                \
+    ::memset(&(first), 0, n);                              \
   } while (0)
 
   ZR_(allow_alias_, deprecated_);
@@ -8085,7 +8085,7 @@ void UninterpretedOption::Clear() {
 #define ZR_(first, last) do {                              \
     size_t f = OFFSET_OF_FIELD_(first);                    \
     size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \
-    ::memset(&first, 0, n);                                \
+    ::memset(&(first), 0, n);                              \
   } while (0)
 
   if (_has_bits_[0 / 32] & 126) {
