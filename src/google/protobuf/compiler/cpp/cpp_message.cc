@@ -1575,7 +1575,7 @@ GenerateClear(io::Printer* printer) {
       "#define ZR_(first, last) do {                              \\\n"
       "    size_t f = OFFSET_OF_FIELD_(first);                    \\\n"
       "    size_t n = OFFSET_OF_FIELD_(last) - f + sizeof(last);  \\\n"
-      "    ::memset(&first, 0, n);                                \\\n"
+      "    ::memset(&(first), 0, n);                              \\\n"
       "  } while (0)\n\n";
   for (int i = 0; i < runs_of_fields_.size(); i++) {
     const vector<string>& run = runs_of_fields_[i];
