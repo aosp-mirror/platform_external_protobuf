@@ -47,11 +47,19 @@
 #include <google/protobuf/compiler/cpp/cpp_unittest.h>
 
 #include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
 #include <vector>
 
 #include <google/protobuf/unittest.pb.h>
 #include <google/protobuf/unittest_optimize_for.pb.h>
 #include <google/protobuf/unittest_embed_optimize_for.pb.h>
+#if !defined(GOOGLE_PROTOBUF_CMAKE_BUILD) && !defined(_MSC_VER)
+// We exclude this large proto from cmake build because it's too large for
+// visual studio to compile (report internal errors).
+#include <google/protobuf/unittest_enormous_descriptor.pb.h>
+#endif
 #include <google/protobuf/unittest_no_generic_services.pb.h>
 #include <google/protobuf/test_util.h>
 #include <google/protobuf/compiler/cpp/cpp_helpers.h>
@@ -63,7 +71,9 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/dynamic_message.h>
 
+#include <google/protobuf/stubs/callback.h>
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
 #include <google/protobuf/testing/googletest.h>
@@ -127,6 +137,19 @@ TEST(GeneratedDescriptorTest, IdenticalDescriptors) {
             generated_decsriptor_proto.DebugString());
 }
 
+#if !defined(GOOGLE_PROTOBUF_CMAKE_BUILD) && !defined(_MSC_VER)
+// Test that generated code has proper descriptors:
+// Touch a descriptor generated from an enormous message to validate special
+// handling for descriptors exceeding the C++ standard's recommended minimum
+// limit for string literal size
+TEST(GeneratedDescriptorTest, EnormousDescriptor) {
+  const Descriptor* generated_descriptor =
+    TestEnormousDescriptor::descriptor();
+
+  EXPECT_TRUE(generated_descriptor != NULL);
+}
+#endif
+
 #endif  // !PROTOBUF_TEST_NO_DESCRIPTORS
 
 // ===================================================================
@@ -150,6 +173,7 @@ TEST(GeneratedMessageTest, Defaults) {
             &message.optional_import_message());
 }
 
+#ifndef PROTOBUF_USE_DLLS
 TEST(GeneratedMessageTest, Int32StringConversion) {
   EXPECT_EQ("971", Int32ToString(971));
   EXPECT_EQ("(~0x7fffffff)", Int32ToString(kint32min));
@@ -162,6 +186,7 @@ TEST(GeneratedMessageTest, Int64StringConversion) {
   EXPECT_EQ("GOOGLE_LONGLONG(~0x7fffffffffffffff)", Int64ToString(kint64min));
   EXPECT_EQ("GOOGLE_LONGLONG(9223372036854775807)", Int64ToString(kint64max));
 }
+#endif  // !PROTOBUF_USE_DLLS
 
 TEST(GeneratedMessageTest, FloatingPointDefaults) {
   const unittest::TestExtremeDefaultValues& extreme_default =
@@ -248,7 +273,7 @@ TEST(GeneratedMessageTest, ReleaseString) {
 
   message.set_default_string("blah");
   EXPECT_TRUE(message.has_default_string());
-  scoped_ptr<string> str(message.release_default_string());
+  google::protobuf::scoped_ptr<string> str(message.release_default_string());
   EXPECT_FALSE(message.has_default_string());
   ASSERT_TRUE(str != NULL);
   EXPECT_EQ("blah", *str);
@@ -267,7 +292,7 @@ TEST(GeneratedMessageTest, ReleaseMessage) {
   EXPECT_FALSE(message.has_optional_nested_message());
 
   message.mutable_optional_nested_message()->set_bb(1);
-  scoped_ptr<unittest::TestAllTypes::NestedMessage> nest(
+  google::protobuf::scoped_ptr<unittest::TestAllTypes::NestedMessage> nest(
       message.release_optional_nested_message());
   EXPECT_FALSE(message.has_optional_nested_message());
   ASSERT_TRUE(nest != NULL);
@@ -531,7 +556,7 @@ TEST(GeneratedMessageTest, DynamicMessageCopyFrom) {
 
   // Construct a new version of the dynamic message via the factory.
   DynamicMessageFactory factory;
-  scoped_ptr<Message> message1;
+  google::protobuf::scoped_ptr<Message> message1;
   message1.reset(factory.GetPrototype(
                      unittest::TestAllTypes::descriptor())->New());
 
@@ -578,9 +603,9 @@ TEST(GeneratedMessageTest, NonEmptyMergeFrom) {
 
 TEST(GeneratedMessageTest, MergeFromSelf) {
   unittest::TestAllTypes message;
-  EXPECT_DEATH(message.MergeFrom(message), "&from");
+  EXPECT_DEATH(message.MergeFrom(message), "Check failed:.*pb[.]cc");
   EXPECT_DEATH(message.MergeFrom(implicit_cast<const Message&>(message)),
-               "&from");
+               "Check failed:.*pb[.]cc");
 }
 
 #endif  // PROTOBUF_HAS_DEATH_TEST
@@ -789,6 +814,21 @@ TEST(GeneratedMessageTest, TestConflictingSymbolNames) {
             message.GetExtension(ExtensionMessage::repeated_int32_ext, 0));
 }
 
+TEST(GeneratedMessageTest, TestConflictingEnumNames) {
+  protobuf_unittest::TestConflictingEnumNames message;
+  message.set_conflicting_enum(protobuf_unittest::TestConflictingEnumNames_NestedConflictingEnum_and_);
+  EXPECT_EQ(1, message.conflicting_enum());
+  message.set_conflicting_enum(protobuf_unittest::TestConflictingEnumNames_NestedConflictingEnum_XOR);
+  EXPECT_EQ(5, message.conflicting_enum());
+
+
+  protobuf_unittest::ConflictingEnum conflicting_enum;
+  conflicting_enum = protobuf_unittest::NOT_EQ;
+  EXPECT_EQ(1, conflicting_enum);
+  conflicting_enum = protobuf_unittest::return_;
+  EXPECT_EQ(3, conflicting_enum);
+}
+
 #ifndef PROTOBUF_TEST_NO_DESCRIPTORS
 
 TEST(GeneratedMessageTest, TestOptimizedForSize) {
@@ -919,6 +959,22 @@ TEST(GeneratedMessageTest, ExtensionConstantValues) {
   EXPECT_EQ(unittest::kRepeatedgroupExtensionFieldNumber, 46);
   EXPECT_EQ(unittest::kRepeatedNestedMessageExtensionFieldNumber, 48);
   EXPECT_EQ(unittest::kRepeatedNestedEnumExtensionFieldNumber, 51);
+}
+
+TEST(GeneratedMessageTest, ParseFromTruncated) {
+  const string long_string = string(128, 'q');
+  FileDescriptorProto p;
+  p.add_extension()->set_name(long_string);
+  const string msg = p.SerializeAsString();
+  int successful_count = 0;
+  for (int i = 0; i <= msg.size(); i++) {
+    if (p.ParseFromArray(msg.c_str(), i)) {
+      ++successful_count;
+    }
+  }
+  // We don't really care about how often we succeeded.
+  // As long as we didn't crash, we're happy.
+  EXPECT_GE(successful_count, 1);
 }
 
 // ===================================================================
@@ -1196,7 +1252,7 @@ class GeneratedServiceTest : public testing::Test {
       foo_(descriptor_->FindMethodByName("Foo")),
       bar_(descriptor_->FindMethodByName("Bar")),
       stub_(&mock_channel_),
-      done_(NewPermanentCallback(&DoNothing)) {}
+      done_(::google::protobuf::internal::NewPermanentCallback(&DoNothing)) {}
 
   virtual void SetUp() {
     ASSERT_TRUE(foo_ != NULL);
@@ -1218,7 +1274,7 @@ class GeneratedServiceTest : public testing::Test {
   unittest::FooResponse foo_response_;
   unittest::BarRequest bar_request_;
   unittest::BarResponse bar_response_;
-  scoped_ptr<Closure> done_;
+  google::protobuf::scoped_ptr<Closure> done_;
 };
 
 TEST_F(GeneratedServiceTest, GetDescriptor) {
@@ -1372,6 +1428,12 @@ class OneofTest : public testing::Test {
       case unittest::TestOneof2::kFooString:
         EXPECT_TRUE(message.has_foo_string());
         break;
+      case unittest::TestOneof2::kFooCord:
+        EXPECT_TRUE(message.has_foo_cord());
+        break;
+      case unittest::TestOneof2::kFooStringPiece:
+        EXPECT_TRUE(message.has_foo_string_piece());
+        break;
       case unittest::TestOneof2::kFooBytes:
         EXPECT_TRUE(message.has_foo_bytes());
         break;
@@ -1383,6 +1445,9 @@ class OneofTest : public testing::Test {
         break;
       case unittest::TestOneof2::kFoogroup:
         EXPECT_TRUE(message.has_foogroup());
+        break;
+      case unittest::TestOneof2::kFooLazyMessage:
+        EXPECT_TRUE(message.has_foo_lazy_message());
         break;
       case unittest::TestOneof2::FOO_NOT_SET:
         break;
@@ -1516,7 +1581,7 @@ TEST_F(OneofTest, ReleaseString) {
 
   message.set_foo_string("blah");
   EXPECT_TRUE(message.has_foo_string());
-  scoped_ptr<string> str(message.release_foo_string());
+  google::protobuf::scoped_ptr<string> str(message.release_foo_string());
   EXPECT_FALSE(message.has_foo_string());
   ASSERT_TRUE(str != NULL);
   EXPECT_EQ("blah", *str);
@@ -1570,7 +1635,7 @@ TEST_F(OneofTest, ReleaseMessage) {
 
   message.mutable_foo_message()->set_qux_int(1);
   EXPECT_TRUE(message.has_foo_message());
-  scoped_ptr<unittest::TestOneof2_NestedMessage> mes(
+  google::protobuf::scoped_ptr<unittest::TestOneof2_NestedMessage> mes(
       message.release_foo_message());
   EXPECT_FALSE(message.has_foo_message());
   ASSERT_TRUE(mes != NULL);
@@ -1687,7 +1752,7 @@ TEST_F(OneofTest, SwapBothHasFields) {
   EXPECT_EQ(message2.foo_string(), "FOO");
 }
 
-TEST_F(OneofTest, CopyContructor) {
+TEST_F(OneofTest, CopyConstructor) {
   unittest::TestOneof2 message1;
   message1.set_foo_bytes("FOO");
 

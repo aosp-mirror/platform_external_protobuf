@@ -43,7 +43,10 @@
 #include <google/protobuf/unittest.pb.h>
 #include <google/protobuf/test_util.h>
 
+#include <google/protobuf/stubs/callback.h>
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/mutex.h>
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
 #include <google/protobuf/stubs/stl_util.h>
@@ -480,6 +483,13 @@ TEST_F(UnknownFieldSetTest, UnknownEnumValue) {
     ASSERT_EQ(UnknownField::TYPE_VARINT, unknown_fields.field(2).type());
     EXPECT_EQ(6, unknown_fields.field(2).varint());
   }
+}
+
+TEST_F(UnknownFieldSetTest, SpaceUsedExcludingSelf) {
+  UnknownFieldSet empty;
+  empty.AddVarint(1, 0);
+  EXPECT_EQ(sizeof(vector<UnknownField>) + sizeof(UnknownField),
+            empty.SpaceUsedExcludingSelf());
 }
 
 TEST_F(UnknownFieldSetTest, SpaceUsed) {
