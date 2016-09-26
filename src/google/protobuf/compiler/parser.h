@@ -185,10 +185,13 @@ class LIBPROTOBUF_EXPORT Parser {
   //   have been passed around by const reference, for no particularly good
   //   reason.  We should probably go through and change them all to mutable
   //   pointer to make this more intuitive.
-  bool TryConsumeEndOfDeclaration(const char* text,
-                                  const LocationRecorder* location);
-  bool ConsumeEndOfDeclaration(const char* text,
-                               const LocationRecorder* location);
+  bool TryConsumeEndOfDeclaration(
+      const char* text, const LocationRecorder* location);
+  bool TryConsumeEndOfDeclarationFinishScope(
+      const char* text, const LocationRecorder* location);
+
+  bool ConsumeEndOfDeclaration(
+      const char* text, const LocationRecorder* location);
 
   // -----------------------------------------------------------------
   // Error logging helpers
@@ -253,9 +256,13 @@ class LIBPROTOBUF_EXPORT Parser {
     //
     // TODO(kenton):  See comment on TryConsumeEndOfDeclaration(), above, for
     //   why this is const.
-    void AttachComments(string* leading, string* trailing) const;
+    void AttachComments(string* leading, string* trailing,
+                        vector<string>* detached_comments) const;
 
    private:
+    // Indexes of parent and current location in the parent
+    // SourceCodeInfo.location repeated field. For top-level elements,
+    // parent_index_ is -1.
     Parser* parser_;
     SourceCodeInfo::Location* location_;
 
@@ -268,7 +275,7 @@ class LIBPROTOBUF_EXPORT Parser {
   // Parses the "syntax = \"proto2\";" line at the top of the file.  Returns
   // false if it failed to parse or if the syntax identifier was not
   // recognized.
-  bool ParseSyntaxIdentifier();
+  bool ParseSyntaxIdentifier(const LocationRecorder& parent);
 
   // These methods parse various individual bits of code.  They return
   // false if they completely fail to parse the construct.  In this case,
@@ -302,9 +309,6 @@ class LIBPROTOBUF_EXPORT Parser {
                    RepeatedField<int32>* weak_dependency,
                    const LocationRecorder& root_location,
                    const FileDescriptorProto* containing_file);
-  bool ParseOption(Message* options,
-                   const LocationRecorder& options_location,
-                   const FileDescriptorProto* containing_file);
 
   // These methods parse the contents of a message, enum, or service type and
   // add them to the given object.  They consume the entire block including
@@ -319,7 +323,7 @@ class LIBPROTOBUF_EXPORT Parser {
                          const LocationRecorder& service_location,
                          const FileDescriptorProto* containing_file);
 
-  // Parse one statement within a message, enum, or service block, inclunding
+  // Parse one statement within a message, enum, or service block, including
   // final semicolon.
   bool ParseMessageStatement(DescriptorProto* message,
                              const LocationRecorder& message_location,
@@ -360,6 +364,14 @@ class LIBPROTOBUF_EXPORT Parser {
                        const LocationRecorder& extensions_location,
                        const FileDescriptorProto* containing_file);
 
+  // Parse a "reserved" declaration.
+  bool ParseReserved(DescriptorProto* message,
+                     const LocationRecorder& message_location);
+  bool ParseReservedNames(DescriptorProto* message,
+                          const LocationRecorder& parent_location);
+  bool ParseReservedNumbers(DescriptorProto* message,
+                            const LocationRecorder& parent_location);
+
   // Parse an "extend" declaration.  (See also comments for
   // ParseMessageField().)
   bool ParseExtend(RepeatedPtrField<FieldDescriptorProto>* extensions,
@@ -397,13 +409,13 @@ class LIBPROTOBUF_EXPORT Parser {
 
 
   // Parse options of a single method or stream.
-  bool ParseOptions(const LocationRecorder& parent_location,
-                    const FileDescriptorProto* containing_file,
-                    const int optionsFieldNumber,
-                    Message* mutable_options);
+  bool ParseMethodOptions(const LocationRecorder& parent_location,
+                          const FileDescriptorProto* containing_file,
+                          const int optionsFieldNumber,
+                          Message* mutable_options);
 
   // Parse "required", "optional", or "repeated" and fill in "label"
-  // with the value.
+  // with the value. Returns true if such a label is consumed.
   bool ParseLabel(FieldDescriptorProto::Label* label,
                   const FileDescriptorProto* containing_file);
 
@@ -426,6 +438,10 @@ class LIBPROTOBUF_EXPORT Parser {
   bool ParseDefaultAssignment(FieldDescriptorProto* field,
                               const LocationRecorder& field_location,
                               const FileDescriptorProto* containing_file);
+
+  bool ParseJsonName(FieldDescriptorProto* field,
+                     const LocationRecorder& field_location,
+                     const FileDescriptorProto* containing_file);
 
   enum OptionStyle {
     OPTION_ASSIGNMENT,  // just "name = value"
@@ -460,6 +476,30 @@ class LIBPROTOBUF_EXPORT Parser {
   // the ending brace.
   bool ParseUninterpretedBlock(string* value);
 
+  struct MapField {
+    // Whether the field is a map field.
+    bool is_map_field;
+    // The types of the key and value if they are primitive types.
+    FieldDescriptorProto::Type key_type;
+    FieldDescriptorProto::Type value_type;
+    // Or the type names string if the types are customized types.
+    string key_type_name;
+    string value_type_name;
+
+    MapField() : is_map_field(false) {}
+  };
+  // Desugar the map syntax to generate a nested map entry message.
+  void GenerateMapEntry(const MapField& map_field, FieldDescriptorProto* field,
+                        RepeatedPtrField<DescriptorProto>* messages);
+
+  // Whether fields without label default to optional fields.
+  bool DefaultToOptionalFields() const {
+    return syntax_identifier_ == "proto3";
+  }
+
+
+  bool ValidateEnum(const EnumDescriptorProto* proto);
+
   // =================================================================
 
   io::Tokenizer* input_;
@@ -474,6 +514,13 @@ class LIBPROTOBUF_EXPORT Parser {
   // Leading doc comments for the next declaration.  These are not complete
   // yet; use ConsumeEndOfDeclaration() to get the complete comments.
   string upcoming_doc_comments_;
+
+  // Detached comments are not connected to any syntax entities. Elements in
+  // this vector are paragraphs of comments separated by empty lines. The
+  // detached comments will be put into the leading_detached_comments field for
+  // the next element (See SourceCodeInfo.Location in descriptor.proto), when
+  // ConsumeEndOfDeclaration() is called.
+  vector<string> upcoming_detached_comments_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Parser);
 };

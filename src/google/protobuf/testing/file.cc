@@ -133,6 +133,8 @@ bool File::RecursivelyCreateDir(const string& path, int mode) {
 
 void File::DeleteRecursively(const string& name,
                              void* dummy1, void* dummy2) {
+  if (name.empty()) return;
+
   // We don't care too much about error checking here since this is only used
   // in tests to delete temporary directories that are under /tmp anyway.
 
@@ -188,6 +190,10 @@ void File::DeleteRecursively(const string& name,
     remove(name.c_str());
   }
 #endif
+}
+
+bool File::ChangeWorkingDirectory(const string& new_working_directory) {
+  return chdir(new_working_directory.c_str()) == 0;
 }
 
 }  // namespace protobuf
