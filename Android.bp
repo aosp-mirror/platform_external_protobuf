@@ -184,6 +184,26 @@ cc_library_shared {
     },
 }
 
+// Compiler library for the host
+// =======================================================
+cc_library_host_shared {
+    name: "libprotoc",
+    defaults: ["libprotobuf-cpp-lite-defaults"],
+
+    srcs: protobuf_cc_full_src_files + [
+        "src/google/protobuf/compiler/plugin.pb.cc",
+    ],
+
+    local_include_dirs: [
+        "config",
+    ],
+    export_include_dirs: ["src", "config"],
+
+    rtti: true,
+
+    shared_libs: ["libz-host"],
+}
+
 // Android Protocol buffer compiler, aprotoc (host executable)
 // used by the build systems as $(PROTOC) defined in
 // build/core/config.mk
