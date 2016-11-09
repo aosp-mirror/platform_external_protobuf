@@ -42,6 +42,7 @@
 #include <string>
 #include <vector>
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
 
 namespace google {
 namespace protobuf {
@@ -87,6 +88,9 @@ class LIBPROTOBUF_EXPORT UnknownFieldSet {
 
   // Merge the contents of some other UnknownFieldSet with this one.
   void MergeFrom(const UnknownFieldSet& other);
+
+  // Similar to above, but this function will destroy the contents of other.
+  void MergeFromAndDestroy(UnknownFieldSet* other);
 
   // Swaps the contents of some other UnknownFieldSet with this one.
   inline void Swap(UnknownFieldSet* x);
@@ -141,12 +145,22 @@ class LIBPROTOBUF_EXPORT UnknownFieldSet {
     return ParseFromArray(data.data(), static_cast<int>(data.size()));
   }
 
+  static const UnknownFieldSet* default_instance();
  private:
-
+  // For InternalMergeFrom
+  friend class UnknownField;
+  // Merges from other UnknownFieldSet. This method assumes, that this object
+  // is newly created and has fields_ == NULL;
+  void InternalMergeFrom(const UnknownFieldSet& other);
   void ClearFallback();
 
+  // fields_ is either NULL, or a pointer to a vector that is *non-empty*. We
+  // never hold the empty vector because we want the 'do we have any unknown
+  // fields' check to be fast, and avoid a cache miss: the UFS instance gets
+  // embedded in the message object, so 'fields_ != NULL' tests a member
+  // variable hot in the cache, without the need to go touch a vector somewhere
+  // else in memory.
   std::vector<UnknownField>* fields_;
-
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(UnknownFieldSet);
 };
 
@@ -198,12 +212,20 @@ class LIBPROTOBUF_EXPORT UnknownField {
   // If this UnknownField contains a pointer, delete it.
   void Delete();
 
+  // Reset all the underlying pointers to NULL. A special function to be only
+  // used while merging from a temporary UFS.
+  void Reset();
+
   // Make a deep copy of any pointers in this UnknownField.
-  void DeepCopy();
+  void DeepCopy(const UnknownField& other);
 
   // Set the wire type of this UnknownField. Should only be used when this
   // UnknownField is being created.
   inline void SetType(Type type);
+
+  union LengthDelimited {
+    string* string_value_;
+  };
 
   uint32 number_;
   uint32 type_;
@@ -211,9 +233,7 @@ class LIBPROTOBUF_EXPORT UnknownField {
     uint64 varint_;
     uint32 fixed32_;
     uint64 fixed64_;
-    mutable union {
-      string* string_value_;
-    } length_delimited_;
+    mutable union LengthDelimited length_delimited_;
     UnknownFieldSet* group_;
   };
 };
@@ -222,13 +242,14 @@ class LIBPROTOBUF_EXPORT UnknownField {
 // inline implementations
 
 inline void UnknownFieldSet::Clear() {
-  if (fields_ != NULL) {
+  if (fields_) {
     ClearFallback();
   }
 }
 
 inline bool UnknownFieldSet::empty() const {
-  return fields_ == NULL || fields_->empty();
+  // Invariant: fields_ is never empty if present.
+  return !fields_;
 }
 
 inline void UnknownFieldSet::Swap(UnknownFieldSet* x) {
@@ -236,9 +257,10 @@ inline void UnknownFieldSet::Swap(UnknownFieldSet* x) {
 }
 
 inline int UnknownFieldSet::field_count() const {
-  return (fields_ == NULL) ? 0 : static_cast<int>(fields_->size());
+  return fields_ ? static_cast<int>(fields_->size()) : 0;
 }
 inline const UnknownField& UnknownFieldSet::field(int index) const {
+  GOOGLE_DCHECK(fields_ != NULL);
   return (*fields_)[index];
 }
 inline UnknownField* UnknownFieldSet::mutable_field(int index) {

@@ -32,34 +32,39 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
+#include <google/protobuf/text_format.h>
+
 #include <math.h>
 #include <stdlib.h>
 #include <limits>
+#include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
 
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/io/tokenizer.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/testing/file.h>
+#include <google/protobuf/testing/file.h>
+#include <google/protobuf/test_util.h>
 #include <google/protobuf/unittest.pb.h>
 #include <google/protobuf/unittest_mset.pb.h>
-#include <google/protobuf/test_util.h>
-
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/testing/file.h>
-#include <google/protobuf/testing/googletest.h>
-#include <gtest/gtest.h>
+#include <google/protobuf/unittest_mset_wire_format.pb.h>
+#include <google/protobuf/io/tokenizer.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
+#include <google/protobuf/testing/googletest.h>
+#include <gtest/gtest.h>
+#include <google/protobuf/stubs/mathlimits.h>
+
 
 namespace google {
 namespace protobuf {
 
 // Can't use an anonymous namespace here due to brokenness of Tru64 compiler.
 namespace text_format_unittest {
-
-inline bool IsNaN(double value) {
-  // NaN is never equal to anything, even itself.
-  return value != value;
-}
 
 // A basic string with different escapable characters for testing.
 const string kEscapeTestString =
@@ -263,7 +268,7 @@ TEST_F(TextFormatTest, PrintUnknownFields) {
 }
 
 TEST_F(TextFormatTest, PrintUnknownFieldsHidden) {
-  // Test printing of unknown fields in a message when supressed.
+  // Test printing of unknown fields in a message when suppressed.
 
   unittest::OneString message;
   message.set_data("data");
@@ -451,7 +456,7 @@ TEST_F(TextFormatTest, ErrorCasesRegisteringFieldValuePrinterShouldFail) {
 class CustomMessageFieldValuePrinter : public TextFormat::FieldValuePrinter {
  public:
   virtual string PrintInt32(int32 v) const {
-    return StrCat(FieldValuePrinter::PrintInt32(v), "  # x", ToHex(v));
+    return StrCat(FieldValuePrinter::PrintInt32(v), "  # x", strings::Hex(v));
   }
 
   virtual string PrintMessageStart(const Message& message,
@@ -586,7 +591,7 @@ TEST_F(TextFormatTest, ParseConcatenatedString) {
   // Compare.
   EXPECT_EQ("foobar", proto_.optional_string());
 
-  // Create a parse string with multiple parts on seperate lines.
+  // Create a parse string with multiple parts on separate lines.
   parse_string = "optional_string: \"foo\"\n"
                  "\"bar\"\n";
 
@@ -897,8 +902,8 @@ TEST_F(TextFormatTest, ParseExotic) {
   EXPECT_EQ(message.repeated_double(8), numeric_limits<double>::infinity());
   EXPECT_EQ(message.repeated_double(9), -numeric_limits<double>::infinity());
   EXPECT_EQ(message.repeated_double(10), -numeric_limits<double>::infinity());
-  EXPECT_TRUE(IsNaN(message.repeated_double(11)));
-  EXPECT_TRUE(IsNaN(message.repeated_double(12)));
+  EXPECT_TRUE(MathLimits<double>::IsNaN(message.repeated_double(11)));
+  EXPECT_TRUE(MathLimits<double>::IsNaN(message.repeated_double(12)));
 
   // Note:  Since these string literals have \0's in them, we must explicitly
   //   pass their sizes to string's constructor.
@@ -932,7 +937,7 @@ class TextFormatParserTest : public testing::Test {
  protected:
   void ExpectFailure(const string& input, const string& message, int line,
                      int col) {
-    scoped_ptr<unittest::TestAllTypes> proto(new unittest::TestAllTypes);
+    google::protobuf::scoped_ptr<unittest::TestAllTypes> proto(new unittest::TestAllTypes);
     ExpectFailure(input, message, line, col, proto.get());
   }
 
@@ -993,7 +998,7 @@ class TextFormatParserTest : public testing::Test {
 };
 
 TEST_F(TextFormatParserTest, ParseInfoTreeBuilding) {
-  scoped_ptr<unittest::TestAllTypes> message(new unittest::TestAllTypes);
+  google::protobuf::scoped_ptr<unittest::TestAllTypes> message(new unittest::TestAllTypes);
   const Descriptor* d = message->GetDescriptor();
 
   string stringData =
@@ -1058,7 +1063,7 @@ TEST_F(TextFormatParserTest, ParseInfoTreeBuilding) {
 }
 
 TEST_F(TextFormatParserTest, ParseFieldValueFromString) {
-  scoped_ptr<unittest::TestAllTypes> message(new unittest::TestAllTypes);
+  google::protobuf::scoped_ptr<unittest::TestAllTypes> message(new unittest::TestAllTypes);
   const Descriptor* d = message->GetDescriptor();
 
 #define EXPECT_FIELD(name, value, valuestring) \
@@ -1324,12 +1329,12 @@ TEST_F(TextFormatParserTest, InvalidFieldValues) {
       "Expected \":\", found \"{\".", 1, 22);
 }
 
-TEST_F(TextFormatParserTest, MessageDelimeters) {
-  // Non-matching delimeters.
+TEST_F(TextFormatParserTest, MessageDelimiters) {
+  // Non-matching delimiters.
   ExpectFailure("OptionalGroup <\n \n}\n", "Expected \">\", found \"}\".",
                 3, 1);
 
-  // Invalid delimeters.
+  // Invalid delimiters.
   ExpectFailure("OptionalGroup [\n \n]\n", "Expected \"{\", found \"[\".",
                 1, 15);
 
@@ -1340,7 +1345,7 @@ TEST_F(TextFormatParserTest, MessageDelimeters) {
 }
 
 TEST_F(TextFormatParserTest, UnknownExtension) {
-  // Non-matching delimeters.
+  // Non-matching delimiters.
   ExpectFailure("[blahblah]: 123",
                 "Extension \"blahblah\" is not defined or is not an "
                 "extension of \"protobuf_unittest.TestAllTypes\".",

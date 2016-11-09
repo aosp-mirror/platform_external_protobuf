@@ -43,10 +43,12 @@
 
 #include <string>
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/message_lite.h>
 #include <google/protobuf/repeated_field.h>
 #include <google/protobuf/wire_format_lite.h>
 #include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/arenastring.h>
 
 
 namespace google {
@@ -272,8 +274,8 @@ inline bool WireFormatLite::ReadRepeatedFixedSizePrimitive(
     // The number of bytes each type occupies on the wire.
     const int per_value_size = tag_size + sizeof(value);
 
-    int elements_available = min(values->Capacity() - values->size(),
-                                 size / per_value_size);
+    int elements_available =
+        std::min(values->Capacity() - values->size(), size / per_value_size);
     int num_read = 0;
     while (num_read < elements_available &&
            (buffer = io::CodedInputStream::ExpectTagFromArray(
@@ -365,7 +367,7 @@ inline bool WireFormatLite::ReadPackedFixedSizePrimitive(
     bytes_limit = input->BytesUntilLimit();
   } else {
     bytes_limit =
-        min(bytes_limit, static_cast<int64>(input->BytesUntilLimit()));
+        std::min(bytes_limit, static_cast<int64>(input->BytesUntilLimit()));
   }
   if (bytes_limit >= new_bytes) {
     // Fast-path that pre-allocates *values to the final size.
@@ -410,12 +412,12 @@ inline bool WireFormatLite::ReadPackedPrimitive<                               \
       CPPTYPE, WireFormatLite::DECLARED_TYPE>(input, values);                  \
 }
 
-READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(uint32, TYPE_FIXED32);
-READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(uint64, TYPE_FIXED64);
-READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(int32, TYPE_SFIXED32);
-READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(int64, TYPE_SFIXED64);
-READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(float, TYPE_FLOAT);
-READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(double, TYPE_DOUBLE);
+READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(uint32, TYPE_FIXED32)
+READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(uint64, TYPE_FIXED64)
+READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(int32, TYPE_SFIXED32)
+READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(int64, TYPE_SFIXED64)
+READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(float, TYPE_FLOAT)
+READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE(double, TYPE_DOUBLE)
 
 #undef READ_REPEATED_PACKED_FIXED_SIZE_PRIMITIVE
 
@@ -424,6 +426,7 @@ bool WireFormatLite::ReadPackedPrimitiveNoInline(io::CodedInputStream* input,
                                                  RepeatedField<CType>* values) {
   return ReadPackedPrimitive<CType, DeclaredType>(input, values);
 }
+
 
 
 inline bool WireFormatLite::ReadGroup(int field_number,
@@ -442,15 +445,12 @@ inline bool WireFormatLite::ReadMessage(io::CodedInputStream* input,
                                         MessageLite* value) {
   uint32 length;
   if (!input->ReadVarint32(&length)) return false;
-  if (!input->IncrementRecursionDepth()) return false;
-  io::CodedInputStream::Limit limit = input->PushLimit(length);
-  if (!value->MergePartialFromCodedStream(input)) return false;
+  std::pair<io::CodedInputStream::Limit, int> p =
+      input->IncrementRecursionDepthAndPushLimit(length);
+  if (p.second < 0 || !value->MergePartialFromCodedStream(input)) return false;
   // Make sure that parsing stopped when the limit was hit, not at an endgroup
   // tag.
-  if (!input->ConsumedEntireMessage()) return false;
-  input->PopLimit(limit);
-  input->DecrementRecursionDepth();
-  return true;
+  return input->DecrementRecursionDepthAndPopLimit(p.first);
 }
 
 // We name the template parameter something long and extremely unlikely to occur
@@ -471,7 +471,7 @@ inline bool WireFormatLite::ReadGroupNoVirtual(
   if (!value->
       MessageType_WorkAroundCppLookupDefect::MergePartialFromCodedStream(input))
     return false;
-  input->DecrementRecursionDepth();
+  input->UnsafeDecrementRecursionDepth();
   // Make sure the last thing read was an end tag for this group.
   if (!input->LastTagWas(MakeTag(field_number, WIRETYPE_END_GROUP))) {
     return false;
@@ -479,21 +479,37 @@ inline bool WireFormatLite::ReadGroupNoVirtual(
   return true;
 }
 template<typename MessageType_WorkAroundCppLookupDefect>
+inline bool WireFormatLite::ReadGroupNoVirtualNoRecursionDepth(
+    int field_number, io::CodedInputStream* input,
+    MessageType_WorkAroundCppLookupDefect* value) {
+  return value->MessageType_WorkAroundCppLookupDefect::
+             MergePartialFromCodedStream(input) &&
+         input->LastTagWas(MakeTag(field_number, WIRETYPE_END_GROUP));
+}
+template<typename MessageType_WorkAroundCppLookupDefect>
 inline bool WireFormatLite::ReadMessageNoVirtual(
     io::CodedInputStream* input, MessageType_WorkAroundCppLookupDefect* value) {
   uint32 length;
   if (!input->ReadVarint32(&length)) return false;
-  if (!input->IncrementRecursionDepth()) return false;
-  io::CodedInputStream::Limit limit = input->PushLimit(length);
+  std::pair<io::CodedInputStream::Limit, int> p =
+      input->IncrementRecursionDepthAndPushLimit(length);
+  if (p.second < 0 || !value->
+      MessageType_WorkAroundCppLookupDefect::MergePartialFromCodedStream(input))
+    return false;
+  // Make sure that parsing stopped when the limit was hit, not at an endgroup
+  // tag.
+  return input->DecrementRecursionDepthAndPopLimit(p.first);
+}
+template<typename MessageType_WorkAroundCppLookupDefect>
+inline bool WireFormatLite::ReadMessageNoVirtualNoRecursionDepth(
+    io::CodedInputStream* input, MessageType_WorkAroundCppLookupDefect* value) {
+  io::CodedInputStream::Limit old_limit = input->ReadLengthAndPushLimit();
   if (!value->
       MessageType_WorkAroundCppLookupDefect::MergePartialFromCodedStream(input))
     return false;
   // Make sure that parsing stopped when the limit was hit, not at an endgroup
   // tag.
-  if (!input->ConsumedEntireMessage()) return false;
-  input->PopLimit(limit);
-  input->DecrementRecursionDepth();
-  return true;
+  return input->CheckEntireMessageConsumedAndPopLimit(old_limit);
 }
 
 // ===================================================================
@@ -819,12 +835,14 @@ inline int WireFormatLite::EnumSize(int value) {
 }
 
 inline int WireFormatLite::StringSize(const string& value) {
-  return io::CodedOutputStream::VarintSize32(value.size()) +
-         value.size();
+  return static_cast<int>(
+      io::CodedOutputStream::VarintSize32(static_cast<uint32>(value.size())) +
+      value.size());
 }
 inline int WireFormatLite::BytesSize(const string& value) {
-  return io::CodedOutputStream::VarintSize32(value.size()) +
-         value.size();
+  return static_cast<int>(
+      io::CodedOutputStream::VarintSize32(static_cast<uint32>(value.size())) +
+      value.size());
 }
 
 

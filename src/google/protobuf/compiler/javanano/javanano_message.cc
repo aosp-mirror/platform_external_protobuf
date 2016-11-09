@@ -90,6 +90,7 @@ void MessageGenerator::GenerateStaticVariables(io::Printer* printer) {
   // Generate static members for all nested types.
   for (int i = 0; i < descriptor_->nested_type_count(); i++) {
     // TODO(kenton):  Reuse MessageGenerator objects?
+    if (IsMapEntry(descriptor_->nested_type(i))) continue;
     MessageGenerator(descriptor_->nested_type(i), params_)
       .GenerateStaticVariables(printer);
   }
@@ -100,6 +101,7 @@ void MessageGenerator::GenerateStaticVariableInitializers(
   // Generate static member initializers for all nested types.
   for (int i = 0; i < descriptor_->nested_type_count(); i++) {
    // TODO(kenton):  Reuse MessageGenerator objects?
+    if (IsMapEntry(descriptor_->nested_type(i))) continue;
     MessageGenerator(descriptor_->nested_type(i), params_)
       .GenerateStaticVariableInitializers(printer);
   }
@@ -175,7 +177,42 @@ void MessageGenerator::Generate(io::Printer* printer) {
   }
 
   for (int i = 0; i < descriptor_->nested_type_count(); i++) {
+    if (IsMapEntry(descriptor_->nested_type(i))) continue;
     MessageGenerator(descriptor_->nested_type(i), params_).Generate(printer);
+  }
+
+  // oneof
+  map<string, string> vars;
+  vars["message_name"] = descriptor_->name();
+  for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
+    const OneofDescriptor* oneof_desc = descriptor_->oneof_decl(i);
+    vars["oneof_name"] = UnderscoresToCamelCase(oneof_desc);
+    vars["oneof_capitalized_name"] =
+        UnderscoresToCapitalizedCamelCase(oneof_desc);
+    vars["oneof_index"] = SimpleItoa(oneof_desc->index());
+    // Oneof Constants
+    for (int j = 0; j < oneof_desc->field_count(); j++) {
+      const FieldDescriptor* field = oneof_desc->field(j);
+      vars["number"] = SimpleItoa(field->number());
+      vars["cap_field_name"] = ToUpper(field->name());
+      printer->Print(vars,
+        "public static final int $cap_field_name$_FIELD_NUMBER = $number$;\n");
+    }
+    // oneofCase_ and oneof_
+    printer->Print(vars,
+      "private int $oneof_name$Case_ = 0;\n"
+      "private java.lang.Object $oneof_name$_;\n");
+    printer->Print(vars,
+      "public int get$oneof_capitalized_name$Case() {\n"
+      "  return this.$oneof_name$Case_;\n"
+      "}\n");
+    // Oneof clear
+    printer->Print(vars,
+      "public $message_name$ clear$oneof_capitalized_name$() {\n"
+      "  this.$oneof_name$Case_ = 0;\n"
+      "  this.$oneof_name$_ = null;\n"
+      "  return this;\n"
+      "}\n");
   }
 
   // Lazy initialization of otherwise static final fields can help prevent the
@@ -231,10 +268,6 @@ void MessageGenerator::Generate(io::Printer* printer) {
     field_generators_.get(descriptor_->field(i)).GenerateMembers(
         printer, lazy_init);
   }
-
-  // Insertion point for proto compiler plugins
-  printer->Print("\n// @@protoc_insertion_point(class_scope:$classname$)\n",
-                 "classname", descriptor_->full_name());
 
   // Constructor, with lazy init code if needed
   if (lazy_init && field_generators_.saved_defaults_needed()) {
@@ -370,6 +403,11 @@ void MessageGenerator::GenerateMergeFromMethods(io::Printer* printer) {
     "classname", descriptor_->name());
 
   printer->Indent();
+  if (HasMapField(descriptor_)) {
+    printer->Print(
+      "com.google.protobuf.nano.MapFactories.MapFactory mapFactory =\n"
+      "  com.google.protobuf.nano.MapFactories.getMapFactory();\n");
+  }
 
   printer->Print(
     "while (true) {\n");
@@ -388,7 +426,7 @@ void MessageGenerator::GenerateMergeFromMethods(io::Printer* printer) {
   printer->Indent();
   if (params_.store_unknown_fields()) {
     printer->Print(
-        "if (!super.storeUnknownField(input, tag)) {\n"
+        "if (!storeUnknownField(input, tag)) {\n"
         "  return this;\n"
         "}\n");
   } else {
@@ -503,6 +541,14 @@ void MessageGenerator::GenerateFieldInitializers(io::Printer* printer) {
     field_generators_.get(field).GenerateClearCode(printer);
   }
 
+  // Clear oneofs.
+  for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
+    printer->Print(
+      "clear$oneof_capitalized_name$();\n",
+      "oneof_capitalized_name", UnderscoresToCapitalizedCamelCase(
+          descriptor_->oneof_decl(i)));
+  }
+
   // Clear unknown fields.
   if (params_.store_unknown_fields()) {
     printer->Print("unknownFieldData = null;\n");
@@ -559,6 +605,16 @@ void MessageGenerator::GenerateEquals(io::Printer* printer) {
     "}\n"
     "$classname$ other = ($classname$) o;\n",
     "classname", descriptor_->name());
+
+  // Checking oneof case before checking each oneof field.
+  for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
+    const OneofDescriptor* oneof_desc = descriptor_->oneof_decl(i);
+    printer->Print(
+      "if (this.$oneof_name$Case_ != other.$oneof_name$Case_) {\n"
+      "  return false;\n"
+      "}\n",
+      "oneof_name", UnderscoresToCamelCase(oneof_desc));
+  }
 
   for (int i = 0; i < descriptor_->field_count(); i++) {
     const FieldDescriptor* field = descriptor_->field(i);

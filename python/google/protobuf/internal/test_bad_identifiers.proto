@@ -30,6 +30,7 @@
 
 // Author: kenton@google.com (Kenton Varda)
 
+syntax = "proto2";
 
 package protobuf_unittest;
 

@@ -36,6 +36,9 @@
 #define GOOGLE_PROTOBUF_COMPILER_JAVA_FILE_H__
 
 #include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
 #include <string>
 #include <vector>
 #include <google/protobuf/stubs/common.h>
@@ -64,7 +67,8 @@ namespace java {
 
 class FileGenerator {
  public:
-  FileGenerator(const FileDescriptor* file, bool immutable_api = true);
+  FileGenerator(const FileDescriptor* file, bool immutable_api = true,
+                bool enforce_lite = false);
   ~FileGenerator();
 
   // Checks for problems that would otherwise lead to cryptic compile errors.
@@ -96,10 +100,10 @@ class FileGenerator {
   string java_package_;
   string classname_;
 
-  scoped_array<scoped_ptr<MessageGenerator> > message_generators_;
-  scoped_array<scoped_ptr<ExtensionGenerator> > extension_generators_;
-  scoped_ptr<GeneratorFactory> generator_factory_;
-  scoped_ptr<Context> context_;
+  google::protobuf::scoped_array<google::protobuf::scoped_ptr<MessageGenerator> > message_generators_;
+  google::protobuf::scoped_array<google::protobuf::scoped_ptr<ExtensionGenerator> > extension_generators_;
+  google::protobuf::scoped_ptr<GeneratorFactory> generator_factory_;
+  google::protobuf::scoped_ptr<Context> context_;
   ClassNameResolver* name_resolver_;
   bool immutable_api_;
 
