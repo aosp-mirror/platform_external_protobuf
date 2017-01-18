@@ -131,6 +131,7 @@ class RepeatedImmutableStringFieldGenerator : public ImmutableFieldGenerator {
   void GenerateMergingCode(io::Printer* printer) const;
   void GenerateBuildingCode(io::Printer* printer) const;
   void GenerateParsingCode(io::Printer* printer) const;
+  void GenerateParsingCodeFromPacked(io::Printer* printer) const;
   void GenerateParsingDoneCode(io::Printer* printer) const;
   void GenerateSerializationCode(io::Printer* printer) const;
   void GenerateSerializedSizeCode(io::Printer* printer) const;

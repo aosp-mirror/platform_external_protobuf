@@ -35,10 +35,6 @@
 // This file makes extensive use of RFC 3092.  :)
 
 #include <algorithm>
-#include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 
 #include <google/protobuf/descriptor_database.h>
 #include <google/protobuf/descriptor.h>
@@ -46,9 +42,7 @@
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/stubs/strutil.h>
 
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/scoped_ptr.h>
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
 
@@ -181,7 +175,7 @@ class DescriptorDatabaseTest
     EXPECT_FALSE(test_case_->AddToDatabase(file_proto));
   }
 
-  google::protobuf::scoped_ptr<DescriptorDatabaseTestCase> test_case_;
+  scoped_ptr<DescriptorDatabaseTestCase> test_case_;
   DescriptorDatabase* database_;
 };
 
@@ -414,7 +408,7 @@ TEST_P(DescriptorDatabaseTest, FindAllExtensionNumbers) {
     vector<int> numbers;
     EXPECT_TRUE(database_->FindAllExtensionNumbers("Foo", &numbers));
     ASSERT_EQ(2, numbers.size());
-    std::sort(numbers.begin(), numbers.end());
+    sort(numbers.begin(), numbers.end());
     EXPECT_EQ(5, numbers[0]);
     EXPECT_EQ(32, numbers[1]);
   }
@@ -728,7 +722,7 @@ TEST_F(MergedDescriptorDatabaseTest, FindAllExtensionNumbers) {
     vector<int> numbers;
     EXPECT_TRUE(forward_merged_.FindAllExtensionNumbers("Baz", &numbers));
     ASSERT_EQ(2, numbers.size());
-    std::sort(numbers.begin(), numbers.end());
+    sort(numbers.begin(), numbers.end());
     EXPECT_EQ(12, numbers[0]);
     EXPECT_EQ(13, numbers[1]);
   }
@@ -737,7 +731,7 @@ TEST_F(MergedDescriptorDatabaseTest, FindAllExtensionNumbers) {
     vector<int> numbers;
     EXPECT_TRUE(reverse_merged_.FindAllExtensionNumbers("Baz", &numbers));
     ASSERT_EQ(2, numbers.size());
-    std::sort(numbers.begin(), numbers.end());
+    sort(numbers.begin(), numbers.end());
     EXPECT_EQ(12, numbers[0]);
     EXPECT_EQ(13, numbers[1]);
   }

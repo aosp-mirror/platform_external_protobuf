@@ -34,20 +34,15 @@
 
 #include <google/protobuf/compiler/cpp/cpp_field.h>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 
 #include <google/protobuf/compiler/cpp/cpp_helpers.h>
 #include <google/protobuf/compiler/cpp/cpp_primitive_field.h>
 #include <google/protobuf/compiler/cpp/cpp_string_field.h>
 #include <google/protobuf/compiler/cpp/cpp_enum_field.h>
-#include <google/protobuf/compiler/cpp/cpp_map_field.h>
 #include <google/protobuf/compiler/cpp/cpp_message_field.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/wire_format.h>
 #include <google/protobuf/io/printer.h>
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/strutil.h>
 
@@ -67,43 +62,18 @@ void SetCommonFieldVariables(const FieldDescriptor* descriptor,
   (*variables)["classname"] = ClassName(FieldScope(descriptor), false);
   (*variables)["declared_type"] = DeclaredTypeMethodName(descriptor->type());
 
-  // non_null_ptr_to_name is usable only if has_$name$ is true.  It yields a
-  // pointer that will not be NULL.  Subclasses of FieldGenerator may set
-  // (*variables)["non_null_ptr_to_name"] differently.
-  (*variables)["non_null_ptr_to_name"] =
-      StrCat("&this->", FieldName(descriptor), "()");
-
   (*variables)["tag_size"] = SimpleItoa(
     WireFormat::TagSize(descriptor->number(), descriptor->type()));
   (*variables)["deprecation"] = descriptor->options().deprecated()
       ? " PROTOBUF_DEPRECATED" : "";
-  (*variables)["deprecated_attr"] = descriptor->options().deprecated()
-      ? "PROTOBUF_DEPRECATED_ATTR " : "";
 
   (*variables)["cppget"] = "Get";
-
-  if (HasFieldPresence(descriptor->file())) {
-    (*variables)["set_hasbit"] =
-        "set_has_" + FieldName(descriptor) + "();";
-    (*variables)["clear_hasbit"] =
-        "clear_has_" + FieldName(descriptor) + "();";
-  } else {
-    (*variables)["set_hasbit"] = "";
-    (*variables)["clear_hasbit"] = "";
-  }
-
-  // By default, empty string, so that generic code used for both oneofs and
-  // singular fields can be written.
-  (*variables)["oneof_prefix"] = "";
 }
 
 void SetCommonOneofFieldVariables(const FieldDescriptor* descriptor,
                                   map<string, string>* variables) {
-  const string prefix = descriptor->containing_oneof()->name() + "_.";
-  (*variables)["oneof_prefix"] = prefix;
+  (*variables)["oneof_prefix"] = descriptor->containing_oneof()->name() + "_.";
   (*variables)["oneof_name"] = descriptor->containing_oneof()->name();
-  (*variables)["non_null_ptr_to_name"] =
-      StrCat(prefix, (*variables)["name"], "_");
 }
 
 FieldGenerator::~FieldGenerator() {}
@@ -123,9 +93,8 @@ GenerateMergeFromCodedStreamWithPacking(io::Printer* printer) const {
 FieldGeneratorMap::FieldGeneratorMap(const Descriptor* descriptor,
                                      const Options& options)
     : descriptor_(descriptor),
-      options_(options),
       field_generators_(
-          new google::protobuf::scoped_ptr<FieldGenerator>[descriptor->field_count()]) {
+          new scoped_ptr<FieldGenerator>[descriptor->field_count()]) {
   // Construct all the FieldGenerators.
   for (int i = 0; i < descriptor->field_count(); i++) {
     field_generators_[i].reset(MakeGenerator(descriptor->field(i), options));
@@ -137,11 +106,7 @@ FieldGenerator* FieldGeneratorMap::MakeGenerator(const FieldDescriptor* field,
   if (field->is_repeated()) {
     switch (field->cpp_type()) {
       case FieldDescriptor::CPPTYPE_MESSAGE:
-        if (field->is_map()) {
-          return new MapFieldGenerator(field, options);
-        } else {
-          return new RepeatedMessageFieldGenerator(field, options);
-        }
+        return new RepeatedMessageFieldGenerator(field, options);
       case FieldDescriptor::CPPTYPE_STRING:
         switch (field->options().ctype()) {
           default:  // RepeatedStringFieldGenerator handles unknown ctypes.

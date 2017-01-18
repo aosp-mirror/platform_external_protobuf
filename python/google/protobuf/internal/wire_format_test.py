@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
@@ -34,16 +34,12 @@
 
 __author__ = 'robinson@google.com (Will Robinson)'
 
-try:
-  import unittest2 as unittest  #PY26
-except ImportError:
-  import unittest
-
+from google.apputils import basetest
 from google.protobuf import message
 from google.protobuf.internal import wire_format
 
 
-class WireFormatTest(unittest.TestCase):
+class WireFormatTest(basetest.TestCase):
 
   def testPackTag(self):
     field_number = 0xabc
@@ -254,4 +250,4 @@ class WireFormatTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  unittest.main()
+  basetest.main()

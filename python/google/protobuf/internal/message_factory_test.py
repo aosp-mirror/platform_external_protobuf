@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
@@ -34,11 +34,7 @@
 
 __author__ = 'matthewtoia@google.com (Matt Toia)'
 
-try:
-  import unittest2 as unittest  #PY26
-except ImportError:
-  import unittest
-
+from google.apputils import basetest
 from google.protobuf import descriptor_pb2
 from google.protobuf.internal import factory_test1_pb2
 from google.protobuf.internal import factory_test2_pb2
@@ -47,7 +43,7 @@ from google.protobuf import descriptor_pool
 from google.protobuf import message_factory
 
 
-class MessageFactoryTest(unittest.TestCase):
+class MessageFactoryTest(basetest.TestCase):
 
   def setUp(self):
     self.factory_test1_fd = descriptor_pb2.FileDescriptorProto.FromString(
@@ -85,9 +81,9 @@ class MessageFactoryTest(unittest.TestCase):
     serialized = msg.SerializeToString()
     converted = factory_test2_pb2.Factory2Message.FromString(serialized)
     reserialized = converted.SerializeToString()
-    self.assertEqual(serialized, reserialized)
+    self.assertEquals(serialized, reserialized)
     result = cls.FromString(reserialized)
-    self.assertEqual(msg, result)
+    self.assertEquals(msg, result)
 
   def testGetPrototype(self):
     db = descriptor_database.DescriptorDatabase()
@@ -97,29 +93,28 @@ class MessageFactoryTest(unittest.TestCase):
     factory = message_factory.MessageFactory()
     cls = factory.GetPrototype(pool.FindMessageTypeByName(
         'google.protobuf.python.internal.Factory2Message'))
-    self.assertFalse(cls is factory_test2_pb2.Factory2Message)
+    self.assertIsNot(cls, factory_test2_pb2.Factory2Message)
     self._ExerciseDynamicClass(cls)
     cls2 = factory.GetPrototype(pool.FindMessageTypeByName(
         'google.protobuf.python.internal.Factory2Message'))
-    self.assertTrue(cls is cls2)
+    self.assertIs(cls, cls2)
 
   def testGetMessages(self):
     # performed twice because multiple calls with the same input must be allowed
     for _ in range(2):
-      messages = message_factory.GetMessages([self.factory_test1_fd,
-                                              self.factory_test2_fd])
-      self.assertTrue(
-          set(['google.protobuf.python.internal.Factory2Message',
-               'google.protobuf.python.internal.Factory1Message'],
-             ).issubset(set(messages.keys())))
+      messages = message_factory.GetMessages([self.factory_test2_fd,
+                                              self.factory_test1_fd])
+      self.assertContainsSubset(
+          ['google.protobuf.python.internal.Factory2Message',
+           'google.protobuf.python.internal.Factory1Message'],
+          messages.keys())
       self._ExerciseDynamicClass(
           messages['google.protobuf.python.internal.Factory2Message'])
-      self.assertTrue(
-          set(['google.protobuf.python.internal.Factory2Message.one_more_field',
-               'google.protobuf.python.internal.another_field'],
-             ).issubset(
-                 set(messages['google.protobuf.python.internal.Factory1Message']
-                     ._extensions_by_name.keys())))
+      self.assertContainsSubset(
+          ['google.protobuf.python.internal.Factory2Message.one_more_field',
+           'google.protobuf.python.internal.another_field'],
+          (messages['google.protobuf.python.internal.Factory1Message']
+           ._extensions_by_name.keys()))
       factory_msg1 = messages['google.protobuf.python.internal.Factory1Message']
       msg1 = messages['google.protobuf.python.internal.Factory1Message']()
       ext1 = factory_msg1._extensions_by_name[
@@ -128,63 +123,9 @@ class MessageFactoryTest(unittest.TestCase):
           'google.protobuf.python.internal.another_field']
       msg1.Extensions[ext1] = 'test1'
       msg1.Extensions[ext2] = 'test2'
-      self.assertEqual('test1', msg1.Extensions[ext1])
-      self.assertEqual('test2', msg1.Extensions[ext2])
-
-  def testDuplicateExtensionNumber(self):
-    pool = descriptor_pool.DescriptorPool()
-    factory = message_factory.MessageFactory(pool=pool)
-
-    # Add Container message.
-    f = descriptor_pb2.FileDescriptorProto()
-    f.name = 'google/protobuf/internal/container.proto'
-    f.package = 'google.protobuf.python.internal'
-    msg = f.message_type.add()
-    msg.name = 'Container'
-    rng = msg.extension_range.add()
-    rng.start = 1
-    rng.end = 10
-    pool.Add(f)
-    msgs = factory.GetMessages([f.name])
-    self.assertIn('google.protobuf.python.internal.Container', msgs)
-
-    # Extend container.
-    f = descriptor_pb2.FileDescriptorProto()
-    f.name = 'google/protobuf/internal/extension.proto'
-    f.package = 'google.protobuf.python.internal'
-    f.dependency.append('google/protobuf/internal/container.proto')
-    msg = f.message_type.add()
-    msg.name = 'Extension'
-    ext = msg.extension.add()
-    ext.name = 'extension_field'
-    ext.number = 2
-    ext.label = descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL
-    ext.type_name = 'Extension'
-    ext.extendee = 'Container'
-    pool.Add(f)
-    msgs = factory.GetMessages([f.name])
-    self.assertIn('google.protobuf.python.internal.Extension', msgs)
-
-    # Add Duplicate extending the same field number.
-    f = descriptor_pb2.FileDescriptorProto()
-    f.name = 'google/protobuf/internal/duplicate.proto'
-    f.package = 'google.protobuf.python.internal'
-    f.dependency.append('google/protobuf/internal/container.proto')
-    msg = f.message_type.add()
-    msg.name = 'Duplicate'
-    ext = msg.extension.add()
-    ext.name = 'extension_field'
-    ext.number = 2
-    ext.label = descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL
-    ext.type_name = 'Duplicate'
-    ext.extendee = 'Container'
-    pool.Add(f)
-
-    with self.assertRaises(Exception) as cm:
-      factory.GetMessages([f.name])
-
-    self.assertIsInstance(cm.exception, (AssertionError, ValueError))
+      self.assertEquals('test1', msg1.Extensions[ext1])
+      self.assertEquals('test2', msg1.Extensions[ext2])
 
 
 if __name__ == '__main__':
-  unittest.main()
+  basetest.main()

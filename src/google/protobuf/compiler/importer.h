@@ -121,12 +121,6 @@ class LIBPROTOBUF_EXPORT SourceTreeDescriptorDatabase : public DescriptorDatabas
                   ErrorLocation location,
                   const string& message);
 
-    virtual void AddWarning(const string& filename,
-                            const string& element_name,
-                            const Message* descriptor,
-                            ErrorLocation location,
-                            const string& message);
-
    private:
     SourceTreeDescriptorDatabase* owner_;
   };
@@ -193,9 +187,6 @@ class LIBPROTOBUF_EXPORT MultiFileErrorCollector {
   // an error with the entire file (e.g. "not found").
   virtual void AddError(const string& filename, int line, int column,
                         const string& message) = 0;
-
-  virtual void AddWarning(const string& filename, int line, int column,
-                          const string& message) {}
 
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(MultiFileErrorCollector);

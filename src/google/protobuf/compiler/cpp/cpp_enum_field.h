@@ -46,14 +46,14 @@ namespace cpp {
 
 class EnumFieldGenerator : public FieldGenerator {
  public:
-  EnumFieldGenerator(const FieldDescriptor* descriptor, const Options& options);
+  explicit EnumFieldGenerator(const FieldDescriptor* descriptor,
+                              const Options& options);
   ~EnumFieldGenerator();
 
   // implements FieldGenerator ---------------------------------------
   void GeneratePrivateMembers(io::Printer* printer) const;
   void GenerateAccessorDeclarations(io::Printer* printer) const;
-  void GenerateInlineAccessorDefinitions(io::Printer* printer,
-                                         bool is_inline) const;
+  void GenerateInlineAccessorDefinitions(io::Printer* printer) const;
   void GenerateClearingCode(io::Printer* printer) const;
   void GenerateMergingCode(io::Printer* printer) const;
   void GenerateSwappingCode(io::Printer* printer) const;
@@ -73,13 +73,12 @@ class EnumFieldGenerator : public FieldGenerator {
 
 class EnumOneofFieldGenerator : public EnumFieldGenerator {
  public:
-  EnumOneofFieldGenerator(const FieldDescriptor* descriptor,
-                          const Options& options);
+  explicit EnumOneofFieldGenerator(const FieldDescriptor* descriptor,
+                                   const Options& options);
   ~EnumOneofFieldGenerator();
 
   // implements FieldGenerator ---------------------------------------
-  void GenerateInlineAccessorDefinitions(io::Printer* printer,
-                                         bool is_inline) const;
+  void GenerateInlineAccessorDefinitions(io::Printer* printer) const;
   void GenerateClearingCode(io::Printer* printer) const;
   void GenerateSwappingCode(io::Printer* printer) const;
   void GenerateConstructorCode(io::Printer* printer) const;
@@ -90,15 +89,14 @@ class EnumOneofFieldGenerator : public EnumFieldGenerator {
 
 class RepeatedEnumFieldGenerator : public FieldGenerator {
  public:
-  RepeatedEnumFieldGenerator(const FieldDescriptor* descriptor,
-                             const Options& options);
+  explicit RepeatedEnumFieldGenerator(const FieldDescriptor* descriptor,
+                                      const Options& options);
   ~RepeatedEnumFieldGenerator();
 
   // implements FieldGenerator ---------------------------------------
   void GeneratePrivateMembers(io::Printer* printer) const;
   void GenerateAccessorDeclarations(io::Printer* printer) const;
-  void GenerateInlineAccessorDefinitions(io::Printer* printer,
-                                         bool is_inline) const;
+  void GenerateInlineAccessorDefinitions(io::Printer* printer) const;
   void GenerateClearingCode(io::Printer* printer) const;
   void GenerateMergingCode(io::Printer* printer) const;
   void GenerateSwappingCode(io::Printer* printer) const;

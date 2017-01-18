@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 
 # See README.txt for information and build instructions.
 
@@ -7,13 +7,13 @@ import sys
 
 # Iterates though all people in the AddressBook and prints info about them.
 def ListPeople(address_book):
-  for person in address_book.people:
+  for person in address_book.person:
     print "Person ID:", person.id
     print "  Name:", person.name
-    if person.email != "":
+    if person.HasField('email'):
       print "  E-mail address:", person.email
 
-    for phone_number in person.phones:
+    for phone_number in person.phone:
       if phone_number.type == addressbook_pb2.Person.MOBILE:
         print "  Mobile phone #:",
       elif phone_number.type == addressbook_pb2.Person.HOME:
@@ -31,7 +31,8 @@ if len(sys.argv) != 2:
 address_book = addressbook_pb2.AddressBook()
 
 # Read the existing address book.
-with open(sys.argv[1], "rb") as f:
-  address_book.ParseFromString(f.read())
+f = open(sys.argv[1], "rb")
+address_book.ParseFromString(f.read())
+f.close()
 
 ListPeople(address_book)

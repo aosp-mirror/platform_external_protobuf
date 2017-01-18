@@ -120,7 +120,9 @@ static void WriteDocCommentBodyForLocation(
       lines.pop_back();
     }
 
-    printer->Print(" * <pre>\n");
+    printer->Print(
+        " *\n"
+        " * <pre>\n");
     for (int i = 0; i < lines.size(); i++) {
       // Most lines should start with a space.  Watch out for lines that start
       // with a /, since putting that right after the leading asterisk will
@@ -131,9 +133,7 @@ static void WriteDocCommentBodyForLocation(
         printer->Print(" *$line$\n", "line", lines[i]);
       }
     }
-    printer->Print(
-        " * </pre>\n"
-        " *\n");
+    printer->Print(" * </pre>\n");
   }
 }
 
@@ -163,12 +163,12 @@ static string FirstLineOf(const string& value) {
 }
 
 void WriteMessageDocComment(io::Printer* printer, const Descriptor* message) {
-  printer->Print("/**\n");
-  WriteDocCommentBody(printer, message);
   printer->Print(
-    " * Protobuf type {@code $fullname$}\n"
-    " */\n",
+    "/**\n"
+    " * Protobuf type {@code $fullname$}\n",
     "fullname", EscapeJavadoc(message->full_name()));
+  WriteDocCommentBody(printer, message);
+  printer->Print(" */\n");
 }
 
 void WriteFieldDocComment(io::Printer* printer, const FieldDescriptor* field) {
@@ -176,55 +176,55 @@ void WriteFieldDocComment(io::Printer* printer, const FieldDescriptor* field) {
   // etc., but in practice everyone already knows the difference between these
   // so it's redundant information.
 
-  // We start the comment with the main body based on the comments from the
-  // .proto file (if present). We then end with the field declaration, e.g.:
+  // We use the field declaration as the first line of the comment, e.g.:
   //   optional string foo = 5;
+  // This communicates a lot of information about the field in a small space.
   // If the field is a group, the debug string might end with {.
-  printer->Print("/**\n");
-  WriteDocCommentBody(printer, field);
   printer->Print(
+    "/**\n"
     " * <code>$def$</code>\n",
     "def", EscapeJavadoc(FirstLineOf(field->DebugString())));
+  WriteDocCommentBody(printer, field);
   printer->Print(" */\n");
 }
 
 void WriteEnumDocComment(io::Printer* printer, const EnumDescriptor* enum_) {
-  printer->Print("/**\n");
-  WriteDocCommentBody(printer, enum_);
   printer->Print(
-    " * Protobuf enum {@code $fullname$}\n"
-    " */\n",
+    "/**\n"
+    " * Protobuf enum {@code $fullname$}\n",
     "fullname", EscapeJavadoc(enum_->full_name()));
+  WriteDocCommentBody(printer, enum_);
+  printer->Print(" */\n");
 }
 
 void WriteEnumValueDocComment(io::Printer* printer,
                               const EnumValueDescriptor* value) {
-  printer->Print("/**\n");
-  WriteDocCommentBody(printer, value);
   printer->Print(
-    " * <code>$def$</code>\n"
-    " */\n",
+    "/**\n"
+    " * <code>$def$</code>\n",
     "def", EscapeJavadoc(FirstLineOf(value->DebugString())));
+  WriteDocCommentBody(printer, value);
+  printer->Print(" */\n");
 }
 
 void WriteServiceDocComment(io::Printer* printer,
                             const ServiceDescriptor* service) {
-  printer->Print("/**\n");
-  WriteDocCommentBody(printer, service);
   printer->Print(
-    " * Protobuf service {@code $fullname$}\n"
-    " */\n",
+    "/**\n"
+    " * Protobuf service {@code $fullname$}\n",
     "fullname", EscapeJavadoc(service->full_name()));
+  WriteDocCommentBody(printer, service);
+  printer->Print(" */\n");
 }
 
 void WriteMethodDocComment(io::Printer* printer,
                            const MethodDescriptor* method) {
-  printer->Print("/**\n");
-  WriteDocCommentBody(printer, method);
   printer->Print(
-    " * <code>$def$</code>\n"
-    " */\n",
+    "/**\n"
+    " * <code>$def$</code>\n",
     "def", EscapeJavadoc(FirstLineOf(method->DebugString())));
+  WriteDocCommentBody(printer, method);
+  printer->Print(" */\n");
 }
 
 }  // namespace java

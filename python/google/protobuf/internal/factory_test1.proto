@@ -30,7 +30,6 @@
 
 // Author: matthewtoia@google.com (Matt Toia)
 
-syntax = "proto2";
 
 package google.protobuf.python.internal;
 

@@ -50,7 +50,7 @@ class AddPerson {
         stdout.println("Unknown phone type.  Using default.");
       }
 
-      person.addPhones(phoneNumber);
+      person.addPhone(phoneNumber);
     }
 
     return person.build();
@@ -80,7 +80,7 @@ class AddPerson {
     }
 
     // Add an address.
-    addressBook.addPeople(
+    addressBook.addPerson(
       PromptForAddress(new BufferedReader(new InputStreamReader(System.in)),
                        System.out));
 

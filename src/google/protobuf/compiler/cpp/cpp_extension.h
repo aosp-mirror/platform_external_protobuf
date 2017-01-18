@@ -57,7 +57,7 @@ namespace cpp {
 class ExtensionGenerator {
  public:
   // See generator.cc for the meaning of dllexport_decl.
-  explicit ExtensionGenerator(const FieldDescriptor* descriptor,
+  explicit ExtensionGenerator(const FieldDescriptor* desycriptor,
                               const Options& options);
   ~ExtensionGenerator();
 

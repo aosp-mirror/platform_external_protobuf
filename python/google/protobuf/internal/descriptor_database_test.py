@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
@@ -34,17 +34,13 @@
 
 __author__ = 'matthewtoia@google.com (Matt Toia)'
 
-try:
-  import unittest2 as unittest  #PY26
-except ImportError:
-  import unittest
-
+from google.apputils import basetest
 from google.protobuf import descriptor_pb2
 from google.protobuf.internal import factory_test2_pb2
 from google.protobuf import descriptor_database
 
 
-class DescriptorDatabaseTest(unittest.TestCase):
+class DescriptorDatabaseTest(basetest.TestCase):
 
   def testAdd(self):
     db = descriptor_database.DescriptorDatabase()
@@ -52,18 +48,16 @@ class DescriptorDatabaseTest(unittest.TestCase):
         factory_test2_pb2.DESCRIPTOR.serialized_pb)
     db.Add(file_desc_proto)
 
-    self.assertEqual(file_desc_proto, db.FindFileByName(
+    self.assertEquals(file_desc_proto, db.FindFileByName(
         'google/protobuf/internal/factory_test2.proto'))
-    self.assertEqual(file_desc_proto, db.FindFileContainingSymbol(
+    self.assertEquals(file_desc_proto, db.FindFileContainingSymbol(
         'google.protobuf.python.internal.Factory2Message'))
-    self.assertEqual(file_desc_proto, db.FindFileContainingSymbol(
+    self.assertEquals(file_desc_proto, db.FindFileContainingSymbol(
         'google.protobuf.python.internal.Factory2Message.NestedFactory2Message'))
-    self.assertEqual(file_desc_proto, db.FindFileContainingSymbol(
+    self.assertEquals(file_desc_proto, db.FindFileContainingSymbol(
         'google.protobuf.python.internal.Factory2Enum'))
-    self.assertEqual(file_desc_proto, db.FindFileContainingSymbol(
+    self.assertEquals(file_desc_proto, db.FindFileContainingSymbol(
         'google.protobuf.python.internal.Factory2Message.NestedFactory2Enum'))
-    self.assertEqual(file_desc_proto, db.FindFileContainingSymbol(
-        'google.protobuf.python.internal.MessageWithNestedEnumOnly.NestedEnum'))
 
 if __name__ == '__main__':
-  unittest.main()
+  basetest.main()
