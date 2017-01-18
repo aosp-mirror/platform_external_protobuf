@@ -37,10 +37,14 @@
 
 #include <map>
 #include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
 #include <string>
 
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/stubs/logging.h>
 
 namespace google {
 namespace protobuf {
@@ -90,6 +94,37 @@ class ImmutableFieldGenerator {
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImmutableFieldGenerator);
 };
 
+class ImmutableFieldLiteGenerator {
+ public:
+  ImmutableFieldLiteGenerator() {}
+  virtual ~ImmutableFieldLiteGenerator();
+
+  virtual int GetNumBitsForMessage() const = 0;
+  virtual int GetNumBitsForBuilder() const = 0;
+  virtual void GenerateInterfaceMembers(io::Printer* printer) const = 0;
+  virtual void GenerateMembers(io::Printer* printer) const = 0;
+  virtual void GenerateBuilderMembers(io::Printer* printer) const = 0;
+  virtual void GenerateInitializationCode(io::Printer* printer) const = 0;
+  virtual void GenerateVisitCode(io::Printer* printer) const = 0;
+  virtual void GenerateDynamicMethodMakeImmutableCode(io::Printer* printer)
+      const = 0;
+  virtual void GenerateParsingCode(io::Printer* printer) const = 0;
+  virtual void GenerateParsingCodeFromPacked(io::Printer* printer) const;
+  virtual void GenerateParsingDoneCode(io::Printer* printer) const = 0;
+  virtual void GenerateSerializationCode(io::Printer* printer) const = 0;
+  virtual void GenerateSerializedSizeCode(io::Printer* printer) const = 0;
+  virtual void GenerateFieldBuilderInitializationCode(io::Printer* printer)
+      const = 0;
+
+  virtual void GenerateEqualsCode(io::Printer* printer) const = 0;
+  virtual void GenerateHashCode(io::Printer* printer) const = 0;
+
+  virtual string GetBoxedType() const = 0;
+
+ private:
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImmutableFieldLiteGenerator);
+};
+
 
 // Convenience class which constructs FieldGenerators for a Descriptor.
 template<typename FieldGeneratorType>
@@ -105,7 +140,7 @@ class FieldGeneratorMap {
   const Descriptor* descriptor_;
   Context* context_;
   ClassNameResolver* name_resolver_;
-  scoped_array<scoped_ptr<FieldGeneratorType> > field_generators_;
+  google::protobuf::scoped_array<google::protobuf::scoped_ptr<FieldGeneratorType> > field_generators_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FieldGeneratorMap);
 };

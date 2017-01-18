@@ -155,28 +155,6 @@ int FixedSize(FieldDescriptor::Type type) {
   return -1;
 }
 
-// Return true if the type is a that has variable length
-// for instance String's.
-bool IsVariableLenType(JavaType type) {
-  switch (type) {
-    case JAVATYPE_INT    : return false;
-    case JAVATYPE_LONG   : return false;
-    case JAVATYPE_FLOAT  : return false;
-    case JAVATYPE_DOUBLE : return false;
-    case JAVATYPE_BOOLEAN: return false;
-    case JAVATYPE_STRING : return true;
-    case JAVATYPE_BYTES  : return true;
-    case JAVATYPE_ENUM   : return false;
-    case JAVATYPE_MESSAGE: return true;
-
-    // No default because we want the compiler to complain if any new
-    // JavaTypes are added.
-  }
-
-  GOOGLE_LOG(FATAL) << "Can't get here.";
-  return false;
-}
-
 bool AllAscii(const string& text) {
   for (int i = 0; i < text.size(); i++) {
     if ((text[i] & 0x80) != 0) {
@@ -185,6 +163,7 @@ bool AllAscii(const string& text) {
   }
   return true;
 }
+
 
 void SetPrimitiveVariables(const FieldDescriptor* descriptor, const Params params,
                            map<string, string>* variables) {
@@ -288,16 +267,8 @@ GenerateMembers(io::Printer* printer, bool lazy_init) const {
     }
   }
 
-  JavaType java_type = GetJavaType(descriptor_);
-  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
-    printer->Print(variables_,
-      "public $type$ $name$Buffer;\n"
-      "public int $name$Offset;\n"
-      "public int $name$Length;\n");
-  } else {
-    printer->Print(variables_,
-      "public $type$ $name$;\n");
-  }
+  printer->Print(variables_,
+    "public $type$ $name$;\n");
 
   if (params_.generate_has()) {
     printer->Print(variables_,
@@ -307,16 +278,8 @@ GenerateMembers(io::Printer* printer, bool lazy_init) const {
 
 void PrimitiveFieldGenerator::
 GenerateClearCode(io::Printer* printer) const {
-  JavaType java_type = GetJavaType(descriptor_);
-  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
-    printer->Print(variables_,
-      "$name$Buffer = $default_copy_if_needed$;\n"
-      "$name$Offset = -1;\n"
-      "$name$Length = 0;\n");
-  } else {
-    printer->Print(variables_,
-      "$name$ = $default_copy_if_needed$;\n");
-  }
+  printer->Print(variables_,
+    "$name$ = $default_copy_if_needed$;\n");
 
   if (params_.generate_has()) {
     printer->Print(variables_,
@@ -326,17 +289,8 @@ GenerateClearCode(io::Printer* printer) const {
 
 void PrimitiveFieldGenerator::
 GenerateMergingCode(io::Printer* printer) const {
-  JavaType java_type = GetJavaType(descriptor_);
-  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
-    printer->Print(variables_,
-      "this.$name$Buffer = input.getBuffer();\n"
-      "this.$name$Length = input.readRawVarint32();\n"
-      "this.$name$Offset = input.getAbsolutePosition();\n"
-      "input.skipRawBytes(this.$name$Length);\n");
-  } else {
-    printer->Print(variables_,
-      "this.$name$ = input.read$capitalized_type$();\n");
-  }
+  printer->Print(variables_,
+    "this.$name$ = input.read$capitalized_type$();\n");
 
   if (params_.generate_has()) {
     printer->Print(variables_,
@@ -361,10 +315,7 @@ GenerateSerializationConditional(io::Printer* printer) const {
       "if (");
   }
   JavaType java_type = GetJavaType(descriptor_);
-  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
-    printer->Print(variables_,
-      "this.$name$Offset != -1) {\n");
-  } else if (IsArrayType(java_type)) {
+  if (IsArrayType(java_type)) {
     printer->Print(variables_,
       "!java.util.Arrays.equals(this.$name$, $default$)) {\n");
   } else if (IsReferenceType(java_type)) {
@@ -388,53 +339,28 @@ void PrimitiveFieldGenerator::
 GenerateSerializationCode(io::Printer* printer) const {
   if (descriptor_->is_required() && !params_.generate_has()) {
     // Always serialize a required field if we don't have the 'has' signal.
-    GenerateWriteCode(printer);
-  } else {
-    GenerateSerializationConditional(printer);
-    printer->Indent();
-    GenerateWriteCode(printer);
-    printer->Outdent();
-    printer->Print("}\n");
-  }
-}
-
-void PrimitiveFieldGenerator::
-GenerateWriteCode(io::Printer* printer) const {
-  JavaType java_type = GetJavaType(descriptor_);
-  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
-    printer->Print(variables_,
-      "output.write$capitalized_type$($number$, this.$name$Buffer,\n"
-      "    this.$name$Offset, this.$name$Length);\n");
-  } else {
     printer->Print(variables_,
       "output.write$capitalized_type$($number$, this.$name$);\n");
+  } else {
+    GenerateSerializationConditional(printer);
+    printer->Print(variables_,
+      "  output.write$capitalized_type$($number$, this.$name$);\n"
+      "}\n");
   }
 }
 
 void PrimitiveFieldGenerator::
 GenerateSerializedSizeCode(io::Printer* printer) const {
   if (descriptor_->is_required() && !params_.generate_has()) {
-    GenerateComputeSizeCode(printer);
-  } else {
-    GenerateSerializationConditional(printer);
-    printer->Indent();
-    GenerateComputeSizeCode(printer);
-    printer->Outdent();
-    printer->Print("}\n");
-  }
-}
-
-void PrimitiveFieldGenerator::
-GenerateComputeSizeCode(io::Printer* printer) const {
-  JavaType java_type = GetJavaType(descriptor_);
-  if (java_type == JAVATYPE_BYTES && params_.bytes_offset_length()) {
-    printer->Print(variables_,
-      "size += com.google.protobuf.nano.CodedOutputByteBufferNano\n"
-      "    .compute$capitalized_type$Size($number$, this.$name$Length);\n");
-  } else {
     printer->Print(variables_,
       "size += com.google.protobuf.nano.CodedOutputByteBufferNano\n"
       "    .compute$capitalized_type$Size($number$, this.$name$);\n");
+  } else {
+    GenerateSerializationConditional(printer);
+    printer->Print(variables_,
+      "  size += com.google.protobuf.nano.CodedOutputByteBufferNano\n"
+      "      .compute$capitalized_type$Size($number$, this.$name$);\n"
+      "}\n");
   }
 }
 
@@ -640,7 +566,6 @@ GenerateMembers(io::Printer* printer, bool lazy_init) const {
 
 void AccessorPrimitiveFieldGenerator::
 GenerateClearCode(io::Printer* printer) const {
-  
   printer->Print(variables_,
     "$name$_ = $default_copy_if_needed$;\n");
 }
@@ -768,8 +693,79 @@ GenerateHashCodeCode(io::Printer* printer) const {
 
 // ===================================================================
 
-RepeatedPrimitiveFieldGenerator::
-RepeatedPrimitiveFieldGenerator(const FieldDescriptor* descriptor, const Params& params)
+PrimitiveOneofFieldGenerator::PrimitiveOneofFieldGenerator(
+    const FieldDescriptor* descriptor, const Params& params)
+  : FieldGenerator(params), descriptor_(descriptor) {
+    SetPrimitiveVariables(descriptor, params, &variables_);
+    SetCommonOneofVariables(descriptor, &variables_);
+}
+
+PrimitiveOneofFieldGenerator::~PrimitiveOneofFieldGenerator() {}
+
+void PrimitiveOneofFieldGenerator::GenerateMembers(
+    io::Printer* printer, bool /*unused lazy_init*/) const {
+  printer->Print(variables_,
+    "public boolean has$capitalized_name$() {\n"
+    "  return $has_oneof_case$;\n"
+    "}\n"
+    "public $type$ get$capitalized_name$() {\n"
+    "  if ($has_oneof_case$) {\n"
+    "    return ($type$) ($boxed_type$) this.$oneof_name$_;\n"
+    "  }\n"
+    "  return $default$;\n"
+    "}\n"
+    "public $message_name$ set$capitalized_name$($type$ value) {\n"
+    "  $set_oneof_case$;\n"
+    "  this.$oneof_name$_ = value;\n"
+    "  return this;\n"
+    "}\n");
+}
+
+void PrimitiveOneofFieldGenerator::GenerateClearCode(
+    io::Printer* printer) const {
+  // No clear method for oneof fields.
+}
+
+void PrimitiveOneofFieldGenerator::GenerateMergingCode(
+    io::Printer* printer) const {
+  printer->Print(variables_,
+    "this.$oneof_name$_ = input.read$capitalized_type$();\n"
+    "$set_oneof_case$;\n");
+}
+
+void PrimitiveOneofFieldGenerator::GenerateSerializationCode(
+    io::Printer* printer) const {
+  printer->Print(variables_,
+    "if ($has_oneof_case$) {\n"
+    "  output.write$capitalized_type$(\n"
+    "      $number$, ($boxed_type$) this.$oneof_name$_);\n"
+    "}\n");
+}
+
+void PrimitiveOneofFieldGenerator::GenerateSerializedSizeCode(
+    io::Printer* printer) const {
+  printer->Print(variables_,
+    "if ($has_oneof_case$) {\n"
+    "  size += com.google.protobuf.nano.CodedOutputByteBufferNano\n"
+    "      .compute$capitalized_type$Size(\n"
+    "          $number$, ($boxed_type$) this.$oneof_name$_);\n"
+    "}\n");
+}
+
+void PrimitiveOneofFieldGenerator::GenerateEqualsCode(
+    io::Printer* printer) const {
+  GenerateOneofFieldEquals(descriptor_, variables_, printer);
+}
+
+void PrimitiveOneofFieldGenerator::GenerateHashCodeCode(
+    io::Printer* printer) const {
+  GenerateOneofFieldHashCode(descriptor_, variables_, printer);
+}
+
+// ===================================================================
+
+RepeatedPrimitiveFieldGenerator::RepeatedPrimitiveFieldGenerator(
+    const FieldDescriptor* descriptor, const Params& params)
   : FieldGenerator(params), descriptor_(descriptor) {
   SetPrimitiveVariables(descriptor, params, &variables_);
 }

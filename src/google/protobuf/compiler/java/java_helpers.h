@@ -132,7 +132,7 @@ string FieldConstantName(const FieldDescriptor *field);
 
 // Returns the type of the FieldDescriptor.
 // This does nothing interesting for the open source release, but is used for
-// hacks that improve compatability with version 1 protocol buffers at Google.
+// hacks that improve compatibility with version 1 protocol buffers at Google.
 FieldDescriptor::Type GetType(const FieldDescriptor* field);
 
 enum JavaType {
@@ -148,6 +148,8 @@ enum JavaType {
 };
 
 JavaType GetJavaType(const FieldDescriptor* field);
+
+const char* PrimitiveTypeName(JavaType type);
 
 // Get the fully-qualified class name for a boxed primitive type, e.g.
 // "java.lang.Integer" for JAVATYPE_INT.  Returns NULL for enum and message
@@ -168,57 +170,41 @@ inline string ImmutableDefaultValue(const FieldDescriptor* field,
 }
 bool IsDefaultValueJavaDefault(const FieldDescriptor* field);
 
-// Does this message class use UnknownFieldSet?
-// Otherwise, unknown fields will be stored in a ByteString object
-inline bool UseUnknownFieldSet(const Descriptor* descriptor) {
-  return descriptor->file()->options().optimize_for() !=
-           FileOptions::LITE_RUNTIME;
-}
-
-// Does this message class have generated parsing, serialization, and other
-// standard methods for which reflection-based fallback implementations exist?
-inline bool HasGeneratedMethods(const Descriptor* descriptor) {
-  return descriptor->file()->options().optimize_for() !=
-           FileOptions::CODE_SIZE;
-}
-
 // Does this message have specialized equals() and hashCode() methods?
 inline bool HasEqualsAndHashCode(const Descriptor* descriptor) {
   return descriptor->file()->options().java_generate_equals_and_hash();
 }
 
 // Does this message class have descriptor and reflection methods?
-inline bool HasDescriptorMethods(const Descriptor* descriptor) {
-  return descriptor->file()->options().optimize_for() !=
-           FileOptions::LITE_RUNTIME;
+inline bool HasDescriptorMethods(const Descriptor* descriptor,
+                                 bool enforce_lite) {
+  return !enforce_lite &&
+         descriptor->file()->options().optimize_for() !=
+             FileOptions::LITE_RUNTIME;
 }
-inline bool HasDescriptorMethods(const EnumDescriptor* descriptor) {
-  return descriptor->file()->options().optimize_for() !=
-           FileOptions::LITE_RUNTIME;
+inline bool HasDescriptorMethods(const EnumDescriptor* descriptor,
+                                 bool enforce_lite) {
+  return !enforce_lite &&
+         descriptor->file()->options().optimize_for() !=
+             FileOptions::LITE_RUNTIME;
 }
-inline bool HasDescriptorMethods(const FileDescriptor* descriptor) {
-  return descriptor->options().optimize_for() !=
-           FileOptions::LITE_RUNTIME;
-}
-
-inline bool HasNestedBuilders(const Descriptor* descriptor) {
-  // The proto-lite version doesn't support nested builders.
-  return descriptor->file()->options().optimize_for() !=
-           FileOptions::LITE_RUNTIME;
+inline bool HasDescriptorMethods(const FileDescriptor* descriptor,
+                                 bool enforce_lite) {
+  return !enforce_lite &&
+         descriptor->options().optimize_for() != FileOptions::LITE_RUNTIME;
 }
 
 // Should we generate generic services for this file?
-inline bool HasGenericServices(const FileDescriptor *file) {
+inline bool HasGenericServices(const FileDescriptor *file, bool enforce_lite) {
   return file->service_count() > 0 &&
-         file->options().optimize_for() != FileOptions::LITE_RUNTIME &&
+         HasDescriptorMethods(file, enforce_lite) &&
          file->options().java_generic_services();
 }
 
-inline bool IsLazy(const FieldDescriptor* descriptor) {
+inline bool IsLazy(const FieldDescriptor* descriptor, bool enforce_lite) {
   // Currently, the proto-lite version suports lazy field.
   // TODO(niwasaki): Support lazy fields also for other proto runtimes.
-  if (descriptor->file()->options().optimize_for() !=
-      FileOptions::LITE_RUNTIME) {
+  if (HasDescriptorMethods(descriptor->file(), enforce_lite)) {
     return false;
   }
   return descriptor->options().lazy();
@@ -302,17 +288,61 @@ struct ExtensionRangeOrdering {
 // and return it. The caller should delete the returned array.
 const FieldDescriptor** SortFieldsByNumber(const Descriptor* descriptor);
 
+// Does this message class have any packed fields?
+inline bool HasPackedFields(const Descriptor* descriptor) {
+  for (int i = 0; i < descriptor->field_count(); i++) {
+    if (descriptor->field(i)->is_packed()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Check a message type and its sub-message types recursively to see if any of
 // them has a required field. Return true if a required field is found.
 bool HasRequiredFields(const Descriptor* descriptor);
 
 // Whether a .proto file supports field presence test for non-message types.
 inline bool SupportFieldPresence(const FileDescriptor* descriptor) {
-  return true;
+  return descriptor->syntax() != FileDescriptor::SYNTAX_PROTO3;
+}
+
+// Whether generate classes expose public PARSER instances.
+inline bool ExposePublicParser(const FileDescriptor* descriptor) {
+  // TODO(liujisi): Mark the PARSER private in 3.1.x releases.
+  return descriptor->syntax() == FileDescriptor::SYNTAX_PROTO2;
+}
+
+// Whether unknown enum values are kept (i.e., not stored in UnknownFieldSet
+// but in the message and can be queried using additional getters that return
+// ints.
+inline bool SupportUnknownEnumValue(const FileDescriptor* descriptor) {
+  return descriptor->syntax() == FileDescriptor::SYNTAX_PROTO3;
 }
 
 // Check whether a mesasge has repeated fields.
 bool HasRepeatedFields(const Descriptor* descriptor);
+
+inline bool IsMapEntry(const Descriptor* descriptor) {
+  return descriptor->options().map_entry();
+}
+
+inline bool IsMapField(const FieldDescriptor* descriptor) {
+  return descriptor->is_map();
+}
+
+inline bool PreserveUnknownFields(const Descriptor* descriptor) {
+  return descriptor->file()->syntax() != FileDescriptor::SYNTAX_PROTO3;
+}
+
+inline bool IsAnyMessage(const Descriptor* descriptor) {
+  return descriptor->full_name() == "google.protobuf.Any";
+}
+
+inline bool CheckUtf8(const FieldDescriptor* descriptor) {
+  return descriptor->file()->syntax() == FileDescriptor::SYNTAX_PROTO3 ||
+      descriptor->file()->options().java_string_check_utf8();
+}
 
 }  // namespace java
 }  // namespace compiler
