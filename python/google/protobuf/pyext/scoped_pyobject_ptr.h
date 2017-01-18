@@ -33,14 +33,12 @@
 #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_SCOPED_PYOBJECT_PTR_H__
 #define GOOGLE_PROTOBUF_PYTHON_CPP_SCOPED_PYOBJECT_PTR_H__
 
-#include <google/protobuf/stubs/common.h>
-
 #include <Python.h>
 
 namespace google {
 class ScopedPyObjectPtr {
  public:
-  // Constructor.  Defaults to initializing with NULL.
+  // Constructor.  Defaults to intializing with NULL.
   // There is no way to create an uninitialized ScopedPyObjectPtr.
   explicit ScopedPyObjectPtr(PyObject* p = NULL) : ptr_(p) { }
 
@@ -51,22 +49,23 @@ class ScopedPyObjectPtr {
 
   // Reset.  Deletes the current owned object, if any.
   // Then takes ownership of a new object, if given.
-  // This function must be called with a reference that you own.
-  //   this->reset(this->get()) is wrong!
-  //   this->reset(this->release()) is OK.
+  // this->reset(this->get()) works.
   PyObject* reset(PyObject* p = NULL) {
-    Py_XDECREF(ptr_);
-    ptr_ = p;
+    if (p != ptr_) {
+      Py_XDECREF(ptr_);
+      ptr_ = p;
+    }
     return ptr_;
   }
 
   // Releases ownership of the object.
-  // The caller now owns the returned reference.
   PyObject* release() {
     PyObject* p = ptr_;
     ptr_ = NULL;
     return p;
   }
+
+  operator PyObject*() { return ptr_; }
 
   PyObject* operator->() const  {
     assert(ptr_ != NULL);

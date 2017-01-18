@@ -30,7 +30,6 @@
 
 // Author: matthewtoia@google.com (Matt Toia)
 
-syntax = "proto2";
 
 package google.protobuf.python.internal;
 
@@ -86,12 +85,6 @@ message Factory2Message {
 
 message LoopMessage {
   optional Factory2Message loop = 1;
-}
-
-message MessageWithNestedEnumOnly {
-  enum NestedEnum {
-    NESTED_MESSAGE_ENUM_0 = 0;
-  }
 }
 
 extend Factory1Message {

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 
 # See README.txt for information and build instructions.
 
@@ -19,7 +19,7 @@ def PromptForAddress(person):
     if number == "":
       break
 
-    phone_number = person.phones.add()
+    phone_number = person.phone.add()
     phone_number.number = number
 
     type = raw_input("Is this a mobile, home, or work phone? ")
@@ -43,14 +43,16 @@ address_book = addressbook_pb2.AddressBook()
 
 # Read the existing address book.
 try:
-  with open(sys.argv[1], "rb") as f:
-    address_book.ParseFromString(f.read())
+  f = open(sys.argv[1], "rb")
+  address_book.ParseFromString(f.read())
+  f.close()
 except IOError:
   print sys.argv[1] + ": File not found.  Creating a new file."
 
 # Add an address.
-PromptForAddress(address_book.people.add())
+PromptForAddress(address_book.person.add())
 
 # Write the new address book back to disk.
-with open(sys.argv[1], "wb") as f:
-  f.write(address_book.SerializeToString())
+f = open(sys.argv[1], "wb")
+f.write(address_book.SerializeToString())
+f.close()

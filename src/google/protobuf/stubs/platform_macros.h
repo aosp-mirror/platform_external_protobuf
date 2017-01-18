@@ -31,6 +31,8 @@
 #ifndef GOOGLE_PROTOBUF_PLATFORM_MACROS_H_
 #define GOOGLE_PROTOBUF_PLATFORM_MACROS_H_
 
+#include <google/protobuf/stubs/common.h>
+
 #define GOOGLE_PROTOBUF_PLATFORM_ERROR \
 #error "Host platform was not detected as supported by protobuf"
 
@@ -65,17 +67,11 @@
 #define GOOGLE_PROTOBUF_ARCH_32_BIT 1
 #elif defined(sparc)
 #define GOOGLE_PROTOBUF_ARCH_SPARC 1
-#if defined(__sparc_v9__) || defined(__sparcv9) || defined(__arch64__)
+#ifdef SOLARIS_64BIT_ENABLED
 #define GOOGLE_PROTOBUF_ARCH_64_BIT 1
 #else
 #define GOOGLE_PROTOBUF_ARCH_32_BIT 1
 #endif
-#elif defined(_POWER) || defined(__powerpc64__) || defined(__PPC64__)
-#define GOOGLE_PROTOBUF_ARCH_POWER 1
-#define GOOGLE_PROTOBUF_ARCH_64_BIT 1
-#elif defined(__PPC__)
-#define GOOGLE_PROTOBUF_ARCH_PPC 1
-#define GOOGLE_PROTOBUF_ARCH_32_BIT 1
 #elif defined(__GNUC__)
 # if (((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7)) || (__GNUC__ > 4))
 // We fallback to the generic Clang/GCC >= 4.7 implementation in atomicops.h
@@ -96,30 +92,12 @@ GOOGLE_PROTOBUF_PLATFORM_ERROR
 
 #if defined(__APPLE__)
 #define GOOGLE_PROTOBUF_OS_APPLE
-#include <TargetConditionals.h>
-#if TARGET_OS_IPHONE
-#define GOOGLE_PROTOBUF_OS_IPHONE
-#endif
-#elif defined(__EMSCRIPTEN__)
-#define GOOGLE_PROTOBUF_OS_EMSCRIPTEN
 #elif defined(__native_client__)
 #define GOOGLE_PROTOBUF_OS_NACL
 #elif defined(sun)
 #define GOOGLE_PROTOBUF_OS_SOLARIS
-#elif defined(_AIX)
-#define GOOGLE_PROTOBUF_OS_AIX
-#elif defined(__ANDROID__)
-#define GOOGLE_PROTOBUF_OS_ANDROID
 #endif
 
 #undef GOOGLE_PROTOBUF_PLATFORM_ERROR
-
-#if defined(GOOGLE_PROTOBUF_OS_ANDROID) || defined(GOOGLE_PROTOBUF_OS_IPHONE)
-// Android ndk does not support the __thread keyword very well yet. Here
-// we use pthread_key_create()/pthread_getspecific()/... methods for
-// TLS support on android.
-// iOS also does not support the __thread keyword.
-#define GOOGLE_PROTOBUF_NO_THREADLOCAL
-#endif
 
 #endif  // GOOGLE_PROTOBUF_PLATFORM_MACROS_H_

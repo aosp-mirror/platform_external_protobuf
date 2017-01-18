@@ -32,10 +32,8 @@
 
 #include <cstdio>
 #include <cstring>
-#include <limits>
 #include <string>
 
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 
 namespace google {
@@ -108,16 +106,6 @@ double NoLocaleStrtod(const char* text, char** original_endptr) {
   }
 
   return result;
-}
-
-float SafeDoubleToFloat(double value) {
-  if (value > std::numeric_limits<float>::max()) {
-    return std::numeric_limits<float>::infinity();
-  } else if (value < -std::numeric_limits<float>::max()) {
-    return -std::numeric_limits<float>::infinity();
-  } else {
-    return static_cast<float>(value);
-  }
 }
 
 }  // namespace io

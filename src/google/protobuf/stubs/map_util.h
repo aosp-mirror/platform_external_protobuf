@@ -353,6 +353,7 @@ template <class Collection>
 void InsertOrDie(Collection* const collection,
                  const typename Collection::value_type::first_type& key,
                  const typename Collection::value_type::second_type& data) {
+  typedef typename Collection::value_type value_type;
   GOOGLE_CHECK(InsertIfNotPresent(collection, key, data))
       << "duplicate key: " << key;
 }
@@ -363,6 +364,7 @@ void InsertOrDieNoPrint(
     Collection* const collection,
     const typename Collection::value_type::first_type& key,
     const typename Collection::value_type::second_type& data) {
+  typedef typename Collection::value_type value_type;
   GOOGLE_CHECK(InsertIfNotPresent(collection, key, data)) << "duplicate key.";
 }
 

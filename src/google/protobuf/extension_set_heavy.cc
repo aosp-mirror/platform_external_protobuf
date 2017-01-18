@@ -91,10 +91,9 @@ class DescriptorPoolExtensionFinder : public ExtensionFinder {
   const Descriptor* containing_type_;
 };
 
-void ExtensionSet::AppendToList(
-    const Descriptor* containing_type,
-    const DescriptorPool* pool,
-    std::vector<const FieldDescriptor*>* output) const {
+void ExtensionSet::AppendToList(const Descriptor* containing_type,
+                                const DescriptorPool* pool,
+                                std::vector<const FieldDescriptor*>* output) const {
   for (map<int, Extension>::const_iterator iter = extensions_.begin();
        iter != extensions_.end(); ++iter) {
     bool has = false;
@@ -170,7 +169,7 @@ MessageLite* ExtensionSet::MutableMessage(const FieldDescriptor* descriptor,
     const MessageLite* prototype =
         factory->GetPrototype(descriptor->message_type());
     extension->is_lazy = false;
-    extension->message_value = prototype->New(arena_);
+    extension->message_value = prototype->New();
     extension->is_cleared = false;
     return extension->message_value;
   } else {
@@ -197,39 +196,27 @@ MessageLite* ExtensionSet::ReleaseMessage(const FieldDescriptor* descriptor,
     if (iter->second.is_lazy) {
       ret = iter->second.lazymessage_value->ReleaseMessage(
           *factory->GetPrototype(descriptor->message_type()));
-      if (arena_ == NULL) {
-        delete iter->second.lazymessage_value;
-      }
+      delete iter->second.lazymessage_value;
     } else {
-      if (arena_ != NULL) {
-        ret = (iter->second.message_value)->New();
-        ret->CheckTypeAndMergeFrom(*(iter->second.message_value));
-      } else {
-        ret = iter->second.message_value;
-      }
+      ret = iter->second.message_value;
     }
     extensions_.erase(descriptor->number());
     return ret;
   }
 }
 
-ExtensionSet::Extension* ExtensionSet::MaybeNewRepeatedExtension(const FieldDescriptor* descriptor) {
+MessageLite* ExtensionSet::AddMessage(const FieldDescriptor* descriptor,
+                                      MessageFactory* factory) {
   Extension* extension;
   if (MaybeNewExtension(descriptor->number(), descriptor, &extension)) {
     extension->type = descriptor->type();
     GOOGLE_DCHECK_EQ(cpp_type(extension->type), FieldDescriptor::CPPTYPE_MESSAGE);
     extension->is_repeated = true;
     extension->repeated_message_value =
-        ::google::protobuf::Arena::CreateMessage<RepeatedPtrField<MessageLite> >(arena_);
+      new RepeatedPtrField<MessageLite>();
   } else {
     GOOGLE_DCHECK_TYPE(*extension, REPEATED, MESSAGE);
   }
-  return extension;
-}
-
-MessageLite* ExtensionSet::AddMessage(const FieldDescriptor* descriptor,
-                                      MessageFactory* factory) {
-  Extension* extension = MaybeNewRepeatedExtension(descriptor);
 
   // RepeatedPtrField<Message> does not know how to Add() since it cannot
   // allocate an abstract object, so we have to be tricky.
@@ -243,17 +230,10 @@ MessageLite* ExtensionSet::AddMessage(const FieldDescriptor* descriptor,
     } else {
       prototype = &extension->repeated_message_value->Get(0);
     }
-    result = prototype->New(arena_);
+    result = prototype->New();
     extension->repeated_message_value->AddAllocated(result);
   }
   return result;
-}
-
-void ExtensionSet::AddAllocatedMessage(const FieldDescriptor* descriptor,
-                                       MessageLite* new_entry) {
-  Extension* extension = MaybeNewRepeatedExtension(descriptor);
-
-  extension->repeated_message_value->AddAllocated(new_entry);
 }
 
 static bool ValidateEnumUsingDescriptor(const void* arg, int number) {

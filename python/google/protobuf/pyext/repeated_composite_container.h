@@ -43,33 +43,30 @@
 #include <string>
 #include <vector>
 
+
 namespace google {
 namespace protobuf {
 
 class FieldDescriptor;
 class Message;
 
-#ifdef _SHARED_PTR_H
-using std::shared_ptr;
-#else
 using internal::shared_ptr;
-#endif
 
 namespace python {
 
 struct CMessage;
-struct CMessageClass;
+struct CFieldDescriptor;
 
 // A RepeatedCompositeContainer can be in one of two states: attached
 // or released.
 //
 // When in the attached state all modifications to the container are
 // done both on the 'message' and on the 'child_messages'
-// list.  In this state all Messages referred to by the children in
+// list.  In this state all Messages refered to by the children in
 // 'child_messages' are owner by the 'owner'.
 //
 // When in the released state 'message', 'owner', 'parent', and
-// 'parent_field_descriptor' are NULL.
+// 'parent_field' are NULL.
 typedef struct RepeatedCompositeContainer {
   PyObject_HEAD;
 
@@ -85,8 +82,7 @@ typedef struct RepeatedCompositeContainer {
   CMessage* parent;
 
   // A descriptor used to modify the underlying 'message'.
-  // The pointer is owned by the global DescriptorPool.
-  const FieldDescriptor* parent_field_descriptor;
+  CFieldDescriptor* parent_field;
 
   // Pointer to the C++ Message that contains this container.  The
   // RepeatedCompositeContainer does not own this pointer.
@@ -95,8 +91,8 @@ typedef struct RepeatedCompositeContainer {
   // calling Clear() or ClearField() on the parent.
   Message* message;
 
-  // The type used to create new child messages.
-  CMessageClass* child_message_class;
+  // A callable that is used to create new child messages.
+  PyObject* subclass_init;
 
   // A list of child messages.
   PyObject* child_messages;
@@ -106,12 +102,8 @@ extern PyTypeObject RepeatedCompositeContainer_Type;
 
 namespace repeated_composite_container {
 
-// Builds a RepeatedCompositeContainer object, from a parent message and a
-// field descriptor.
-PyObject *NewContainer(
-    CMessage* parent,
-    const FieldDescriptor* parent_field_descriptor,
-    CMessageClass *child_message_class);
+// Returns the number of items in this repeated composite container.
+static Py_ssize_t Length(RepeatedCompositeContainer* self);
 
 // Appends a new CMessage to the container and returns it.  The
 // CMessage is initialized using the content of kwargs.
@@ -151,7 +143,8 @@ int AssignSubscript(RepeatedCompositeContainer* self,
 // Releases the messages in the container to the given message.
 //
 // Returns 0 on success, -1 on failure.
-int ReleaseToMessage(RepeatedCompositeContainer* self, Message* new_message);
+int ReleaseToMessage(RepeatedCompositeContainer* self,
+                     google::protobuf::Message* new_message);
 
 // Releases the messages in the container to a new message.
 //
@@ -163,13 +156,13 @@ int SetOwner(RepeatedCompositeContainer* self,
              const shared_ptr<Message>& new_owner);
 
 // Removes the last element of the repeated message field 'field' on
-// the Message 'parent', and transfers the ownership of the released
-// Message to 'target'.
+// the Message 'message', and transfers the ownership of the released
+// Message to 'cmessage'.
 //
 // Corresponds to reflection api method ReleaseMessage.
-void ReleaseLastTo(CMessage* parent,
-                   const FieldDescriptor* field,
-                   CMessage* target);
+void ReleaseLastTo(const FieldDescriptor* field,
+                   Message* message,
+                   CMessage* cmessage);
 
 }  // namespace repeated_composite_container
 }  // namespace python

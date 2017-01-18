@@ -9,4 +9,6 @@ Version: @VERSION@
 Libs: -L${libdir} -lprotobuf @PTHREAD_CFLAGS@ @PTHREAD_LIBS@
 Libs.private: @LIBS@
 Cflags: -I${includedir} @PTHREAD_CFLAGS@
-Conflicts: protobuf-lite
+# Commented out because it crashes pkg-config *sigh*:
+#   http://bugs.freedesktop.org/show_bug.cgi?id=13265
+# Conflicts: protobuf-lite

@@ -34,7 +34,6 @@
 
 #include <google/protobuf/io/zero_copy_stream.h>
 
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 
 namespace google {

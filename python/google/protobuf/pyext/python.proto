@@ -33,7 +33,6 @@
 // These message definitions are used to exercises known corner cases
 // in the C++ implementation of the Python API.
 
-syntax = "proto2";
 
 package google.protobuf.python.internal;
 
@@ -64,5 +63,4 @@ message TestAllExtensions {
 
 extend TestAllExtensions {
   optional TestAllTypes.NestedMessage optional_nested_message_extension = 1;
-  repeated TestAllTypes.NestedMessage repeated_nested_message_extension = 2;
 }

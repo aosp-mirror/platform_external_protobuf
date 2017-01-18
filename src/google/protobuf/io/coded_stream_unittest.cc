@@ -34,10 +34,6 @@
 //
 // This file contains tests and benchmarks.
 
-#include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <vector>
 
 #include <google/protobuf/io/coded_stream.h>
@@ -45,8 +41,6 @@
 #include <limits.h>
 
 #include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
@@ -149,7 +143,6 @@ uint8 CodedStreamTest::buffer_[CodedStreamTest::kBufferSize];
 // we can use special optimized paths that don't worry about bounds
 // checks.
 const int kBlockSizes[] = {1, 2, 3, 5, 7, 13, 32, 1024};
-
 
 // -------------------------------------------------------------------
 // Varint tests.
@@ -508,11 +501,11 @@ struct Fixed64Case {
 };
 
 inline std::ostream& operator<<(std::ostream& os, const Fixed32Case& c) {
-  return os << "0x" << std::hex << c.value << std::dec;
+  return os << "0x" << hex << c.value << dec;
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Fixed64Case& c) {
-  return os << "0x" << std::hex << c.value << std::dec;
+  return os << "0x" << hex << c.value << dec;
 }
 
 Fixed32Case kFixed32Cases[] = {
@@ -683,7 +676,7 @@ TEST_F(CodedStreamTest, ReadStringImpossiblyLargeFromStringOnStack) {
 }
 
 TEST_F(CodedStreamTest, ReadStringImpossiblyLargeFromStringOnHeap) {
-  google::protobuf::scoped_array<uint8> buffer(new uint8[8]);
+  scoped_array<uint8> buffer(new uint8[8]);
   CodedInputStream coded_input(buffer.get(), 8);
   string str;
   EXPECT_FALSE(coded_input.ReadString(&str, 1 << 30));

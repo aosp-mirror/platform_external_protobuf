@@ -138,14 +138,6 @@ class LIBPROTOBUF_EXPORT WireFormat {
   static bool SkipMessage(io::CodedInputStream* input,
                           UnknownFieldSet* unknown_fields);
 
-  // Read a packed enum field. If the is_valid function is not NULL, values for
-  // which is_valid(value) returns false are appended to unknown_fields_stream.
-  static bool ReadPackedEnumPreserveUnknowns(io::CodedInputStream* input,
-                                             uint32 field_number,
-                                             bool (*is_valid)(int),
-                                             UnknownFieldSet* unknown_fields,
-                                             RepeatedField<int>* values);
-
   // Write the contents of an UnknownFieldSet to the output.
   static void SerializeUnknownFields(const UnknownFieldSet& unknown_fields,
                                      io::CodedOutputStream* output);
@@ -231,8 +223,8 @@ class LIBPROTOBUF_EXPORT WireFormat {
       const Message& message);
 
   enum Operation {
-    PARSE = 0,
-    SERIALIZE = 1,
+    PARSE,
+    SERIALIZE,
   };
 
   // Verifies that a string field is valid UTF8, logging an error if not.
@@ -247,6 +239,13 @@ class LIBPROTOBUF_EXPORT WireFormat {
                                          const char* field_name);
 
  private:
+  // Verifies that a string field is valid UTF8, logging an error if not.
+  static void VerifyUTF8StringFallback(
+      const char* data,
+      int size,
+      Operation op,
+      const char* field_name);
+
   // Skip a MessageSet field.
   static bool SkipMessageSetField(io::CodedInputStream* input,
                                   uint32 field_number,
@@ -257,6 +256,8 @@ class LIBPROTOBUF_EXPORT WireFormat {
                                            const FieldDescriptor* field,
                                            Message* message,
                                            io::CodedInputStream* input);
+
+
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(WireFormat);
 };
@@ -281,7 +282,7 @@ class LIBPROTOBUF_EXPORT UnknownFieldSetFieldSkipper : public FieldSkipper {
 
 inline WireFormatLite::WireType WireFormat::WireTypeForField(
     const FieldDescriptor* field) {
-  if (field->is_packed()) {
+  if (field->options().packed()) {
     return WireFormatLite::WIRETYPE_LENGTH_DELIMITED;
   } else {
     return WireTypeForFieldType(field->type());
@@ -312,8 +313,7 @@ inline int WireFormat::TagSize(int field_number, FieldDescriptor::Type type) {
 inline void WireFormat::VerifyUTF8String(const char* data, int size,
     WireFormat::Operation op) {
 #ifdef GOOGLE_PROTOBUF_UTF8_VALIDATION_ENABLED
-  WireFormatLite::VerifyUtf8String(
-      data, size, static_cast<WireFormatLite::Operation>(op), NULL);
+  WireFormat::VerifyUTF8StringFallback(data, size, op, NULL);
 #else
   // Avoid the compiler warning about unsued variables.
   (void)data; (void)size; (void)op;
@@ -324,8 +324,7 @@ inline void WireFormat::VerifyUTF8StringNamedField(
     const char* data, int size, WireFormat::Operation op,
     const char* field_name) {
 #ifdef GOOGLE_PROTOBUF_UTF8_VALIDATION_ENABLED
-  WireFormatLite::VerifyUtf8String(
-      data, size, static_cast<WireFormatLite::Operation>(op), field_name);
+  WireFormat::VerifyUTF8StringFallback(data, size, op, field_name);
 #endif
 }
 

@@ -28,6 +28,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#PY25 compatible for GAE.
+#
+# Copyright 2008 Google Inc. All Rights Reserved.
+
 """Provides type checking routines.
 
 This module defines type checking utilities in the forms of dictionaries:
@@ -45,11 +49,8 @@ TYPE_TO_DESERIALIZE_METHOD: A dictionary with field types and deserialization
 
 __author__ = 'robinson@google.com (Will Robinson)'
 
-import six
-
-if six.PY3:
-  long = int
-
+import sys  ##PY25
+if sys.version < '2.6': bytes = str  ##PY25
 from google.protobuf.internal import api_implementation
 from google.protobuf.internal import decoder
 from google.protobuf.internal import encoder
@@ -58,8 +59,6 @@ from google.protobuf import descriptor
 
 _FieldDescriptor = descriptor.FieldDescriptor
 
-def SupportsOpenEnums(field_descriptor):
-  return field_descriptor.containing_type.syntax == "proto3"
 
 def GetTypeChecker(field):
   """Returns a type checker for a message field of the specified types.
@@ -75,11 +74,7 @@ def GetTypeChecker(field):
       field.type == _FieldDescriptor.TYPE_STRING):
     return UnicodeValueChecker()
   if field.cpp_type == _FieldDescriptor.CPPTYPE_ENUM:
-    if SupportsOpenEnums(field):
-      # When open enums are supported, any int32 can be assigned.
-      return _VALUE_CHECKERS[_FieldDescriptor.CPPTYPE_INT32]
-    else:
-      return EnumValueChecker(field.enum_type)
+    return EnumValueChecker(field.enum_type)
   return _VALUE_CHECKERS[field.cpp_type]
 
 
@@ -109,16 +104,6 @@ class TypeChecker(object):
     return proposed_value
 
 
-class TypeCheckerWithDefault(TypeChecker):
-
-  def __init__(self, default_value, *acceptable_types):
-    TypeChecker.__init__(self, acceptable_types)
-    self._default_value = default_value
-
-  def DefaultValue(self):
-    return self._default_value
-
-
 # IntValueChecker and its subclasses perform integer type-checks
 # and bounds-checks.
 class IntValueChecker(object):
@@ -126,9 +111,9 @@ class IntValueChecker(object):
   """Checker used for integer fields.  Performs type-check and range check."""
 
   def CheckValue(self, proposed_value):
-    if not isinstance(proposed_value, six.integer_types):
+    if not isinstance(proposed_value, (int, long)):
       message = ('%.1024r has type %s, but expected one of: %s' %
-                 (proposed_value, type(proposed_value), six.integer_types))
+                 (proposed_value, type(proposed_value), (int, long)))
       raise TypeError(message)
     if not self._MIN <= proposed_value <= self._MAX:
       raise ValueError('Value out of range: %d' % proposed_value)
@@ -137,9 +122,6 @@ class IntValueChecker(object):
     # (e.g. the C++ implementation) simpler.
     proposed_value = self._TYPE(proposed_value)
     return proposed_value
-
-  def DefaultValue(self):
-    return 0
 
 
 class EnumValueChecker(object):
@@ -150,16 +132,13 @@ class EnumValueChecker(object):
     self._enum_type = enum_type
 
   def CheckValue(self, proposed_value):
-    if not isinstance(proposed_value, six.integer_types):
+    if not isinstance(proposed_value, (int, long)):
       message = ('%.1024r has type %s, but expected one of: %s' %
-                 (proposed_value, type(proposed_value), six.integer_types))
+                 (proposed_value, type(proposed_value), (int, long)))
       raise TypeError(message)
     if proposed_value not in self._enum_type.values_by_number:
       raise ValueError('Unknown enum value: %d' % proposed_value)
     return proposed_value
-
-  def DefaultValue(self):
-    return self._enum_type.values[0].number
 
 
 class UnicodeValueChecker(object):
@@ -170,24 +149,22 @@ class UnicodeValueChecker(object):
   """
 
   def CheckValue(self, proposed_value):
-    if not isinstance(proposed_value, (bytes, six.text_type)):
+    if not isinstance(proposed_value, (bytes, unicode)):
       message = ('%.1024r has type %s, but expected one of: %s' %
-                 (proposed_value, type(proposed_value), (bytes, six.text_type)))
+                 (proposed_value, type(proposed_value), (bytes, unicode)))
       raise TypeError(message)
 
-    # If the value is of type 'bytes' make sure that it is valid UTF-8 data.
+    # If the value is of type 'bytes' make sure that it is in 7-bit ASCII
+    # encoding.
     if isinstance(proposed_value, bytes):
       try:
-        proposed_value = proposed_value.decode('utf-8')
+        proposed_value = proposed_value.decode('ascii')
       except UnicodeDecodeError:
-        raise ValueError('%.1024r has type bytes, but isn\'t valid UTF-8 '
-                         'encoding. Non-UTF-8 strings must be converted to '
+        raise ValueError('%.1024r has type bytes, but isn\'t in 7-bit ASCII '
+                         'encoding. Non-ASCII strings must be converted to '
                          'unicode objects before being added.' %
                          (proposed_value))
     return proposed_value
-
-  def DefaultValue(self):
-    return u""
 
 
 class Int32ValueChecker(IntValueChecker):
@@ -222,13 +199,12 @@ _VALUE_CHECKERS = {
     _FieldDescriptor.CPPTYPE_INT64: Int64ValueChecker(),
     _FieldDescriptor.CPPTYPE_UINT32: Uint32ValueChecker(),
     _FieldDescriptor.CPPTYPE_UINT64: Uint64ValueChecker(),
-    _FieldDescriptor.CPPTYPE_DOUBLE: TypeCheckerWithDefault(
-        0.0, float, int, long),
-    _FieldDescriptor.CPPTYPE_FLOAT: TypeCheckerWithDefault(
-        0.0, float, int, long),
-    _FieldDescriptor.CPPTYPE_BOOL: TypeCheckerWithDefault(
-        False, bool, int),
-    _FieldDescriptor.CPPTYPE_STRING: TypeCheckerWithDefault(b'', bytes),
+    _FieldDescriptor.CPPTYPE_DOUBLE: TypeChecker(
+        float, int, long),
+    _FieldDescriptor.CPPTYPE_FLOAT: TypeChecker(
+        float, int, long),
+    _FieldDescriptor.CPPTYPE_BOOL: TypeChecker(bool, int),
+    _FieldDescriptor.CPPTYPE_STRING: TypeChecker(bytes),
     }
 
 

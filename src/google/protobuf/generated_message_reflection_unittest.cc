@@ -43,16 +43,10 @@
 // rather than generated accessors.
 
 #include <google/protobuf/generated_message_reflection.h>
-#include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
-
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/test_util.h>
 #include <google/protobuf/unittest.pb.h>
 
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
@@ -359,7 +353,7 @@ TEST(GeneratedMessageReflectionTest, ReleaseLast) {
   ASSERT_EQ(2, message.repeated_foreign_message_size());
   const protobuf_unittest::ForeignMessage* expected =
       message.mutable_repeated_foreign_message(1);
-  google::protobuf::scoped_ptr<Message> released(message.GetReflection()->ReleaseLast(
+  scoped_ptr<Message> released(message.GetReflection()->ReleaseLast(
       &message, descriptor->FindFieldByName("repeated_foreign_message")));
   EXPECT_EQ(expected, released.get());
 }
@@ -382,9 +376,9 @@ TEST(GeneratedMessageReflectionTest, ReleaseLastExtensions) {
       unittest::repeated_foreign_message_extension));
   const protobuf_unittest::ForeignMessage* expected = message.MutableExtension(
       unittest::repeated_foreign_message_extension, 1);
-  google::protobuf::scoped_ptr<Message> released(message.GetReflection()->ReleaseLast(
+  scoped_ptr<Message> released(message.GetReflection()->ReleaseLast(
       &message, descriptor->file()->FindExtensionByName(
-                    "repeated_foreign_message_extension")));
+          "repeated_foreign_message_extension")));
   EXPECT_EQ(expected, released.get());
 
 }
@@ -550,57 +544,6 @@ TEST(GeneratedMessageReflectionTest, SetAllocatedExtensionMessageTest) {
       &to_message);
   reflection_tester.ExpectMessagesReleasedViaReflection(
       &to_message, TestUtil::ReflectionTester::IS_NULL);
-}
-
-TEST(GeneratedMessageReflectionTest, AddRepeatedMessage) {
-  unittest::TestAllTypes message;
-
-  const Reflection* reflection = message.GetReflection();
-  const Reflection* nested_reflection =
-      unittest::TestAllTypes::NestedMessage::default_instance().GetReflection();
-
-  const FieldDescriptor* nested_bb =
-      unittest::TestAllTypes::NestedMessage::descriptor()->FindFieldByName(
-          "bb");
-
-  Message* nested = reflection->AddMessage(
-      &message, F("repeated_nested_message"));
-  nested_reflection->SetInt32(nested, nested_bb, 11);
-
-  EXPECT_EQ(11, message.repeated_nested_message(0).bb());
-}
-
-TEST(GeneratedMessageReflectionTest, MutableRepeatedMessage) {
-  unittest::TestAllTypes message;
-
-  const Reflection* reflection = message.GetReflection();
-  const Reflection* nested_reflection =
-      unittest::TestAllTypes::NestedMessage::default_instance().GetReflection();
-
-  const FieldDescriptor* nested_bb =
-      unittest::TestAllTypes::NestedMessage::descriptor()->FindFieldByName(
-          "bb");
-
-  message.add_repeated_nested_message()->set_bb(12);
-
-  Message* nested = reflection->MutableRepeatedMessage(
-      &message, F("repeated_nested_message"), 0);
-  EXPECT_EQ(12, nested_reflection->GetInt32(*nested, nested_bb));
-  nested_reflection->SetInt32(nested, nested_bb, 13);
-  EXPECT_EQ(13, message.repeated_nested_message(0).bb());
-}
-
-TEST(GeneratedMessageReflectionTest, AddAllocatedMessage) {
-  unittest::TestAllTypes message;
-
-  const Reflection* reflection = message.GetReflection();
-
-  unittest::TestAllTypes::NestedMessage* nested =
-      new unittest::TestAllTypes::NestedMessage();
-  nested->set_bb(11);
-  reflection->AddAllocatedMessage(&message, F("repeated_nested_message"), nested);
-  EXPECT_EQ(1, message.repeated_nested_message_size());
-  EXPECT_EQ(11, message.repeated_nested_message(0).bb());
 }
 
 TEST(GeneratedMessageReflectionTest, ListFieldsOneOf) {

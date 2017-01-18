@@ -41,21 +41,12 @@ namespace protobuf {
 namespace compiler {
 namespace cpp {
 
-// Generator options (see generator.cc for a description of each):
+// Generator options:
 struct Options {
-  Options()
-      : safe_boundary_check(false),
-        proto_h(false),
-        annotate_headers(false),
-        enforce_lite(false) {}
-
+  Options() : safe_boundary_check(false) {
+  }
   string dllexport_decl;
   bool safe_boundary_check;
-  bool proto_h;
-  bool annotate_headers;
-  bool enforce_lite;
-  string annotation_pragma_name;
-  string annotation_guard_name;
 };
 
 }  // namespace cpp

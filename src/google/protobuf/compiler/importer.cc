@@ -44,9 +44,6 @@
 
 #include <algorithm>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 
 #include <google/protobuf/compiler/importer.h>
 
@@ -125,7 +122,7 @@ SourceTreeDescriptorDatabase::~SourceTreeDescriptorDatabase() {}
 
 bool SourceTreeDescriptorDatabase::FindFileByName(
     const string& filename, FileDescriptorProto* output) {
-  google::protobuf::scoped_ptr<io::ZeroCopyInputStream> input(source_tree_->Open(filename));
+  scoped_ptr<io::ZeroCopyInputStream> input(source_tree_->Open(filename));
   if (input == NULL) {
     if (error_collector_ != NULL) {
       error_collector_->AddError(filename, -1, 0,
@@ -183,19 +180,6 @@ void SourceTreeDescriptorDatabase::ValidationErrorCollector::AddError(
   int line, column;
   owner_->source_locations_.Find(descriptor, location, &line, &column);
   owner_->error_collector_->AddError(filename, line, column, message);
-}
-
-void SourceTreeDescriptorDatabase::ValidationErrorCollector::AddWarning(
-    const string& filename,
-    const string& element_name,
-    const Message* descriptor,
-    ErrorLocation location,
-    const string& message) {
-  if (owner_->error_collector_ == NULL) return;
-
-  int line, column;
-  owner_->source_locations_.Find(descriptor, location, &line, &column);
-  owner_->error_collector_->AddWarning(filename, line, column, message);
 }
 
 // ===================================================================
@@ -416,7 +400,7 @@ DiskSourceTree::DiskFileToVirtualFile(
   // Verify that we can open the file.  Note that this also has the side-effect
   // of verifying that we are not canonicalizing away any non-existent
   // directories.
-  google::protobuf::scoped_ptr<io::ZeroCopyInputStream> stream(OpenDiskFile(disk_file));
+  scoped_ptr<io::ZeroCopyInputStream> stream(OpenDiskFile(disk_file));
   if (stream == NULL) {
     return CANNOT_OPEN;
   }
@@ -426,7 +410,7 @@ DiskSourceTree::DiskFileToVirtualFile(
 
 bool DiskSourceTree::VirtualFileToDiskFile(const string& virtual_file,
                                            string* disk_file) {
-  google::protobuf::scoped_ptr<io::ZeroCopyInputStream> stream(
+  scoped_ptr<io::ZeroCopyInputStream> stream(
       OpenVirtualFile(virtual_file, disk_file));
   return stream != NULL;
 }

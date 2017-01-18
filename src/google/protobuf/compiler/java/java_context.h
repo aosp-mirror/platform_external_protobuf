@@ -33,9 +33,6 @@
 
 #include <map>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <vector>
 
 #include <google/protobuf/stubs/common.h>
@@ -46,7 +43,6 @@ namespace protobuf {
   class FieldDescriptor;
   class OneofDescriptor;
   class Descriptor;
-  class EnumDescriptor;
   namespace compiler {
     namespace java {
       class ClassNameResolver;  // name_resolver.h
@@ -79,30 +75,15 @@ class Context {
   const OneofGeneratorInfo* GetOneofGeneratorInfo(
       const OneofDescriptor* oneof) const;
 
-  // Enforces all the files (including transitive dependencies) to use
-  // LiteRuntime.
-  void SetEnforceLite(bool enforce_lite) {
-    enforce_lite_ = enforce_lite;
-  }
-
-  bool EnforceLite() const {
-    return enforce_lite_;
-  }
-
-  // Does this message class have generated parsing, serialization, and other
-  // standard methods for which reflection-based fallback implementations exist?
-  bool HasGeneratedMethods(const Descriptor* descriptor) const;
-
  private:
   void InitializeFieldGeneratorInfo(const FileDescriptor* file);
   void InitializeFieldGeneratorInfoForMessage(const Descriptor* message);
   void InitializeFieldGeneratorInfoForFields(
       const vector<const FieldDescriptor*>& fields);
 
-  google::protobuf::scoped_ptr<ClassNameResolver> name_resolver_;
+  scoped_ptr<ClassNameResolver> name_resolver_;
   map<const FieldDescriptor*, FieldGeneratorInfo> field_generator_info_map_;
   map<const OneofDescriptor*, OneofGeneratorInfo> oneof_generator_info_map_;
-  bool enforce_lite_;
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Context);
 };
 
