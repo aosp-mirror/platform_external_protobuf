@@ -87,6 +87,15 @@ cc_library {
     },
 }
 
+// C++ lite library for the platform and host.
+// =======================================================
+cc_library_static {
+    name: "libprotobuf-cpp-lite_static",
+    host_supported: true,
+    defaults: ["libprotobuf-cpp-lite-defaults"],
+    cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
+}
+
 // C++ lite library + rtti (libc++ flavored for the platform and host)
 // =======================================================
 cc_library_shared {
