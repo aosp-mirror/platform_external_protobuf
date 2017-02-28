@@ -491,6 +491,8 @@ class LIBPROTOBUF_EXPORT GeneratedMessageReflection : public Reflection {
 template<typename To, typename From>
 inline To dynamic_cast_if_available(From from) {
 #if defined(GOOGLE_PROTOBUF_NO_RTTI) || (defined(_MSC_VER)&&!defined(_CPPRTTI))
+  // Avoid the compiler warning about unused variables.
+  (void)from;
   return NULL;
 #else
   return dynamic_cast<To>(from);
