@@ -325,6 +325,9 @@ inline void WireFormat::VerifyUTF8StringNamedField(
     const char* field_name) {
 #ifdef GOOGLE_PROTOBUF_UTF8_VALIDATION_ENABLED
   WireFormat::VerifyUTF8StringFallback(data, size, op, field_name);
+#else
+  // Avoid the compiler warning about unused variables.
+  (void)data; (void)size; (void)op; (void)field_name;
 #endif
 }
 
