@@ -66,6 +66,7 @@ cc_library_static {
 cc_library {
     name: "libprotobuf-cpp-lite",
     host_supported: true,
+    vendor_available: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
@@ -82,6 +83,7 @@ cc_library {
 cc_library_shared {
     name: "libprotobuf-cpp-lite-rtti",
     host_supported: true,
+    vendor_available: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
     rtti: true,
@@ -151,13 +153,14 @@ cc_library_shared {
     name: "libprotobuf-cpp-full",
     defaults: ["libprotobuf-cpp-lite-defaults"],
     host_supported: true,
+    vendor_available: true,
 
     srcs: protobuf_cc_full_src_files,
 
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
     target: {
         android: {
-            shared_libs: ["libz"],
+            shared_libs: ["libz", "liblog"],
         },
         host: {
             shared_libs: ["libz-host"],
@@ -170,13 +173,14 @@ cc_library_shared {
 cc_library_shared {
     name: "libprotobuf-cpp-full-rtti",
     defaults: ["libprotobuf-cpp-lite-defaults"],
+    vendor_available: true,
 
     srcs: protobuf_cc_full_src_files,
 
     rtti: true,
     target: {
         android: {
-            shared_libs: ["libz"],
+            shared_libs: ["libz", "liblog"],
         },
         host: {
             shared_libs: ["libz-host"],
