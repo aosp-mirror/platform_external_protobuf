@@ -77,6 +77,9 @@ cc_library {
     name: "libprotobuf-cpp-lite",
     host_supported: true,
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
@@ -204,6 +207,9 @@ cc_library_shared {
     defaults: ["libprotobuf-cpp-lite-defaults"],
     host_supported: true,
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: protobuf_cc_full_src_files,
 
