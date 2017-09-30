@@ -214,12 +214,10 @@ cc_library_shared {
     srcs: protobuf_cc_full_src_files,
 
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
+    shared_libs: ["libz"],
     target: {
         android: {
-            shared_libs: ["libz", "liblog"],
-        },
-        host: {
-            shared_libs: ["libz-host"],
+            shared_libs: ["liblog"],
         },
     },
 }
@@ -234,12 +232,10 @@ cc_library_shared {
     srcs: protobuf_cc_full_src_files,
 
     rtti: true,
+    shared_libs: ["libz"],
     target: {
         android: {
-            shared_libs: ["libz", "liblog"],
-        },
-        host: {
-            shared_libs: ["libz-host"],
+            shared_libs: ["liblog"],
         },
     },
 }
@@ -263,7 +259,7 @@ cc_library_host_shared {
 
     rtti: true,
 
-    shared_libs: ["libz-host"],
+    shared_libs: ["libz"],
 }
 
 // Android Protocol buffer compiler, aprotoc (host executable)
@@ -276,9 +272,6 @@ cc_binary_host {
     target: {
         windows: {
             enabled: true,
-        },
-        not_windows: {
-            host_ldlibs: ["-lpthread"],
         },
     },
 
