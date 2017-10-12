@@ -22,7 +22,33 @@ IGNORED_WARNINGS = [
 ]
 
 cc_defaults {
+    name: "protobuf-cflags-defaults",
+    clang_cflags: [
+        "-Wno-error=unused-const-variable",
+        "-Wno-error=user-defined-warnings",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wno-error=format",
+        "-Wno-error=format-extra-args",
+        "-Wno-error=ignored-qualifiers",
+        "-Wno-error=sign-promo",
+        "-Wno-unused-function",
+    ],
+    target: {
+        android: {
+            cflags: ["-Werror"],
+        },
+        // cannot suppress gcc warning on redefined macros
+        not_windows: {
+            cflags: ["-Werror"],
+        },
+    },
+}
+
+cc_defaults {
     name: "libprotobuf-cpp-lite-defaults",
+    defaults: ["protobuf-cflags-defaults"],
     srcs: [
         "src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc",
         "src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc",
@@ -266,6 +292,7 @@ cc_library_host_shared {
 // =======================================================
 cc_binary_host {
     name: "aprotoc",
+    defaults: ["protobuf-cflags-defaults"],
 
     target: {
         windows: {
