@@ -171,8 +171,6 @@ void FileGenerator::Generate(io::Printer* printer) {
       "package", java_package_);
   }
 
-  printer->Print("\n// @@protoc_insertion_point(imports_scope)\n");
-
   // Note: constants (from enums, emitted in the loop below) may have the same names as constants
   // in the nested classes. This causes Java warnings, but is not fatal, so we suppress those
   // warnings here in the top-most class declaration.
@@ -217,7 +215,7 @@ template<typename GeneratorClass, typename DescriptorClass>
 static void GenerateSibling(const string& package_dir,
                             const string& java_package,
                             const DescriptorClass* descriptor,
-                            OutputDirectory* output_directory,
+                            GeneratorContext* output_directory,
                             vector<string>* file_list,
                             const Params& params) {
   string filename = package_dir + descriptor->name() + ".java";
@@ -240,7 +238,7 @@ static void GenerateSibling(const string& package_dir,
 }
 
 void FileGenerator::GenerateSiblings(const string& package_dir,
-                                     OutputDirectory* output_directory,
+                                     GeneratorContext* output_directory,
                                      vector<string>* file_list) {
   if (params_.java_multiple_files(file_->name())) {
     for (int i = 0; i < file_->message_type_count(); i++) {

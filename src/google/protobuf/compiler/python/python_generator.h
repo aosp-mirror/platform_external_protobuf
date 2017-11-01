@@ -38,6 +38,7 @@
 #include <string>
 
 #include <google/protobuf/compiler/code_generator.h>
+#include <google/protobuf/stubs/mutex.h>
 #include <google/protobuf/stubs/common.h>
 
 namespace google {
@@ -127,6 +128,8 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   void PrintServiceDescriptor(const ServiceDescriptor& descriptor) const;
   void PrintServiceClass(const ServiceDescriptor& descriptor) const;
   void PrintServiceStub(const ServiceDescriptor& descriptor) const;
+  void PrintDescriptorKeyAndModuleName(
+      const ServiceDescriptor& descriptor) const ;
 
   void PrintEnumValueDescriptor(const EnumValueDescriptor& descriptor) const;
   string OptionsValue(const string& class_name,
@@ -147,6 +150,9 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   void FixOptionsForField(const FieldDescriptor& field) const;
   void FixOptionsForEnum(const EnumDescriptor& descriptor) const;
   void FixOptionsForMessage(const Descriptor& descriptor) const;
+
+  void CopyPublicDependenciesAliases(
+      const string& copy_from, const FileDescriptor* file) const;
 
   // Very coarse-grained lock to ensure that Generate() is reentrant.
   // Guards file_, printer_ and file_descriptor_serialized_.
