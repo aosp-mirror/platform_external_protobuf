@@ -32,13 +32,12 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_JAVA_FILE_H__
-#define GOOGLE_PROTOBUF_COMPILER_JAVA_FILE_H__
+#ifndef GOOGLE_PROTOBUF_COMPILER_JAVANANO_FILE_H__
+#define GOOGLE_PROTOBUF_COMPILER_JAVANANO_FILE_H__
 
 #include <string>
 #include <vector>
 #include <google/protobuf/stubs/common.h>
-#include <google/protobuf/compiler/code_generator.h>
 #include <google/protobuf/compiler/javanano/javanano_params.h>
 
 namespace google {
@@ -46,6 +45,9 @@ namespace protobuf {
   class FileDescriptor;        // descriptor.h
   namespace io {
     class Printer;             // printer.h
+  }
+  namespace compiler {
+    class GeneratorContext;     // code_generator.h
   }
 }
 
@@ -69,7 +71,7 @@ class FileGenerator {
   // files other than the outer file (i.e. one for each message, enum, and
   // service type).
   void GenerateSiblings(const string& package_dir,
-                        OutputDirectory* output_directory,
+                        GeneratorContext* output_directory,
                         vector<string>* file_list);
 
   const string& java_package() { return java_package_; }
@@ -89,4 +91,4 @@ class FileGenerator {
 }  // namespace protobuf
 
 }  // namespace google
-#endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_FILE_H__
+#endif  // GOOGLE_PROTOBUF_COMPILER_JAVANANO_FILE_H__

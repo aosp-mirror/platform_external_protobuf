@@ -40,13 +40,21 @@
 // reflection_ops_unittest, cover the rest of the functionality used by
 // DynamicMessage.
 
+#include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
+
+#include <google/protobuf/stubs/scoped_ptr.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/dynamic_message.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/test_util.h>
 #include <google/protobuf/unittest.pb.h>
+#include <google/protobuf/unittest_no_field_presence.pb.h>
 
+#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
 
@@ -65,6 +73,8 @@ class DynamicMessageTest : public testing::Test {
   const Message* packed_prototype_;
   const Descriptor* oneof_descriptor_;
   const Message* oneof_prototype_;
+  const Descriptor* proto3_descriptor_;
+  const Message* proto3_prototype_;
 
   DynamicMessageTest(): factory_(&pool_) {}
 
@@ -76,16 +86,20 @@ class DynamicMessageTest : public testing::Test {
     FileDescriptorProto unittest_file;
     FileDescriptorProto unittest_import_file;
     FileDescriptorProto unittest_import_public_file;
+    FileDescriptorProto unittest_no_field_presence_file;
 
     unittest::TestAllTypes::descriptor()->file()->CopyTo(&unittest_file);
     unittest_import::ImportMessage::descriptor()->file()->CopyTo(
       &unittest_import_file);
     unittest_import::PublicImportMessage::descriptor()->file()->CopyTo(
       &unittest_import_public_file);
+    proto2_nofieldpresence_unittest::TestAllTypes::descriptor()->
+        file()->CopyTo(&unittest_no_field_presence_file);
 
     ASSERT_TRUE(pool_.BuildFile(unittest_import_public_file) != NULL);
     ASSERT_TRUE(pool_.BuildFile(unittest_import_file) != NULL);
     ASSERT_TRUE(pool_.BuildFile(unittest_file) != NULL);
+    ASSERT_TRUE(pool_.BuildFile(unittest_no_field_presence_file) != NULL);
 
     descriptor_ = pool_.FindMessageTypeByName("protobuf_unittest.TestAllTypes");
     ASSERT_TRUE(descriptor_ != NULL);
@@ -105,6 +119,12 @@ class DynamicMessageTest : public testing::Test {
       pool_.FindMessageTypeByName("protobuf_unittest.TestOneof2");
     ASSERT_TRUE(oneof_descriptor_ != NULL);
     oneof_prototype_ = factory_.GetPrototype(oneof_descriptor_);
+
+    proto3_descriptor_ =
+      pool_.FindMessageTypeByName(
+          "proto2_nofieldpresence_unittest.TestAllTypes");
+    ASSERT_TRUE(proto3_descriptor_ != NULL);
+    proto3_prototype_ = factory_.GetPrototype(proto3_descriptor_);
   }
 };
 
@@ -129,7 +149,7 @@ TEST_F(DynamicMessageTest, IndependentOffsets) {
   // Check that all fields have independent offsets by setting each
   // one to a unique value then checking that they all still have those
   // unique values (i.e. they don't stomp each other).
-  scoped_ptr<Message> message(prototype_->New());
+  google::protobuf::scoped_ptr<Message> message(prototype_->New());
   TestUtil::ReflectionTester reflection_tester(descriptor_);
 
   reflection_tester.SetAllFieldsViaReflection(message.get());
@@ -138,7 +158,7 @@ TEST_F(DynamicMessageTest, IndependentOffsets) {
 
 TEST_F(DynamicMessageTest, Extensions) {
   // Check that extensions work.
-  scoped_ptr<Message> message(extensions_prototype_->New());
+  google::protobuf::scoped_ptr<Message> message(extensions_prototype_->New());
   TestUtil::ReflectionTester reflection_tester(extensions_descriptor_);
 
   reflection_tester.SetAllFieldsViaReflection(message.get());
@@ -147,7 +167,7 @@ TEST_F(DynamicMessageTest, Extensions) {
 
 TEST_F(DynamicMessageTest, PackedFields) {
   // Check that packed fields work properly.
-  scoped_ptr<Message> message(packed_prototype_->New());
+  google::protobuf::scoped_ptr<Message> message(packed_prototype_->New());
   TestUtil::ReflectionTester reflection_tester(packed_descriptor_);
 
   reflection_tester.SetPackedFieldsViaReflection(message.get());
@@ -156,7 +176,7 @@ TEST_F(DynamicMessageTest, PackedFields) {
 
 TEST_F(DynamicMessageTest, Oneof) {
   // Check that oneof fields work properly.
-  scoped_ptr<Message> message(oneof_prototype_->New());
+  google::protobuf::scoped_ptr<Message> message(oneof_prototype_->New());
 
   // Check default values.
   const Descriptor* descriptor = message->GetDescriptor();
@@ -217,7 +237,7 @@ TEST_F(DynamicMessageTest, SpaceUsed) {
   // Since we share the implementation with generated messages, we don't need
   // to test very much here.  Just make sure it appears to be working.
 
-  scoped_ptr<Message> message(prototype_->New());
+  google::protobuf::scoped_ptr<Message> message(prototype_->New());
   TestUtil::ReflectionTester reflection_tester(descriptor_);
 
   int initial_space_used = message->SpaceUsed();
@@ -225,6 +245,48 @@ TEST_F(DynamicMessageTest, SpaceUsed) {
   reflection_tester.SetAllFieldsViaReflection(message.get());
   EXPECT_LT(initial_space_used, message->SpaceUsed());
 }
+
+TEST_F(DynamicMessageTest, Arena) {
+  Arena arena;
+  Message* message = prototype_->New(&arena);
+  (void)message;  // avoid unused-variable error.
+  // Return without freeing: should not leak.
+}
+
+TEST_F(DynamicMessageTest, Proto3) {
+  Message* message = proto3_prototype_->New();
+  const Reflection* refl = message->GetReflection();
+  const Descriptor* desc = message->GetDescriptor();
+
+  // Just test a single primtive and single message field here to make sure we
+  // are getting the no-field-presence semantics elsewhere. DynamicMessage uses
+  // GeneratedMessageReflection under the hood, so the rest should be fine as
+  // long as GMR recognizes that we're using a proto3 message.
+  const FieldDescriptor* optional_int32 =
+      desc->FindFieldByName("optional_int32");
+  const FieldDescriptor* optional_msg =
+      desc->FindFieldByName("optional_nested_message");
+  EXPECT_TRUE(optional_int32 != NULL);
+  EXPECT_TRUE(optional_msg != NULL);
+
+  EXPECT_EQ(false, refl->HasField(*message, optional_int32));
+  refl->SetInt32(message, optional_int32, 42);
+  EXPECT_EQ(true, refl->HasField(*message, optional_int32));
+  refl->SetInt32(message, optional_int32, 0);
+  EXPECT_EQ(false, refl->HasField(*message, optional_int32));
+
+  EXPECT_EQ(false, refl->HasField(*message, optional_msg));
+  refl->MutableMessage(message, optional_msg);
+  EXPECT_EQ(true, refl->HasField(*message, optional_msg));
+  delete refl->ReleaseMessage(message, optional_msg);
+  EXPECT_EQ(false, refl->HasField(*message, optional_msg));
+
+  // Also ensure that the default instance handles field presence properly.
+  EXPECT_EQ(false, refl->HasField(*proto3_prototype_, optional_msg));
+
+  delete message;
+}
+
 
 }  // namespace protobuf
 }  // namespace google
