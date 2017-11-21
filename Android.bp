@@ -36,8 +36,8 @@ cc_defaults {
         "-Wno-unused-function",
     ],
     target: {
-        android: {
-            cflags: ["-Werror"],
+        windows: {
+            cflags: ["-Wno-error"],
         },
         // cannot suppress gcc warning on redefined macros
         not_windows: {
