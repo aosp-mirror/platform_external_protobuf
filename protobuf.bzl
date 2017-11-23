@@ -187,6 +187,7 @@ def cc_proto_library(
       visibility=["//visibility:public"],
   )
 
+  cc_libs = list(cc_libs)
   if default_runtime and not default_runtime in cc_libs:
     cc_libs += [default_runtime]
   if use_grpc_plugin:
@@ -272,6 +273,7 @@ def py_proto_library(
       visibility=["//visibility:public"],
   )
 
+  py_libs = list(py_libs)
   if default_runtime and not default_runtime in py_libs + deps:
     py_libs += [default_runtime]
 
