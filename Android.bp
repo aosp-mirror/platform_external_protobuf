@@ -43,6 +43,9 @@ cc_defaults {
         not_windows: {
             cflags: ["-Werror"],
         },
+        android: {
+            cflags: ["-Werror"],
+        },
     },
 }
 
