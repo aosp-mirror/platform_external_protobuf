@@ -276,6 +276,8 @@ cc_library_host_shared {
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
     srcs: protobuf_cc_full_src_files + [
+        "src/google/protobuf/compiler/code_generator.cc",
+        "src/google/protobuf/compiler/plugin.cc",
         "src/google/protobuf/compiler/plugin.pb.cc",
     ],
 
