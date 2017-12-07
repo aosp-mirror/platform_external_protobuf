@@ -29,7 +29,7 @@ LINK_OPTS = select({
 })
 
 load(
-    "protobuf",
+    ":protobuf.bzl",
     "cc_proto_library",
     "py_proto_library",
     "internal_gen_well_known_protos_java",
