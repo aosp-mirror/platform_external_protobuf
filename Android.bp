@@ -36,11 +36,14 @@ cc_defaults {
         "-Wno-unused-function",
     ],
     target: {
-        android: {
-            cflags: ["-Werror"],
+        windows: {
+            cflags: ["-Wno-error"],
         },
         // cannot suppress gcc warning on redefined macros
         not_windows: {
+            cflags: ["-Werror"],
+        },
+        android: {
             cflags: ["-Werror"],
         },
     },
@@ -273,6 +276,8 @@ cc_library_host_shared {
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
     srcs: protobuf_cc_full_src_files + [
+        "src/google/protobuf/compiler/code_generator.cc",
+        "src/google/protobuf/compiler/plugin.cc",
         "src/google/protobuf/compiler/plugin.pb.cc",
     ],
 
