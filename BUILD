@@ -29,7 +29,7 @@ LINK_OPTS = select({
 })
 
 load(
-    "protobuf",
+    ":protobuf.bzl",
     "cc_proto_library",
     "py_proto_library",
     "internal_gen_well_known_protos_java",
@@ -540,12 +540,12 @@ java_library(
     srcs = glob([
         "java/util/src/main/java/com/google/protobuf/util/*.java",
     ]),
+    visibility = ["//visibility:public"],
     deps = [
         "protobuf_java",
         "//external:gson",
         "//external:guava",
     ],
-    visibility = ["//visibility:public"],
 )
 
 ################################################################################
@@ -564,8 +564,8 @@ py_library(
             "python/google/protobuf/internal/test_util.py",
         ],
     ),
-    srcs_version = "PY2AND3",
     imports = ["python"],
+    srcs_version = "PY2AND3",
 )
 
 cc_binary(
@@ -637,7 +637,7 @@ py_proto_library(
     protoc = ":protoc",
     py_libs = [
         ":python_srcs",
-        "//external:six"
+        "//external:six",
     ],
     srcs_version = "PY2AND3",
     visibility = ["//visibility:public"],
