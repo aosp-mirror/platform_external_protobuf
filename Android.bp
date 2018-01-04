@@ -97,7 +97,7 @@ cc_library_static {
 
     sdk_version: "9",
 
-    stl: "stlport_static",
+    stl: "c++_static",
 }
 
 // C++ lite library for the platform and host.
@@ -211,7 +211,7 @@ cc_library_static {
 
     sdk_version: "9",
 
-    stl: "stlport_static",
+    stl: "c++_static",
 }
 
 // C++ full library for the platform and host
