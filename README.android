@@ -1,10 +1,14 @@
 URL: http://code.google.com/p/protobuf/downloads/list
-Version: 2.2.0a
+Version: v3.0.0-beta3
 License: Google BSD like
 Description: "Protobuf: The Google protobuf compiler and runtimes for various languages"
 
-Local Modifications: Initial changes include support for the micro
-protobuf compiler and the assoicated runtime.
+Local changes:
+
+Local Modifications:
+ - Initial changes include support for the micro protobuf compiler and the
+   assoicated runtime.
+ - https://github.com/google/protobuf/pull/2732: const FieldDescriptorCompare
 
 Protocol Buffers are a way of encoding structured data in an efficient
 yet extensible format. Google uses Protocol Buffers for almost all
