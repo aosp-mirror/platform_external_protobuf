@@ -591,4 +591,7 @@ java_library {
     host_supported: true,
     srcs: ["java/core/src/stubs/**/*.java"],
     sdk_version: "core_current",
+    // This library can't be build with JDK9 since the same package (sun.misc) already
+    // exist in jdk.unsupported module. Using the same Java version as libprotobuf-java-lite.
+    java_version: "1.7",
 }
