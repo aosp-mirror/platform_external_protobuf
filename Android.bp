@@ -594,4 +594,5 @@ java_library {
     // This library can't be build with JDK9 since the same package (sun.misc) already
     // exist in jdk.unsupported module. Using the same Java version as libprotobuf-java-lite.
     java_version: "1.7",
+    installable: false,
 }
