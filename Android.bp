@@ -550,7 +550,11 @@ java_library_static {
         "java/core/src/main/java/com/google/protobuf/WireFormat.java",
     ],
 
-    libs: ["libcore_private.stubs"],
+    target: {
+        android: {
+            libs: ["libcore_private.stubs"],
+        },
+    },
 
     java_version: "1.7",
 }
@@ -588,7 +592,7 @@ java_library_host {
 // =======================================================
 java_library {
     name: "libcore_private.stubs",
-    host_supported: true,
     srcs: ["java/core/src/stubs/**/*.java"],
     sdk_version: "core_current",
+    installable: false,
 }
