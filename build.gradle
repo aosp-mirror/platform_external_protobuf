@@ -89,7 +89,7 @@ sourceSets {
 
 if (project == rootProject) {
     ext.getAndroidPrebuilt = { apiLevel ->
-        files("$rootDir/../../prebuilts/sdk/$apiLevel/android.jar")
+        files("$rootDir/../../prebuilts/sdk/$apiLevel/public/android.jar")
     }
 }
 
