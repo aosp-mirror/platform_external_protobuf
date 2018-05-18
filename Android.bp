@@ -613,6 +613,9 @@ python_library {
             enabled: true,
         },
     },
+    libs: [
+        "py-six",
+    ],
     proto: {
         local_include_dirs: [
             "src",
