@@ -572,11 +572,16 @@ java_library_host {
     name: "libprotobuf-java-full",
 
     srcs: [
-        // This contains more source files than needed for the full version, but the
-        // additional files should not create any conflict.
         "java/core/src/main/java/**/*.java",
-        "src/google/protobuf/descriptor.proto",
+        ":libprotobuf-internal-protos",
     ],
+
+    proto: {
+        local_include_dirs: [
+            "src",
+        ],
+        canonical_path_from_root: false,
+    },
 
     java_version: "1.7",
 }
