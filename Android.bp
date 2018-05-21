@@ -97,7 +97,7 @@ cc_library_static {
 
     sdk_version: "9",
 
-    stl: "stlport_static",
+    stl: "c++_static",
 }
 
 // C++ lite library for the platform and host.
@@ -142,108 +142,95 @@ cc_library_shared {
 
 // C++ full library
 // =======================================================
-protobuf_cc_full_src_files = [
-    "src/google/protobuf/any.pb.cc",
-    "src/google/protobuf/api.pb.cc",
-    "src/google/protobuf/stubs/mathlimits.cc",
-    "src/google/protobuf/any.cc",
-    "src/google/protobuf/descriptor.cc",
-    "src/google/protobuf/descriptor_database.cc",
-    "src/google/protobuf/descriptor.pb.cc",
-    "src/google/protobuf/duration.pb.cc",
-    "src/google/protobuf/dynamic_message.cc",
-    "src/google/protobuf/empty.pb.cc",
-    "src/google/protobuf/extension_set_heavy.cc",
-    "src/google/protobuf/field_mask.pb.cc",
-    "src/google/protobuf/generated_message_reflection.cc",
-    "src/google/protobuf/map_field.cc",
-    "src/google/protobuf/message.cc",
-    "src/google/protobuf/reflection_ops.cc",
-    "src/google/protobuf/service.cc",
-    "src/google/protobuf/source_context.pb.cc",
-    "src/google/protobuf/struct.pb.cc",
-    "src/google/protobuf/stubs/substitute.cc",
-    "src/google/protobuf/text_format.cc",
-    "src/google/protobuf/timestamp.pb.cc",
-    "src/google/protobuf/type.pb.cc",
-    "src/google/protobuf/unknown_field_set.cc",
-    "src/google/protobuf/wire_format.cc",
-    "src/google/protobuf/wrappers.pb.cc",
-    "src/google/protobuf/io/gzip_stream.cc",
-    "src/google/protobuf/io/printer.cc",
-    "src/google/protobuf/io/strtod.cc",
-    "src/google/protobuf/io/tokenizer.cc",
-    "src/google/protobuf/io/zero_copy_stream_impl.cc",
-    "src/google/protobuf/compiler/importer.cc",
-    "src/google/protobuf/compiler/parser.cc",
-    "src/google/protobuf/util/field_comparator.cc",
-    "src/google/protobuf/util/field_mask_util.cc",
-    "src/google/protobuf/util/internal/datapiece.cc",
-    "src/google/protobuf/util/internal/default_value_objectwriter.cc",
-    "src/google/protobuf/util/internal/error_listener.cc",
-    "src/google/protobuf/util/internal/field_mask_utility.cc",
-    "src/google/protobuf/util/internal/json_escaping.cc",
-    "src/google/protobuf/util/internal/json_objectwriter.cc",
-    "src/google/protobuf/util/internal/json_stream_parser.cc",
-    "src/google/protobuf/util/internal/object_writer.cc",
-    "src/google/protobuf/util/internal/protostream_objectsource.cc",
-    "src/google/protobuf/util/internal/protostream_objectwriter.cc",
-    "src/google/protobuf/util/internal/proto_writer.cc",
-    "src/google/protobuf/util/internal/type_info.cc",
-    "src/google/protobuf/util/internal/type_info_test_helper.cc",
-    "src/google/protobuf/util/internal/utility.cc",
-    "src/google/protobuf/util/json_util.cc",
-    "src/google/protobuf/util/message_differencer.cc",
-    "src/google/protobuf/util/time_util.cc",
-    "src/google/protobuf/util/type_resolver_util.cc",
-]
+cc_defaults {
+    name: "libprotobuf-cpp-full-defaults",
+    defaults: ["libprotobuf-cpp-lite-defaults"],
+
+    srcs: [
+        "src/google/protobuf/any.pb.cc",
+        "src/google/protobuf/api.pb.cc",
+        "src/google/protobuf/stubs/mathlimits.cc",
+        "src/google/protobuf/any.cc",
+        "src/google/protobuf/descriptor.cc",
+        "src/google/protobuf/descriptor_database.cc",
+        "src/google/protobuf/descriptor.pb.cc",
+        "src/google/protobuf/duration.pb.cc",
+        "src/google/protobuf/dynamic_message.cc",
+        "src/google/protobuf/empty.pb.cc",
+        "src/google/protobuf/extension_set_heavy.cc",
+        "src/google/protobuf/field_mask.pb.cc",
+        "src/google/protobuf/generated_message_reflection.cc",
+        "src/google/protobuf/map_field.cc",
+        "src/google/protobuf/message.cc",
+        "src/google/protobuf/reflection_ops.cc",
+        "src/google/protobuf/service.cc",
+        "src/google/protobuf/source_context.pb.cc",
+        "src/google/protobuf/struct.pb.cc",
+        "src/google/protobuf/stubs/substitute.cc",
+        "src/google/protobuf/text_format.cc",
+        "src/google/protobuf/timestamp.pb.cc",
+        "src/google/protobuf/type.pb.cc",
+        "src/google/protobuf/unknown_field_set.cc",
+        "src/google/protobuf/wire_format.cc",
+        "src/google/protobuf/wrappers.pb.cc",
+        "src/google/protobuf/io/gzip_stream.cc",
+        "src/google/protobuf/io/printer.cc",
+        "src/google/protobuf/io/strtod.cc",
+        "src/google/protobuf/io/tokenizer.cc",
+        "src/google/protobuf/io/zero_copy_stream_impl.cc",
+        "src/google/protobuf/compiler/importer.cc",
+        "src/google/protobuf/compiler/parser.cc",
+        "src/google/protobuf/util/field_comparator.cc",
+        "src/google/protobuf/util/field_mask_util.cc",
+        "src/google/protobuf/util/internal/datapiece.cc",
+        "src/google/protobuf/util/internal/default_value_objectwriter.cc",
+        "src/google/protobuf/util/internal/error_listener.cc",
+        "src/google/protobuf/util/internal/field_mask_utility.cc",
+        "src/google/protobuf/util/internal/json_escaping.cc",
+        "src/google/protobuf/util/internal/json_objectwriter.cc",
+        "src/google/protobuf/util/internal/json_stream_parser.cc",
+        "src/google/protobuf/util/internal/object_writer.cc",
+        "src/google/protobuf/util/internal/protostream_objectsource.cc",
+        "src/google/protobuf/util/internal/protostream_objectwriter.cc",
+        "src/google/protobuf/util/internal/proto_writer.cc",
+        "src/google/protobuf/util/internal/type_info.cc",
+        "src/google/protobuf/util/internal/type_info_test_helper.cc",
+        "src/google/protobuf/util/internal/utility.cc",
+        "src/google/protobuf/util/json_util.cc",
+        "src/google/protobuf/util/message_differencer.cc",
+        "src/google/protobuf/util/time_util.cc",
+        "src/google/protobuf/util/type_resolver_util.cc",
+    ],
+
+    cflags: ["-DHAVE_ZLIB=1"],
+    shared_libs: ["libz"],
+}
 
 // C++ full library for the NDK.
 // =======================================================
 cc_library_static {
     name: "libprotobuf-cpp-full-ndk",
-    defaults: ["libprotobuf-cpp-lite-defaults"],
-
-    srcs: protobuf_cc_full_src_files,
-    shared_libs: ["libz"],
+    defaults: ["libprotobuf-cpp-full-defaults"],
 
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
 
     sdk_version: "9",
 
-    stl: "stlport_static",
-}
-
-// C++ full library for the NDK, Gnustl+rtti version.
-// =======================================================
-cc_library_static {
-    name: "libprotobuf-cpp-full-ndk-gnustl-rtti",
-    defaults: ["libprotobuf-cpp-lite-defaults"],
-
-    srcs: protobuf_cc_full_src_files,
-    shared_libs: ["libz"],
-
-    rtti: true,
-    sdk_version: "14",
-    stl: "gnustl_static",
-
+    stl: "c++_static",
 }
 
 // C++ full library for the platform and host
 // =======================================================
 cc_library_shared {
     name: "libprotobuf-cpp-full",
-    defaults: ["libprotobuf-cpp-lite-defaults"],
+    defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
     vendor_available: true,
     vndk: {
         enabled: true,
     },
 
-    srcs: protobuf_cc_full_src_files,
-
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
-    shared_libs: ["libz"],
     target: {
         android: {
             shared_libs: ["liblog"],
@@ -255,13 +242,10 @@ cc_library_shared {
 // =======================================================
 cc_library_shared {
     name: "libprotobuf-cpp-full-rtti",
-    defaults: ["libprotobuf-cpp-lite-defaults"],
+    defaults: ["libprotobuf-cpp-full-defaults"],
     vendor_available: true,
 
-    srcs: protobuf_cc_full_src_files,
-
     rtti: true,
-    shared_libs: ["libz"],
     target: {
         android: {
             shared_libs: ["liblog"],
@@ -273,9 +257,9 @@ cc_library_shared {
 // =======================================================
 cc_library_host_shared {
     name: "libprotoc",
-    defaults: ["libprotobuf-cpp-lite-defaults"],
+    defaults: ["libprotobuf-cpp-full-defaults"],
 
-    srcs: protobuf_cc_full_src_files + [
+    srcs: [
         "src/google/protobuf/compiler/code_generator.cc",
         "src/google/protobuf/compiler/plugin.cc",
         "src/google/protobuf/compiler/plugin.pb.cc",
@@ -284,11 +268,12 @@ cc_library_host_shared {
     local_include_dirs: [
         "config",
     ],
-    export_include_dirs: ["src", "config"],
+    export_include_dirs: [
+        "src",
+        "config",
+    ],
 
     rtti: true,
-
-    shared_libs: ["libz"],
 }
 
 // Android Protocol buffer compiler, aprotoc (host executable)
@@ -462,7 +447,9 @@ cc_binary_host {
 
     static_libs: ["libz"],
 
-    cflags: IGNORED_WARNINGS,
+    cflags: IGNORED_WARNINGS + [
+        "-DHAVE_ZLIB=1",
+    ],
 
 }
 
@@ -519,7 +506,7 @@ java_library_host {
 java_library_static {
     name: "libprotobuf-java-lite",
     host_supported: true,
-    no_framework_libs: true,
+    sdk_version: "core_current",
 
     srcs: [
         "java/core/src/main/java/com/google/protobuf/AbstractMessageLite.java",
@@ -563,6 +550,12 @@ java_library_static {
         "java/core/src/main/java/com/google/protobuf/WireFormat.java",
     ],
 
+    target: {
+        android: {
+            libs: ["libcore_private.stubs"],
+        },
+    },
+
     java_version: "1.7",
 }
 
@@ -579,11 +572,16 @@ java_library_host {
     name: "libprotobuf-java-full",
 
     srcs: [
-        // This contains more source files than needed for the full version, but the
-        // additional files should not create any conflict.
         "java/core/src/main/java/**/*.java",
-        "src/google/protobuf/descriptor.proto",
+        ":libprotobuf-internal-protos",
     ],
+
+    proto: {
+        local_include_dirs: [
+            "src",
+        ],
+        canonical_path_from_root: false,
+    },
 
     java_version: "1.7",
 }
@@ -593,4 +591,66 @@ java_library_host {
 java_library_host {
     name: "host-libprotobuf-java-full",
     static_libs: ["libprotobuf-java-full"],
+}
+
+// Stubs library for using hidden APIs in core-oj and core-libart
+// =======================================================
+java_library {
+    name: "libcore_private.stubs",
+    srcs: ["java/core/src/stubs/**/*.java"],
+    sdk_version: "core_current",
+    installable: false,
+}
+
+// Python library
+// =======================================================
+python_library {
+    name: "libprotobuf-python",
+    srcs: [
+        ":libprotobuf-internal-python-srcs",
+        ":libprotobuf-internal-protos",
+    ],
+    version: {
+        py2: {
+            enabled: true,
+        },
+        py3: {
+            enabled: true,
+        },
+    },
+    libs: [
+        "py-six",
+    ],
+    proto: {
+        local_include_dirs: [
+            "src",
+        ],
+        canonical_path_from_root: false,
+    },
+    host_supported: true,
+}
+
+filegroup {
+    name: "libprotobuf-internal-python-srcs",
+    srcs: ["python/google/**/*.py"],
+    path: "python",
+}
+
+filegroup {
+    name: "libprotobuf-internal-protos",
+    srcs: [
+        "src/google/protobuf/descriptor.proto",
+        "src/google/protobuf/any.proto",
+        "src/google/protobuf/source_context.proto",
+        "src/google/protobuf/type.proto",
+        "src/google/protobuf/compiler/plugin.proto",
+        "src/google/protobuf/api.proto",
+        "src/google/protobuf/duration.proto",
+        "src/google/protobuf/empty.proto",
+        "src/google/protobuf/field_mask.proto",
+        "src/google/protobuf/struct.proto",
+        "src/google/protobuf/timestamp.proto",
+        "src/google/protobuf/wrappers.proto",
+    ],
+    path: "src",
 }
