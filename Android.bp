@@ -453,10 +453,18 @@ cc_binary_host {
 
 }
 
+java_defaults {
+    name: "libprotobuf_errorprone_defaults",
+    errorprone: {
+        javacflags: ["-Xep:MissingOverride:OFF"],  // b/73499927
+    },
+}
+
 // Java nano library
 // =======================================================
 java_library_static {
     name: "libprotobuf-java-nano",
+    defaults: ["libprotobuf_errorprone_defaults"],
     host_supported: true,
 
     sdk_version: "9",
@@ -487,6 +495,7 @@ java_library_host {
 // =======================================================
 java_library_static {
     name: "libprotobuf-java-micro",
+    defaults: ["libprotobuf_errorprone_defaults"],
     host_supported: true,
 
     sdk_version: "8",
@@ -570,6 +579,7 @@ java_library_host {
 // =======================================================
 java_library_host {
     name: "libprotobuf-java-full",
+    defaults: ["libprotobuf_errorprone_defaults"],
 
     srcs: [
         "java/core/src/main/java/**/*.java",
