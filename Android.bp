@@ -105,6 +105,7 @@ cc_library_static {
 cc_library {
     name: "libprotobuf-cpp-lite",
     host_supported: true,
+    recovery_available: true,
     vendor_available: true,
     vndk: {
         enabled: true,
