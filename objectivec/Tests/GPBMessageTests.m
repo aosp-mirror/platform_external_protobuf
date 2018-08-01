@@ -1082,6 +1082,20 @@
   [repeatedStringArray release];
 }
 
+- (void)testSetOverAutocreatedArrayAndSetAgain {
+  // Ensure when dealing with replacing an array it is handled being either
+  // an autocreated one or a straight NSArray.
+
+  // The real test here is that nothing crashes while doing the work.
+  TestAllTypes *message = [TestAllTypes message];
+  [message.repeatedStringArray addObject:@"foo"];
+  XCTAssertEqual(message.repeatedStringArray_Count, (NSUInteger)1);
+  message.repeatedStringArray = [NSMutableArray arrayWithObjects:@"bar", @"bar2", nil];
+  XCTAssertEqual(message.repeatedStringArray_Count, (NSUInteger)2);
+  message.repeatedStringArray = [NSMutableArray arrayWithObject:@"baz"];
+  XCTAssertEqual(message.repeatedStringArray_Count, (NSUInteger)1);
+}
+
 - (void)testReplaceAutocreatedArray {
   // Replacing array should orphan the old one and cause its creator to become
   // visible.
@@ -1171,7 +1185,7 @@
   XCTAssertFalse([message2.a hasA]);
 
   // But adding an element to the map should.
-  [message.a.a.iToI setValue:100 forKey:200];
+  [message.a.a.iToI setInt32:100 forKey:200];
   XCTAssertTrue([message hasA]);
   XCTAssertTrue([message.a hasA]);
   XCTAssertEqual([message.a.a.iToI count], (NSUInteger)1);
@@ -1190,7 +1204,7 @@
   message1a.a.iToI = message1b.a.iToI;
   XCTAssertTrue([message1a hasA]);
   XCTAssertFalse([message1b hasA]);
-  [message1a.a.iToI setValue:1 forKey:2];
+  [message1a.a.iToI setInt32:1 forKey:2];
   XCTAssertTrue([message1a hasA]);
   XCTAssertTrue([message1b hasA]);
   XCTAssertEqual(message1a.a.iToI, message1b.a.iToI);
@@ -1224,7 +1238,8 @@
   // with different objects that are equal).
   TestRecursiveMessageWithRepeatedField *message3 =
       [TestRecursiveMessageWithRepeatedField message];
-  message3.iToI = [GPBInt32Int32Dictionary dictionaryWithValue:10 forKey:20];
+  message3.iToI = [[[GPBInt32Int32Dictionary alloc] init] autorelease];
+  [message3.iToI setInt32:10 forKey:20];
   message3.strToStr =
       [NSMutableDictionary dictionaryWithObject:@"abc" forKey:@"123"];
   XCTAssertNotNil(message.iToI);
@@ -1281,6 +1296,23 @@
   [strToStr release];
 }
 
+- (void)testSetOverAutocreatedMapAndSetAgain {
+  // Ensure when dealing with replacing a map it is handled being either
+  // an autocreated one or a straight NSDictionary.
+
+  // The real test here is that nothing crashes while doing the work.
+  TestRecursiveMessageWithRepeatedField *message =
+      [TestRecursiveMessageWithRepeatedField message];
+  message.strToStr[@"foo"] = @"bar";
+  XCTAssertEqual(message.strToStr_Count, (NSUInteger)1);
+  message.strToStr =
+      [NSMutableDictionary dictionaryWithObjectsAndKeys:@"bar", @"key1", @"baz", @"key2", nil];
+  XCTAssertEqual(message.strToStr_Count, (NSUInteger)2);
+  message.strToStr =
+      [NSMutableDictionary dictionaryWithObject:@"baz" forKey:@"mumble"];
+  XCTAssertEqual(message.strToStr_Count, (NSUInteger)1);
+}
+
 - (void)testReplaceAutocreatedMap {
   // Replacing map should orphan the old one and cause its creator to become
   // visible.
@@ -1292,7 +1324,8 @@
     XCTAssertFalse([message hasA]);
     GPBInt32Int32Dictionary *iToI = [message.a.iToI retain];
     XCTAssertEqual(iToI->_autocreator, message.a);  // Pointer comparision
-    message.a.iToI = [GPBInt32Int32Dictionary dictionaryWithValue:6 forKey:7];
+    message.a.iToI = [[[GPBInt32Int32Dictionary alloc] init] autorelease];
+    [message.a.iToI setInt32:6 forKey:7];
     XCTAssertTrue([message hasA]);
     XCTAssertNotEqual(message.a.iToI, iToI);  // Pointer comparision
     XCTAssertNil(iToI->_autocreator);
@@ -2017,6 +2050,57 @@
   msg1.boolField2 = NO;
   XCTAssertEqualObjects(msg1Prime, msg1);
   XCTAssertEqual([msg1 hash], [msg1Prime hash]);
+}
+
+- (void)testCopyingMapFileds {
+  TestMessageOfMaps *msg = [TestMessageOfMaps message];
+
+  msg.strToStr[@"foo"] = @"bar";
+
+  [msg.strToInt setInt32:1 forKey:@"mumble"];
+  [msg.intToStr setObject:@"wee" forKey:42];
+  [msg.intToInt setInt32:123 forKey:321];
+
+  [msg.strToBool setBool:YES forKey:@"one"];
+  [msg.boolToStr setObject:@"something" forKey:YES];
+  [msg.boolToBool setBool:YES forKey:NO];
+
+  [msg.intToBool setBool:YES forKey:13];
+  [msg.boolToInt setInt32:111 forKey:NO];
+
+  TestAllTypes *subMsg1 = [TestAllTypes message];
+  subMsg1.optionalInt32 = 1;
+  TestAllTypes *subMsg2 = [TestAllTypes message];
+  subMsg1.optionalInt32 = 2;
+  TestAllTypes *subMsg3 = [TestAllTypes message];
+  subMsg1.optionalInt32 = 3;
+
+  msg.strToMsg[@"baz"] = subMsg1;
+  [msg.intToMsg setObject:subMsg2 forKey:222];
+  [msg.boolToMsg setObject:subMsg3 forKey:YES];
+
+  TestMessageOfMaps *msg2 = [[msg copy] autorelease];
+  XCTAssertNotNil(msg2);
+  XCTAssertEqualObjects(msg2, msg);
+  XCTAssertTrue(msg2 != msg);  // ptr compare
+  XCTAssertTrue(msg.strToStr != msg2.strToStr);  // ptr compare
+  XCTAssertTrue(msg.intToStr != msg2.intToStr);  // ptr compare
+  XCTAssertTrue(msg.intToInt != msg2.intToInt);  // ptr compare
+  XCTAssertTrue(msg.strToBool != msg2.strToBool);  // ptr compare
+  XCTAssertTrue(msg.boolToStr != msg2.boolToStr);  // ptr compare
+  XCTAssertTrue(msg.boolToBool != msg2.boolToBool);  // ptr compare
+  XCTAssertTrue(msg.intToBool != msg2.intToBool);  // ptr compare
+  XCTAssertTrue(msg.boolToInt != msg2.boolToInt);  // ptr compare
+  XCTAssertTrue(msg.strToMsg != msg2.strToMsg);  // ptr compare
+  XCTAssertTrue(msg.intToMsg != msg2.intToMsg);  // ptr compare
+  XCTAssertTrue(msg.boolToMsg != msg2.boolToMsg);  // ptr compare
+
+  XCTAssertTrue(msg.strToMsg[@"baz"] != msg2.strToMsg[@"baz"]);  // ptr compare
+  XCTAssertEqualObjects(msg.strToMsg[@"baz"], msg2.strToMsg[@"baz"]);
+  XCTAssertTrue([msg.intToMsg objectForKey:222] != [msg2.intToMsg objectForKey:222]);  // ptr compare
+  XCTAssertEqualObjects([msg.intToMsg objectForKey:222], [msg2.intToMsg objectForKey:222]);
+  XCTAssertTrue([msg.boolToMsg objectForKey:YES] != [msg2.boolToMsg objectForKey:YES]);  // ptr compare
+  XCTAssertEqualObjects([msg.boolToMsg objectForKey:YES], [msg2.boolToMsg objectForKey:YES]);
 }
 
 @end

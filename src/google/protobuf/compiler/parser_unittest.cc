@@ -33,24 +33,21 @@
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <vector>
 #include <algorithm>
 #include <map>
 
 #include <google/protobuf/compiler/parser.h>
 
+#include <google/protobuf/unittest.pb.h>
+#include <google/protobuf/unittest_custom_options.pb.h>
 #include <google/protobuf/io/tokenizer.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/wire_format.h>
 #include <google/protobuf/text_format.h>
-#include <google/protobuf/unittest.pb.h>
-#include <google/protobuf/unittest_custom_options.pb.h>
-#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/wire_format.h>
 #include <google/protobuf/stubs/substitute.h>
+
 #include <google/protobuf/stubs/map_util.h>
 
 #include <google/protobuf/testing/googletest.h>
@@ -178,9 +175,9 @@ class ParserTest : public testing::Test {
   MockErrorCollector error_collector_;
   DescriptorPool pool_;
 
-  google::protobuf::scoped_ptr<io::ZeroCopyInputStream> raw_input_;
-  google::protobuf::scoped_ptr<io::Tokenizer> input_;
-  google::protobuf::scoped_ptr<Parser> parser_;
+  std::unique_ptr<io::ZeroCopyInputStream> raw_input_;
+  std::unique_ptr<io::Tokenizer> input_;
+  std::unique_ptr<Parser> parser_;
   bool require_syntax_identifier_;
 };
 
@@ -664,7 +661,7 @@ TEST_F(ParseMessageTest, ReservedRange) {
   ExpectParsesTo(
     "message TestMessage {\n"
     "  required int32 foo = 1;\n"
-    "  reserved 2, 15, 9 to 11, 3;\n"
+    "  reserved 2, 15, 9 to 11, 3, 20 to max;\n"
     "}\n",
 
     "message_type {"
@@ -674,6 +671,29 @@ TEST_F(ParseMessageTest, ReservedRange) {
     "  reserved_range { start:15  end:16        }"
     "  reserved_range { start:9   end:12        }"
     "  reserved_range { start:3   end:4         }"
+    "  reserved_range { start:20  end:536870912 }"
+    "}");
+}
+
+TEST_F(ParseMessageTest, ReservedRangeOnMessageSet) {
+  ExpectParsesTo(
+    "message TestMessage {\n"
+    "  option message_set_wire_format = true;\n"
+    "  reserved 20 to max;\n"
+    "}\n",
+
+    "message_type {"
+    "  name: \"TestMessage\""
+    "  options {"
+    "    uninterpreted_option {"
+    "      name {"
+    "        name_part: \"message_set_wire_format\""
+    "        is_extension: false"
+    "      }"
+    "      identifier_value: \"true\""
+    "    }"
+    "  }"
+    "  reserved_range { start:20  end:2147483647 }"
     "}");
 }
 
@@ -704,6 +724,30 @@ TEST_F(ParseMessageTest, ExtensionRange) {
     "}");
 }
 
+TEST_F(ParseMessageTest, ExtensionRangeWithOptions) {
+  ExpectParsesTo(
+    "message TestMessage {\n"
+    "  extensions 10 to 19 [(i) = 5];\n"
+    "}\n",
+
+    "message_type {"
+    "  name: \"TestMessage\""
+    "  extension_range {"
+    "    start:10"
+    "    end:20"
+    "    options {"
+    "      uninterpreted_option {"
+    "        name {"
+    "          name_part: \"i\""
+    "          is_extension: true"
+    "        }"
+    "        positive_int_value: 5"
+    "      }"
+    "    }"
+    "  }"
+    "}");
+}
+
 TEST_F(ParseMessageTest, CompoundExtensionRange) {
   ExpectParsesTo(
     "message TestMessage {\n"
@@ -717,6 +761,82 @@ TEST_F(ParseMessageTest, CompoundExtensionRange) {
     "  extension_range { start:9   end:12        }"
     "  extension_range { start:100 end:536870912 }"
     "  extension_range { start:3   end:4         }"
+    "}");
+}
+
+TEST_F(ParseMessageTest, CompoundExtensionRangeWithOptions) {
+  ExpectParsesTo(
+    "message TestMessage {\n"
+    "  extensions 2, 15, 9 to 11, 100 to max, 3 [(i) = 5];\n"
+    "}\n",
+
+    "message_type {"
+    "  name: \"TestMessage\""
+    "  extension_range {"
+    "    start:2"
+    "    end:3"
+    "    options {"
+    "      uninterpreted_option {"
+    "        name {"
+    "          name_part: \"i\""
+    "          is_extension: true"
+    "        }"
+    "        positive_int_value: 5"
+    "      }"
+    "    }"
+    "  }"
+    "  extension_range {"
+    "    start:15"
+    "    end:16"
+    "    options {"
+    "      uninterpreted_option {"
+    "        name {"
+    "          name_part: \"i\""
+    "          is_extension: true"
+    "        }"
+    "        positive_int_value: 5"
+    "      }"
+    "    }"
+    "  }"
+    "  extension_range {"
+    "    start:9"
+    "    end:12"
+    "    options {"
+    "      uninterpreted_option {"
+    "        name {"
+    "          name_part: \"i\""
+    "          is_extension: true"
+    "        }"
+    "        positive_int_value: 5"
+    "      }"
+    "    }"
+    "  }"
+    "  extension_range {"
+    "    start:100"
+    "    end:536870912"
+    "    options {"
+    "      uninterpreted_option {"
+    "        name {"
+    "          name_part: \"i\""
+    "          is_extension: true"
+    "        }"
+    "        positive_int_value: 5"
+    "      }"
+    "    }"
+    "  }"
+    "  extension_range {"
+    "    start:3"
+    "    end:4"
+    "    options {"
+    "      uninterpreted_option {"
+    "        name {"
+    "          name_part: \"i\""
+    "          is_extension: true"
+    "        }"
+    "        positive_int_value: 5"
+    "      }"
+    "    }"
+    "  }"
     "}");
 }
 
@@ -869,6 +989,42 @@ TEST_F(ParseEnumTest, ValueOptions) {
     "      } "
     "    } "
     "  } "
+    "}");
+}
+
+TEST_F(ParseEnumTest, ReservedRange) {
+  ExpectParsesTo(
+    "enum TestEnum {\n"
+    "  FOO = 0;\n"
+    "  reserved -2147483648, -6 to -4, -1 to 1, 2, 15, 9 to 11, 3, 20 to max;\n"
+    "}\n",
+
+    "enum_type {"
+    "  name: \"TestEnum\""
+    "  value { name:\"FOO\" number:0 }"
+    "  reserved_range { start:-2147483648  end:-2147483648 }"
+    "  reserved_range { start:-6           end:-4          }"
+    "  reserved_range { start:-1           end:1           }"
+    "  reserved_range { start:2            end:2           }"
+    "  reserved_range { start:15           end:15          }"
+    "  reserved_range { start:9            end:11          }"
+    "  reserved_range { start:3            end:3           }"
+    "  reserved_range { start:20           end:2147483647  }"
+    "}");
+}
+
+TEST_F(ParseEnumTest, ReservedNames) {
+  ExpectParsesTo(
+    "enum TestEnum {\n"
+    "  FOO = 0;\n"
+    "  reserved \"foo\", \"bar\";\n"
+    "}\n",
+
+    "enum_type {"
+    "  name: \"TestEnum\""
+    "  value { name:\"FOO\" number:0 }"
+    "  reserved_name: \"foo\""
+    "  reserved_name: \"bar\""
     "}");
 }
 
@@ -1366,15 +1522,60 @@ TEST_F(ParseErrorTest, EnumValueMissingNumber) {
     "1:5: Missing numeric value for enum constant.\n");
 }
 
+TEST_F(ParseErrorTest, EnumReservedStandaloneMaxNotAllowed) {
+  ExpectHasErrors(
+    "enum TestEnum {\n"
+    "  FOO = 1;\n"
+    "  reserved max;\n"
+    "}\n",
+    "2:11: Expected enum value or number range.\n");
+}
+
+TEST_F(ParseErrorTest, EnumReservedMixNameAndNumber) {
+  ExpectHasErrors(
+    "enum TestEnum {\n"
+    "  FOO = 1;\n"
+    "  reserved 10, \"foo\";\n"
+    "}\n",
+    "2:15: Expected enum number range.\n");
+}
+
+TEST_F(ParseErrorTest, EnumReservedPositiveNumberOutOfRange) {
+  ExpectHasErrors(
+    "enum TestEnum {\n"
+       "FOO = 1;\n"
+    "  reserved 2147483648;\n"
+    "}\n",
+    "2:11: Integer out of range.\n");
+}
+
+TEST_F(ParseErrorTest, EnumReservedNegativeNumberOutOfRange) {
+  ExpectHasErrors(
+    "enum TestEnum {\n"
+       "FOO = 1;\n"
+    "  reserved -2147483649;\n"
+    "}\n",
+    "2:12: Integer out of range.\n");
+}
+
+TEST_F(ParseErrorTest, EnumReservedMissingQuotes) {
+  ExpectHasErrors(
+    "enum TestEnum {\n"
+    "  FOO = 1;\n"
+    "  reserved foo;\n"
+    "}\n",
+    "2:11: Expected enum value or number range.\n");
+}
+
 // -------------------------------------------------------------------
 // Reserved field number errors
 
-TEST_F(ParseErrorTest, ReservedMaxNotAllowed) {
+TEST_F(ParseErrorTest, ReservedStandaloneMaxNotAllowed) {
   ExpectHasErrors(
     "message Foo {\n"
-    "  reserved 10 to max;\n"
+    "  reserved max;\n"
     "}\n",
-    "1:17: Expected integer.\n");
+    "1:11: Expected field name or number range.\n");
 }
 
 TEST_F(ParseErrorTest, ReservedMixNameAndNumber) {
@@ -1392,6 +1593,23 @@ TEST_F(ParseErrorTest, ReservedMissingQuotes) {
     "}\n",
     "1:11: Expected field name or number range.\n");
 }
+
+TEST_F(ParseErrorTest, ReservedNegativeNumber) {
+  ExpectHasErrors(
+    "message Foo {\n"
+    "  reserved -10;\n"
+    "}\n",
+    "1:11: Expected field name or number range.\n");
+}
+
+TEST_F(ParseErrorTest, ReservedNumberOutOfRange) {
+  ExpectHasErrors(
+    "message Foo {\n"
+    "  reserved 2147483648;\n"
+    "}\n",
+    "1:11: Integer out of range.\n");
+}
+
 
 // -------------------------------------------------------------------
 // Service errors
@@ -2218,7 +2436,7 @@ class SourceInfoTest : public ParserTest {
       const char* expected_leading_comments,
       const char* expected_trailing_comments,
       const char* expected_leading_detached_comments) {
-    pair<SpanMap::iterator, SpanMap::iterator> range =
+    std::pair<SpanMap::iterator, SpanMap::iterator> range =
         spans_.equal_range(SpanKey(descriptor_proto, field, index));
 
     if (start_marker == '\0') {
@@ -2229,8 +2447,8 @@ class SourceInfoTest : public ParserTest {
         return true;
       }
     } else {
-      pair<int, int> start_pos = FindOrDie(markers_, start_marker);
-      pair<int, int> end_pos = FindOrDie(markers_, end_marker);
+      std::pair<int, int> start_pos = FindOrDie(markers_, start_marker);
+      std::pair<int, int> end_pos = FindOrDie(markers_, end_marker);
 
       RepeatedField<int> expected_span;
       expected_span.Add(start_pos.first);
@@ -2295,9 +2513,9 @@ class SourceInfoTest : public ParserTest {
     }
   };
 
-  typedef multimap<SpanKey, const SourceCodeInfo::Location*> SpanMap;
+  typedef std::multimap<SpanKey, const SourceCodeInfo::Location*> SpanMap;
   SpanMap spans_;
-  map<char, pair<int, int> > markers_;
+  std::map<char, std::pair<int, int> > markers_;
   string text_without_markers_;
 
   void ExtractMarkers(const char* text) {

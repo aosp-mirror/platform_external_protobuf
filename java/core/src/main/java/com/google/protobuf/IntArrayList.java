@@ -30,33 +30,35 @@
 
 package com.google.protobuf;
 
-import com.google.protobuf.Internal.IntList;
+import static com.google.protobuf.Internal.checkNotNull;
 
+import com.google.protobuf.Internal.IntList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.RandomAccess;
 
 /**
  * An implementation of {@link IntList} on top of a primitive array.
- * 
+ *
  * @author dweis@google.com (Daniel Weis)
  */
-final class IntArrayList extends AbstractProtobufList<Integer> implements IntList, RandomAccess {
-  
+final class IntArrayList extends AbstractProtobufList<Integer>
+    implements IntList, RandomAccess, PrimitiveNonBoxingCollection {
+
   private static final IntArrayList EMPTY_LIST = new IntArrayList();
   static {
     EMPTY_LIST.makeImmutable();
   }
-  
+
   public static IntArrayList emptyList() {
     return EMPTY_LIST;
   }
-  
+
   /**
    * The backing store for the list.
    */
   private int[] array;
-  
+
   /**
    * The size of the list distinct from the length of the array. That is, it is the number of
    * elements set in the list.
@@ -71,13 +73,26 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
   }
 
   /**
-   * Constructs a new mutable {@code IntArrayList} containing the same elements as {@code other}.
+   * Constructs a new mutable {@code IntArrayList}
+   * containing the same elements as {@code other}.
    */
-  private IntArrayList(int[] array, int size) {
-    this.array = array;
+  private IntArrayList(int[] other, int size) {
+    array = other;
     this.size = size;
   }
-  
+
+  @Override
+  protected void removeRange(int fromIndex, int toIndex) {
+    ensureIsMutable();
+    if (toIndex < fromIndex) {
+      throw new IndexOutOfBoundsException("toIndex < fromIndex");
+    }
+
+    System.arraycopy(array, toIndex, array, fromIndex, size - toIndex);
+    size -= (toIndex - fromIndex);
+    modCount++;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -90,14 +105,14 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
     if (size != other.size) {
       return false;
     }
-    
+
     final int[] arr = other.array;
     for (int i = 0; i < size; i++) {
       if (array[i] != arr[i]) {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -117,7 +132,7 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
     }
     return new IntArrayList(Arrays.copyOf(array, capacity), size);
   }
-  
+
   @Override
   public Integer get(int index) {
     return getInt(index);
@@ -169,7 +184,7 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
     if (index < 0 || index > size) {
       throw new IndexOutOfBoundsException(makeOutOfBoundsExceptionMessage(index));
     }
-    
+
     if (size < array.length) {
       // Shift everything over to make room
       System.arraycopy(array, index, array, index + 1, size - index);
@@ -177,10 +192,10 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
       // Resize to 1.5x the size
       int length = ((size * 3) / 2) + 1;
       int[] newArray = new int[length];
-      
+
       // Copy the first part directly
       System.arraycopy(array, 0, newArray, 0, index);
-      
+
       // Copy the rest shifted over by one to make room
       System.arraycopy(array, index, newArray, index + 1, size - index);
       array = newArray;
@@ -194,38 +209,36 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
   @Override
   public boolean addAll(Collection<? extends Integer> collection) {
     ensureIsMutable();
-    
-    if (collection == null) {
-      throw new NullPointerException();
-    }
-    
+
+    checkNotNull(collection);
+
     // We specialize when adding another IntArrayList to avoid boxing elements.
     if (!(collection instanceof IntArrayList)) {
       return super.addAll(collection);
     }
-    
+
     IntArrayList list = (IntArrayList) collection;
     if (list.size == 0) {
       return false;
     }
-    
+
     int overflow = Integer.MAX_VALUE - size;
     if (overflow < list.size) {
       // We can't actually represent a list this large.
       throw new OutOfMemoryError();
     }
-    
+
     int newSize = size + list.size;
     if (newSize > array.length) {
       array = Arrays.copyOf(array, newSize);
     }
-    
+
     System.arraycopy(list.array, 0, array, size, list.size);
     size = newSize;
     modCount++;
     return true;
   }
-  
+
   @Override
   public boolean remove(Object o) {
     ensureIsMutable();
@@ -245,7 +258,9 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
     ensureIsMutable();
     ensureIndexInRange(index);
     int value = array[index];
-    System.arraycopy(array, index + 1, array, index, size - index);
+    if (index < size - 1) {
+      System.arraycopy(array, index + 1, array, index, size - index);
+    }
     size--;
     modCount++;
     return value;
@@ -254,7 +269,7 @@ final class IntArrayList extends AbstractProtobufList<Integer> implements IntLis
   /**
    * Ensures that the provided {@code index} is within the range of {@code [0, size]}. Throws an
    * {@link IndexOutOfBoundsException} if it is not.
-   * 
+   *
    * @param index the index to verify is in range
    */
   private void ensureIndexInRange(int index) {

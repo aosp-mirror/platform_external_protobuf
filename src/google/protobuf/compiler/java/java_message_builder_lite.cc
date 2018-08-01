@@ -38,9 +38,6 @@
 #include <google/protobuf/stubs/hash.h>
 #include <map>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <vector>
 
 #include <google/protobuf/compiler/java/java_context.h>
@@ -50,12 +47,12 @@
 #include <google/protobuf/compiler/java/java_generator_factory.h>
 #include <google/protobuf/compiler/java/java_helpers.h>
 #include <google/protobuf/compiler/java/java_name_resolver.h>
+#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/printer.h>
-#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/wire_format.h>
-#include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
+#include <google/protobuf/stubs/strutil.h>
 
 namespace google {
 namespace protobuf {
@@ -66,13 +63,6 @@ namespace {
 bool GenerateHasBits(const Descriptor* descriptor) {
   return SupportFieldPresence(descriptor->file()) ||
       HasRepeatedFields(descriptor);
-}
-
-string MapValueImmutableClassdName(const Descriptor* descriptor,
-                                   ClassNameResolver* name_resolver) {
-  const FieldDescriptor* value_field = descriptor->FindFieldByName("value");
-  GOOGLE_CHECK_EQ(FieldDescriptor::TYPE_MESSAGE, value_field->type());
-  return name_resolver->GetImmutableClassName(value_field->message_type());
 }
 }  // namespace
 
@@ -106,7 +96,7 @@ Generate(io::Printer* printer) {
   GenerateCommonBuilderMethods(printer);
 
   // oneof
-  map<string, string> vars;
+  std::map<string, string> vars;
   for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
     vars["oneof_name"] = context_->GetOneofGeneratorInfo(
         descriptor_->oneof_decl(i))->name;
@@ -116,6 +106,7 @@ Generate(io::Printer* printer) {
 
     // oneofCase() and clearOneof()
     printer->Print(vars,
+      "@java.lang.Override\n"
       "public $oneof_capitalized_name$Case\n"
       "    get$oneof_capitalized_name$Case() {\n"
       "  return instance.get$oneof_capitalized_name$Case();\n"

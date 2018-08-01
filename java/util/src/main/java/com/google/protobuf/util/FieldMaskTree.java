@@ -34,10 +34,10 @@ import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.FieldMask;
 import com.google.protobuf.Message;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.logging.Logger;
 
@@ -59,22 +59,26 @@ import java.util.logging.Logger;
  * intersection to two FieldMasks and traverse all fields specified by the
  * FieldMask in a message tree.
  */
-class FieldMaskTree {
+final class FieldMaskTree {
   private static final Logger logger = Logger.getLogger(FieldMaskTree.class.getName());
 
   private static final String FIELD_PATH_SEPARATOR_REGEX = "\\.";
 
-  private static class Node {
-    public TreeMap<String, Node> children = new TreeMap<String, Node>();
+  private static final class Node {
+    final SortedMap<String, Node> children = new TreeMap<String, Node>();
   }
 
   private final Node root = new Node();
 
-  /** Creates an empty FieldMaskTree. */
-  public FieldMaskTree() {}
+  /**
+   * Creates an empty FieldMaskTree.
+   */
+  FieldMaskTree() {}
 
-  /** Creates a FieldMaskTree for a given FieldMask. */
-  public FieldMaskTree(FieldMask mask) {
+  /**
+   * Creates a FieldMaskTree for a given FieldMask.
+   */
+  FieldMaskTree(FieldMask mask) {
     mergeFromFieldMask(mask);
   }
 
@@ -93,7 +97,7 @@ class FieldMaskTree {
    * Likewise, if the field path to add is a sub-path of an existing leaf node,
    * nothing will be changed in the tree.
    */
-  public FieldMaskTree addFieldPath(String path) {
+  FieldMaskTree addFieldPath(String path) {
     String[] parts = path.split(FIELD_PATH_SEPARATOR_REGEX);
     if (parts.length == 0) {
       return this;
@@ -124,15 +128,17 @@ class FieldMaskTree {
   /**
    * Merges all field paths in a FieldMask into this tree.
    */
-  public FieldMaskTree mergeFromFieldMask(FieldMask mask) {
+  FieldMaskTree mergeFromFieldMask(FieldMask mask) {
     for (String path : mask.getPathsList()) {
       addFieldPath(path);
     }
     return this;
   }
 
-  /** Converts this tree to a FieldMask. */
-  public FieldMask toFieldMask() {
+  /**
+   * Converts this tree to a FieldMask.
+   */
+  FieldMask toFieldMask() {
     if (root.children.isEmpty()) {
       return FieldMask.getDefaultInstance();
     }
@@ -141,7 +147,9 @@ class FieldMaskTree {
     return FieldMask.newBuilder().addAllPaths(paths).build();
   }
 
-  /** Gathers all field paths in a sub-tree. */
+  /**
+   * Gathers all field paths in a sub-tree.
+   */
   private void getFieldPaths(Node node, String path, List<String> paths) {
     if (node.children.isEmpty()) {
       paths.add(path);
@@ -154,10 +162,9 @@ class FieldMaskTree {
   }
 
   /**
-   * Adds the intersection of this tree with the given {@code path} to
-   * {@code output}.
+   * Adds the intersection of this tree with the given {@code path} to {@code output}.
    */
-  public void intersectFieldPath(String path, FieldMaskTree output) {
+  void intersectFieldPath(String path, FieldMaskTree output) {
     if (root.children.isEmpty()) {
       return;
     }
@@ -188,11 +195,9 @@ class FieldMaskTree {
   }
 
   /**
-   * Merges all fields specified by this FieldMaskTree from {@code source} to
-   * {@code destination}.
+   * Merges all fields specified by this FieldMaskTree from {@code source} to {@code destination}.
    */
-  public void merge(
-      Message source, Message.Builder destination, FieldMaskUtil.MergeOptions options) {
+  void merge(Message source, Message.Builder destination, FieldMaskUtil.MergeOptions options) {
     if (source.getDescriptorForType() != destination.getDescriptorForType()) {
       throw new IllegalArgumentException("Cannot merge messages of different types.");
     }
@@ -202,8 +207,8 @@ class FieldMaskTree {
     merge(root, "", source, destination, options);
   }
 
-  /** Merges all fields specified by a sub-tree from {@code source} to
-   * {@code destination}.
+  /**
+   * Merges all fields specified by a sub-tree from {@code source} to {@code destination}.
    */
   private void merge(
       Node node,
@@ -211,7 +216,12 @@ class FieldMaskTree {
       Message source,
       Message.Builder destination,
       FieldMaskUtil.MergeOptions options) {
-    assert source.getDescriptorForType() == destination.getDescriptorForType();
+    if (source.getDescriptorForType() != destination.getDescriptorForType()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "source (%s) and destination (%s) descriptor must be equal",
+              source.getDescriptorForType(), destination.getDescriptorForType()));
+    }
 
     Descriptor descriptor = source.getDescriptorForType();
     for (Entry<String, Node> entry : node.children.entrySet()) {
@@ -231,6 +241,11 @@ class FieldMaskTree {
                   + field.getFullName()
                   + "\" is not a "
                   + "singluar message field and cannot have sub-fields.");
+          continue;
+        }
+        if (!source.hasField(field) && !destination.hasField(field)) {
+          // If the message field is not present in both source and destination, skip recursing
+          // so we don't create unnecessary empty messages.
           continue;
         }
         String childPath = path.isEmpty() ? entry.getKey() : path + "." + entry.getKey();

@@ -31,30 +31,28 @@
 package com.google.protobuf;
 
 import protobuf_unittest.UnittestProto.TestDeprecatedFields;
-
-import junit.framework.TestCase;
-
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import junit.framework.TestCase;
 
 /**
  * Test field deprecation
- * 
+ *
  * @author birdo@google.com (Roberto Scaramuzzi)
  */
 public class DeprecatedFieldTest extends TestCase {
   private String[] deprecatedGetterNames = {
       "hasDeprecatedInt32",
       "getDeprecatedInt32"};
-  
+
   private String[] deprecatedBuilderGetterNames = {
       "hasDeprecatedInt32",
       "getDeprecatedInt32",
       "clearDeprecatedInt32"};
-  
+
   private String[] deprecatedBuilderSetterNames = {
-      "setDeprecatedInt32"}; 
-  
+      "setDeprecatedInt32"};
+
   public void testDeprecatedField() throws Exception {
     Class<?> deprecatedFields = TestDeprecatedFields.class;
     Class<?> deprecatedFieldsBuilder = TestDeprecatedFields.Builder.class;
@@ -74,7 +72,15 @@ public class DeprecatedFieldTest extends TestCase {
           isDeprecated(method));
     }
   }
-  
+
+  public void testDeprecatedFieldInOneof() throws Exception {
+    Class<?> oneofCase = TestDeprecatedFields.OneofFieldsCase.class;
+    String name = "DEPRECATED_INT32_IN_ONEOF";
+    java.lang.reflect.Field enumValue = oneofCase.getField(name);
+    assertTrue("Enum value " + name + " should be deprecated.",
+       isDeprecated(enumValue));
+  }
+
   private boolean isDeprecated(AnnotatedElement annotated) {
     return annotated.isAnnotationPresent(Deprecated.class);
   }

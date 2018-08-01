@@ -67,7 +67,7 @@ class FieldGenerator {
   virtual void GenerateCFunctionImplementations(io::Printer* printer) const;
 
   // Exposed for subclasses, should always call it on the parent class also.
-  virtual void DetermineForwardDeclarations(set<string>* fwd_decls) const;
+  virtual void DetermineForwardDeclarations(std::set<string>* fwd_decls) const;
 
   // Used during generation, not intended to be extended by subclasses.
   void GenerateFieldDescription(
@@ -100,7 +100,7 @@ class FieldGenerator {
   virtual bool WantsHasProperty(void) const = 0;
 
   const FieldDescriptor* descriptor_;
-  map<string, string> variables_;
+  std::map<string, string> variables_;
 
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FieldGenerator);
@@ -182,8 +182,8 @@ class FieldGeneratorMap {
 
  private:
   const Descriptor* descriptor_;
-  scoped_array<scoped_ptr<FieldGenerator> > field_generators_;
-  scoped_array<scoped_ptr<FieldGenerator> > extension_generators_;
+  std::vector<std::unique_ptr<FieldGenerator>> field_generators_;
+  std::vector<std::unique_ptr<FieldGenerator>> extension_generators_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FieldGeneratorMap);
 };

@@ -33,9 +33,6 @@
 
 #include <algorithm>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <string>
 #include <vector>
 
@@ -57,7 +54,7 @@ class LIBPROTOBUF_EXPORT ErrorListener {
 
   // Reports an invalid name at the given location.
   virtual void InvalidName(const LocationTrackerInterface& loc,
-                           StringPiece unknown_name, StringPiece message) = 0;
+                           StringPiece invalid_name, StringPiece message) = 0;
 
   // Reports an invalid value for a field.
   virtual void InvalidValue(const LocationTrackerInterface& loc,
@@ -82,7 +79,7 @@ class LIBPROTOBUF_EXPORT NoopErrorListener : public ErrorListener {
   virtual ~NoopErrorListener() {}
 
   virtual void InvalidName(const LocationTrackerInterface& loc,
-                           StringPiece unknown_name, StringPiece message) {}
+                           StringPiece invalid_name, StringPiece message) {}
 
   virtual void InvalidValue(const LocationTrackerInterface& loc,
                             StringPiece type_name, StringPiece value) {}

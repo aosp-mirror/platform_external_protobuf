@@ -32,9 +32,6 @@
 #define GOOGLE_PROTOBUF_UTIL_CONVERTER_DEFAULT_VALUE_OBJECTWRITER_H__
 
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <stack>
 #include <vector>
 
@@ -77,7 +74,7 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
       FieldScrubCallBack;
 
   // A unique pointer to a DefaultValueObjectWriter::FieldScrubCallBack.
-  typedef google::protobuf::scoped_ptr<FieldScrubCallBack> FieldScrubCallBackPtr;
+  typedef std::unique_ptr<FieldScrubCallBack> FieldScrubCallBackPtr;
 
   DefaultValueObjectWriter(TypeResolver* type_resolver,
                            const google::protobuf::Type& type,
@@ -122,7 +119,22 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
   // field_scrub_callback pointer is also transferred to this class
   void RegisterFieldScrubCallBack(FieldScrubCallBackPtr field_scrub_callback);
 
- private:
+  // If set to true, empty lists are suppressed from output when default values
+  // are written.
+  void set_suppress_empty_list(bool value) { suppress_empty_list_ = value; }
+
+  // If set to true, original proto field names are used
+  void set_preserve_proto_field_names(bool value) {
+    preserve_proto_field_names_ = value;
+  }
+
+  // If set to true, enums are rendered as ints from output when default values
+  // are written.
+  void set_print_enums_as_ints(bool value) {
+    use_ints_for_enums_ = value;
+  }
+
+ protected:
   enum NodeKind {
     PRIMITIVE = 0,
     OBJECT = 1,
@@ -135,7 +147,13 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
   class LIBPROTOBUF_EXPORT Node {
    public:
     Node(const string& name, const google::protobuf::Type* type, NodeKind kind,
-         const DataPiece& data, bool is_placeholder, const vector<string>& path,
+         const DataPiece& data, bool is_placeholder,
+         const std::vector<string>& path, bool suppress_empty_list,
+         FieldScrubCallBack* field_scrub_callback);
+    Node(const string& name, const google::protobuf::Type* type, NodeKind kind,
+         const DataPiece& data, bool is_placeholder,
+         const std::vector<string>& path, bool suppress_empty_list,
+         bool preserve_proto_field_names, bool use_ints_for_enums,
          FieldScrubCallBack* field_scrub_callback);
     virtual ~Node() {
       for (int i = 0; i < children_.size(); ++i) {
@@ -152,17 +170,17 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
     // Populates children of this Node based on its type. If there are already
     // children created, they will be merged to the result. Caller should pass
     // in TypeInfo for looking up types of the children.
-    void PopulateChildren(const TypeInfo* typeinfo);
+    virtual void PopulateChildren(const TypeInfo* typeinfo);
 
     // If this node is a leaf (has data), writes the current node to the
     // ObjectWriter; if not, then recursively writes the children to the
     // ObjectWriter.
-    void WriteTo(ObjectWriter* ow);
+    virtual void WriteTo(ObjectWriter* ow);
 
     // Accessors
     const string& name() const { return name_; }
 
-    const vector<string>& path() const { return path_; }
+    const std::vector<string>& path() const { return path_; }
 
     const google::protobuf::Type* type() const { return type_; }
 
@@ -182,7 +200,7 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
       is_placeholder_ = is_placeholder;
     }
 
-   private:
+   protected:
     // Returns the Value Type of a map given the Type of the map entry and a
     // TypeInfo instance.
     const google::protobuf::Type* GetMapValueType(
@@ -212,24 +230,57 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
     // Path of the field of this node
     std::vector<string> path_;
 
+    // Whether to suppress empty list output.
+    bool suppress_empty_list_;
+
+    // Whether to preserve original proto field names
+    bool preserve_proto_field_names_;
+
+    // Whether to always print enums as ints
+    bool use_ints_for_enums_;
+
     // Pointer to function for determining whether a field needs to be scrubbed
     // or not. This callback is owned by the creator of this node.
     FieldScrubCallBack* field_scrub_callback_;
 
+   private:
     GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Node);
   };
 
+  // Creates a new Node and returns it. Caller owns memory of returned object.
+  virtual Node* CreateNewNode(const string& name,
+                              const google::protobuf::Type* type, NodeKind kind,
+                              const DataPiece& data, bool is_placeholder,
+                              const std::vector<string>& path,
+                              bool suppress_empty_list,
+                              FieldScrubCallBack* field_scrub_callback);
+
+  // Creates a new Node and returns it. Caller owns memory of returned object.
+  virtual Node* CreateNewNode(const string& name,
+                              const google::protobuf::Type* type, NodeKind kind,
+                              const DataPiece& data, bool is_placeholder,
+                              const std::vector<string>& path,
+                              bool suppress_empty_list,
+                              bool preserve_proto_field_names,
+                              bool use_ints_for_enums,
+                              FieldScrubCallBack* field_scrub_callback);
+
+  // Creates a DataPiece containing the default value of the type of the field.
+  static DataPiece CreateDefaultDataPieceForField(
+      const google::protobuf::Field& field, const TypeInfo* typeinfo, bool use_ints_for_enums);
+
+ protected:
+  // Returns a pointer to current Node in tree.
+  Node* current() { return current_; }
+
+ private:
   // Populates children of "node" if it is an "any" Node and its real type has
   // been given.
   void MaybePopulateChildrenOfAny(Node* node);
 
   // Writes the root_ node to ow_ and resets the root_ and current_ pointer to
-  // NULL.
+  // nullptr.
   void WriteRoot();
-
-  // Creates a DataPiece containing the default value of the type of the field.
-  static DataPiece CreateDefaultDataPieceForField(
-      const google::protobuf::Field& field, const TypeInfo* typeinfo);
 
   // Adds or replaces the data_ of a primitive child node.
   void RenderDataPiece(StringPiece name, const DataPiece& data);
@@ -238,7 +289,8 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
   // there is no default. For proto3, where we cannot specify an explicit
   // default, a zero value will always be returned.
   static DataPiece FindEnumDefault(const google::protobuf::Field& field,
-                                   const TypeInfo* typeinfo);
+                                   const TypeInfo* typeinfo,
+                                   bool use_ints_for_enums);
 
   // Type information for all the types used in the descriptor. Used to find
   // google::protobuf::Type of nested messages/enums.
@@ -248,14 +300,23 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
   // google::protobuf::Type of the root message type.
   const google::protobuf::Type& type_;
   // Holds copies of strings passed to RenderString.
-  vector<string*> string_values_;
+  std::vector<string*> string_values_;
 
   // The current Node. Owned by its parents.
   Node* current_;
   // The root Node.
-  google::protobuf::scoped_ptr<Node> root_;
+  std::unique_ptr<Node> root_;
   // The stack to hold the path of Nodes from current_ to root_;
   std::stack<Node*> stack_;
+
+  // Whether to suppress output of empty lists.
+  bool suppress_empty_list_;
+
+  // Whether to preserve original proto field names
+  bool preserve_proto_field_names_;
+
+  // Whether to always print enums as ints
+  bool use_ints_for_enums_;
 
   // Unique Pointer to function for determining whether a field needs to be
   // scrubbed or not.

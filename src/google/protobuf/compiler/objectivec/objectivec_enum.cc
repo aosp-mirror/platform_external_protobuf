@@ -62,7 +62,7 @@ void EnumGenerator::GenerateHeader(io::Printer* printer) {
   string enum_comments;
   SourceLocation location;
   if (descriptor_->GetSourceLocation(&location)) {
-    enum_comments = BuildCommentsString(location);
+    enum_comments = BuildCommentsString(location, true);
   } else {
     enum_comments = "";
   }
@@ -74,23 +74,25 @@ void EnumGenerator::GenerateHeader(io::Printer* printer) {
 
   printer->Print("$comments$typedef$deprecated_attribute$ GPB_ENUM($name$) {\n",
                  "comments", enum_comments,
-                 "deprecated_attribute", GetOptionalDeprecatedAttribute(descriptor_),
+                 "deprecated_attribute", GetOptionalDeprecatedAttribute(descriptor_, descriptor_->file()),
                  "name", name_);
   printer->Indent();
 
   if (HasPreservingUnknownEnumSemantics(descriptor_->file())) {
     // Include the unknown value.
     printer->Print(
-      "/// Value used if any message's field encounters a value that is not defined\n"
-      "/// by this enum. The message will also have C functions to get/set the rawValue\n"
-      "/// of the field.\n"
+      "/**\n"
+      " * Value used if any message's field encounters a value that is not defined\n"
+      " * by this enum. The message will also have C functions to get/set the rawValue\n"
+      " * of the field.\n"
+      " **/\n"
       "$name$_GPBUnrecognizedEnumeratorValue = kGPBUnrecognizedEnumeratorValue,\n",
       "name", name_);
   }
   for (int i = 0; i < all_values_.size(); i++) {
     SourceLocation location;
     if (all_values_[i]->GetSourceLocation(&location)) {
-      string comments = BuildCommentsString(location).c_str();
+      string comments = BuildCommentsString(location, true).c_str();
       if (comments.length() > 0) {
         if (i > 0) {
           printer->Print("\n");
@@ -111,8 +113,10 @@ void EnumGenerator::GenerateHeader(io::Printer* printer) {
       "\n"
       "GPBEnumDescriptor *$name$_EnumDescriptor(void);\n"
       "\n"
-      "/// Checks to see if the given value is defined by the enum or was not known at\n"
-      "/// the time this source was generated.\n"
+      "/**\n"
+      " * Checks to see if the given value is defined by the enum or was not known at\n"
+      " * the time this source was generated.\n"
+      " **/\n"
       "BOOL $name$_IsValidValue(int32_t value);\n"
       "\n",
       "name", name_);
@@ -145,7 +149,7 @@ void EnumGenerator::GenerateSource(io::Printer* printer) {
 
   printer->Print(
       "GPBEnumDescriptor *$name$_EnumDescriptor(void) {\n"
-      "  static GPBEnumDescriptor *descriptor = NULL;\n"
+      "  static _Atomic(GPBEnumDescriptor*) descriptor = nil;\n"
       "  if (!descriptor) {\n",
       "name", name_);
 
@@ -188,7 +192,8 @@ void EnumGenerator::GenerateSource(io::Printer* printer) {
         "extraTextFormatInfo", CEscape(text_format_decode_data.Data()));
     }
     printer->Print(
-      "    if (!OSAtomicCompareAndSwapPtrBarrier(nil, worker, (void * volatile *)&descriptor)) {\n"
+      "    GPBEnumDescriptor *expected = nil;\n"
+      "    if (!atomic_compare_exchange_strong(&descriptor, &expected, worker)) {\n"
       "      [worker release];\n"
       "    }\n"
       "  }\n"

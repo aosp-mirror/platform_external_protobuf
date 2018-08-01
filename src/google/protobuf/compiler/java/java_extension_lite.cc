@@ -57,7 +57,7 @@ ImmutableExtensionLiteGenerator::ImmutableExtensionLiteGenerator(
 ImmutableExtensionLiteGenerator::~ImmutableExtensionLiteGenerator() {}
 
 void ImmutableExtensionLiteGenerator::Generate(io::Printer* printer) {
-  map<string, string> vars;
+  std::map<string, string> vars;
   const bool kUseImmutableNames = true;
   InitTemplateVars(descriptor_, scope_, kUseImmutableNames, name_resolver_,
                    &vars);
@@ -96,6 +96,7 @@ void ImmutableExtensionLiteGenerator::Generate(io::Printer* printer) {
         "      com.google.protobuf.WireFormat.FieldType.$type_constant$,\n"
         "      $singular_type$.class);\n");
   }
+  printer->Annotate("name", descriptor_);
 }
 
 int ImmutableExtensionLiteGenerator::GenerateNonNestedInitializationCode(

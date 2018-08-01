@@ -54,17 +54,6 @@ using util::Status;
 using util::error::INVALID_ARGUMENT;
 using util::error::NOT_FOUND;
 
-bool SplitTypeUrl(const string& type_url, string* url_prefix,
-                  string* message_name) {
-  size_t pos = type_url.find_last_of("/");
-  if (pos == string::npos) {
-    return false;
-  }
-  *url_prefix = type_url.substr(0, pos);
-  *message_name = type_url.substr(pos + 1);
-  return true;
-}
-
 class DescriptorPoolTypeResolver : public TypeResolver {
  public:
   DescriptorPoolTypeResolver(const string& url_prefix,
@@ -72,38 +61,27 @@ class DescriptorPoolTypeResolver : public TypeResolver {
       : url_prefix_(url_prefix), pool_(pool) {}
 
   Status ResolveMessageType(const string& type_url, Type* type) {
-    string url_prefix, message_name;
-    if (!SplitTypeUrl(type_url, &url_prefix, &message_name) ||
-        url_prefix != url_prefix_) {
-      return Status(INVALID_ARGUMENT,
-                    StrCat("Invalid type URL, type URLs must be of the form '",
-                           url_prefix_, "/<typename>', got: ", type_url));
+    string type_name;
+    Status status = ParseTypeUrl(type_url, &type_name);
+    if (!status.ok()) {
+      return status;
     }
-    if (url_prefix != url_prefix_) {
-      return Status(INVALID_ARGUMENT,
-                    "Cannot resolve types from URL: " + url_prefix);
-    }
-    const Descriptor* descriptor = pool_->FindMessageTypeByName(message_name);
+
+    const Descriptor* descriptor = pool_->FindMessageTypeByName(type_name);
     if (descriptor == NULL) {
-      return Status(NOT_FOUND,
-                    "Invalid type URL, unknown type: " + message_name);
+      return Status(NOT_FOUND, "Invalid type URL, unknown type: " + type_name);
     }
     ConvertDescriptor(descriptor, type);
     return Status();
   }
 
   Status ResolveEnumType(const string& type_url, Enum* enum_type) {
-    string url_prefix, type_name;
-    if (!SplitTypeUrl(type_url, &url_prefix, &type_name) ||
-        url_prefix != url_prefix_) {
-      return Status(INVALID_ARGUMENT,
-                    StrCat("Invalid type URL, type URLs must be of the form '",
-                           url_prefix_, "/<typename>', got: ", type_url));
+    string type_name;
+    Status status = ParseTypeUrl(type_url, &type_name);
+    if (!status.ok()) {
+      return status;
     }
-    if (url_prefix != url_prefix_) {
-      return Status(INVALID_ARGUMENT,
-                    "Cannot resolve types from URL: " + url_prefix);
-    }
+
     const EnumDescriptor* descriptor = pool_->FindEnumTypeByName(type_name);
     if (descriptor == NULL) {
       return Status(NOT_FOUND, "Invalid type URL, unknown type: " + type_name);
@@ -117,11 +95,6 @@ class DescriptorPoolTypeResolver : public TypeResolver {
     type->Clear();
     type->set_name(descriptor->full_name());
     for (int i = 0; i < descriptor->field_count(); ++i) {
-      const FieldDescriptor* field = descriptor->field(i);
-      if (field->type() == FieldDescriptor::TYPE_GROUP) {
-        // Group fields cannot be represented with Type. We discard them.
-        continue;
-      }
       ConvertFieldDescriptor(descriptor->field(i), type->add_fields());
     }
     for (int i = 0; i < descriptor->oneof_decl_count(); ++i) {
@@ -163,7 +136,8 @@ class DescriptorPoolTypeResolver : public TypeResolver {
     if (descriptor->has_default_value()) {
       field->set_default_value(DefaultValueAsString(descriptor));
     }
-    if (descriptor->type() == FieldDescriptor::TYPE_MESSAGE) {
+    if (descriptor->type() == FieldDescriptor::TYPE_MESSAGE ||
+        descriptor->type() == FieldDescriptor::TYPE_GROUP) {
       field->set_type_url(GetTypeUrl(descriptor->message_type()));
     } else if (descriptor->type() == FieldDescriptor::TYPE_ENUM) {
       field->set_type_url(GetTypeUrl(descriptor->enum_type()));
@@ -201,6 +175,16 @@ class DescriptorPoolTypeResolver : public TypeResolver {
 
   string GetTypeUrl(const EnumDescriptor* descriptor) {
     return url_prefix_ + "/" + descriptor->full_name();
+  }
+
+  Status ParseTypeUrl(const string& type_url, string* type_name) {
+    if (type_url.substr(0, url_prefix_.size() + 1) != url_prefix_ + "/") {
+      return Status(INVALID_ARGUMENT,
+                    StrCat("Invalid type URL, type URLs must be of the form '",
+                           url_prefix_, "/<typename>', got: ", type_url));
+    }
+    *type_name = type_url.substr(url_prefix_.size() + 1);
+    return Status();
   }
 
   string DefaultValueAsString(const FieldDescriptor* descriptor) {

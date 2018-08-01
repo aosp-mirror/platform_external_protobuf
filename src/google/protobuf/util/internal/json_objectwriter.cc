@@ -57,7 +57,7 @@ JsonObjectWriter::~JsonObjectWriter() {
 JsonObjectWriter* JsonObjectWriter::StartObject(StringPiece name) {
   WritePrefix(name);
   WriteChar('{');
-  Push();
+  PushObject();
   return this;
 }
 
@@ -71,7 +71,7 @@ JsonObjectWriter* JsonObjectWriter::EndObject() {
 JsonObjectWriter* JsonObjectWriter::StartList(StringPiece name) {
   WritePrefix(name);
   WriteChar('[');
-  Push();
+  PushArray();
   return this;
 }
 
@@ -147,7 +147,7 @@ JsonObjectWriter* JsonObjectWriter::RenderBytes(StringPiece name,
   string base64;
 
   if (use_websafe_base64_for_bytes_)
-    WebSafeBase64Escape(value.ToString(), &base64);
+    WebSafeBase64EscapeWithPadding(value.ToString(), &base64);
   else
     Base64Escape(value, &base64);
 
@@ -164,14 +164,20 @@ JsonObjectWriter* JsonObjectWriter::RenderNull(StringPiece name) {
   return RenderSimple(name, "null");
 }
 
+JsonObjectWriter* JsonObjectWriter::RenderNullAsEmpty(StringPiece name) {
+  return RenderSimple(name, "");
+}
+
 void JsonObjectWriter::WritePrefix(StringPiece name) {
   bool not_first = !element()->is_first();
   if (not_first) WriteChar(',');
   if (not_first || !element()->is_root()) NewLine();
-  if (!name.empty()) {
+  if (!name.empty() || element()->is_json_object()) {
     WriteChar('"');
-    ArrayByteSource source(name);
-    JsonEscaping::Escape(&source, &sink_);
+    if (!name.empty()) {
+      ArrayByteSource source(name);
+      JsonEscaping::Escape(&source, &sink_);
+    }
     stream_->WriteString("\":");
     if (!indent_string_.empty()) WriteChar(' ');
   }

@@ -18,7 +18,7 @@ class RepeatedFieldTest < Test::Unit::TestCase
     # jRuby additions to the Array class that we can ignore
     arr_methods -= [ :indices, :iter_for_each, :iter_for_each_index,
       :iter_for_each_with_index, :dimensions, :copy_data, :copy_data_simple,
-      :nitems, :iter_for_reverse_each, :indexes]
+      :nitems, :iter_for_reverse_each, :indexes, :append, :prepend]
     arr_methods.each do |method_name|
       assert m.repeated_string.respond_to?(method_name) == true, "does not respond to #{method_name}"
     end
@@ -124,6 +124,12 @@ class RepeatedFieldTest < Test::Unit::TestCase
     assert_equal false, m.repeated_string.empty?
     m.repeated_string << 'bar'
     assert_equal false, m.repeated_string.empty?
+  end
+
+  def test_reassign
+    m = TestMessage.new
+    m.repeated_msg = Google::Protobuf::RepeatedField.new(:message, TestMessage2, [TestMessage2.new(:foo => 1)])
+    assert_equal m.repeated_msg.first, TestMessage2.new(:foo => 1)
   end
 
   def test_array_accessor
@@ -360,6 +366,15 @@ class RepeatedFieldTest < Test::Unit::TestCase
     end
     check_self_modifying_method(m.repeated_string, reference_arr) do |arr|
       arr.delete_at(10)
+    end
+  end
+
+  def test_delete_if
+    m = TestMessage.new
+    reference_arr = %w(foo bar baz)
+    m.repeated_string += reference_arr.clone
+    check_self_modifying_method(m.repeated_string, reference_arr) do |arr|
+      arr.delete_if { |v| v == "bar" }
     end
   end
 

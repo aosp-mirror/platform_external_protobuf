@@ -30,6 +30,7 @@
 
 // Author: kenton@google.com (Kenton Varda)
 
+#include <google/protobuf/message_lite.h>  // TODO(gerbens) ideally remove this.
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/once.h>
 #include <google/protobuf/stubs/status.h>
@@ -108,11 +109,17 @@ string VersionString(int version) {
 // ===================================================================
 // emulates google3/base/logging.cc
 
+// If the minimum logging level is not set, we default to logging messages for
+// all levels.
+#ifndef GOOGLE_PROTOBUF_MIN_LOG_LEVEL
+#define GOOGLE_PROTOBUF_MIN_LOG_LEVEL LOGLEVEL_INFO
+#endif
+
 namespace internal {
+
 #if defined(__ANDROID__)
 inline void DefaultLogHandler(LogLevel level, const char* filename, int line,
                               const string& message) {
-#ifdef GOOGLE_PROTOBUF_MIN_LOG_LEVEL
   if (level < GOOGLE_PROTOBUF_MIN_LOG_LEVEL) {
     return;
   }
@@ -143,11 +150,14 @@ inline void DefaultLogHandler(LogLevel level, const char* filename, int line,
     __android_log_write(ANDROID_LOG_FATAL, "libprotobuf-native",
                         "terminating.\n");
   }
-#endif
 }
+
 #else
 void DefaultLogHandler(LogLevel level, const char* filename, int line,
                        const string& message) {
+  if (level < GOOGLE_PROTOBUF_MIN_LOG_LEVEL) {
+    return;
+  }
   static const char* level_names[] = { "INFO", "WARNING", "ERROR", "FATAL" };
 
   // We use fprintf() instead of cerr because we want this to work at static
@@ -304,86 +314,6 @@ namespace internal { FunctionClosure0::~FunctionClosure0() {} }
 void DoNothing() {}
 
 // ===================================================================
-// emulates google3/base/mutex.cc
-
-#ifdef _WIN32
-
-struct Mutex::Internal {
-  CRITICAL_SECTION mutex;
-#ifndef NDEBUG
-  // Used only to implement AssertHeld().
-  DWORD thread_id;
-#endif
-};
-
-Mutex::Mutex()
-  : mInternal(new Internal) {
-  InitializeCriticalSection(&mInternal->mutex);
-}
-
-Mutex::~Mutex() {
-  DeleteCriticalSection(&mInternal->mutex);
-  delete mInternal;
-}
-
-void Mutex::Lock() {
-  EnterCriticalSection(&mInternal->mutex);
-#ifndef NDEBUG
-  mInternal->thread_id = GetCurrentThreadId();
-#endif
-}
-
-void Mutex::Unlock() {
-#ifndef NDEBUG
-  mInternal->thread_id = 0;
-#endif
-  LeaveCriticalSection(&mInternal->mutex);
-}
-
-void Mutex::AssertHeld() {
-#ifndef NDEBUG
-  GOOGLE_DCHECK_EQ(mInternal->thread_id, GetCurrentThreadId());
-#endif
-}
-
-#elif defined(HAVE_PTHREAD)
-
-struct Mutex::Internal {
-  pthread_mutex_t mutex;
-};
-
-Mutex::Mutex()
-  : mInternal(new Internal) {
-  pthread_mutex_init(&mInternal->mutex, NULL);
-}
-
-Mutex::~Mutex() {
-  pthread_mutex_destroy(&mInternal->mutex);
-  delete mInternal;
-}
-
-void Mutex::Lock() {
-  int result = pthread_mutex_lock(&mInternal->mutex);
-  if (result != 0) {
-    GOOGLE_LOG(FATAL) << "pthread_mutex_lock: " << strerror(result);
-  }
-}
-
-void Mutex::Unlock() {
-  int result = pthread_mutex_unlock(&mInternal->mutex);
-  if (result != 0) {
-    GOOGLE_LOG(FATAL) << "pthread_mutex_unlock: " << strerror(result);
-  }
-}
-
-void Mutex::AssertHeld() {
-  // pthreads dosn't provide a way to check which thread holds the mutex.
-  // TODO(kenton):  Maybe keep track of locking thread ID like with WIN32?
-}
-
-#endif
-
-// ===================================================================
 // emulates google3/util/endian/endian.h
 //
 // TODO(xiaofeng): PROTOBUF_LITTLE_ENDIAN is unfortunately defined in
@@ -407,44 +337,44 @@ uint32 ghtonl(uint32 x) {
 namespace internal {
 
 typedef void OnShutdownFunc();
-vector<void (*)()>* shutdown_functions = NULL;
-Mutex* shutdown_functions_mutex = NULL;
-GOOGLE_PROTOBUF_DECLARE_ONCE(shutdown_functions_init);
+struct ShutdownData {
+  ~ShutdownData() {
+    std::reverse(functions.begin(), functions.end());
+    for (auto pair : functions) pair.first(pair.second);
+  }
 
-void InitShutdownFunctions() {
-  shutdown_functions = new vector<void (*)()>;
-  shutdown_functions_mutex = new Mutex;
-}
+  static ShutdownData* get() {
+    static auto* data = new ShutdownData;
+    return data;
+  }
 
-inline void InitShutdownFunctionsOnce() {
-  GoogleOnceInit(&shutdown_functions_init, &InitShutdownFunctions);
+  std::vector<std::pair<void (*)(const void*), const void*>> functions;
+  Mutex mutex;
+};
+
+static void RunZeroArgFunc(const void* arg) {
+  reinterpret_cast<void (*)()>(const_cast<void*>(arg))();
 }
 
 void OnShutdown(void (*func)()) {
-  InitShutdownFunctionsOnce();
-  MutexLock lock(shutdown_functions_mutex);
-  shutdown_functions->push_back(func);
+  OnShutdownRun(RunZeroArgFunc, reinterpret_cast<void*>(func));
+}
+
+void OnShutdownRun(void (*f)(const void*), const void* arg) {
+  auto shutdown_data = ShutdownData::get();
+  MutexLock lock(&shutdown_data->mutex);
+  shutdown_data->functions.push_back(std::make_pair(f, arg));
 }
 
 }  // namespace internal
 
 void ShutdownProtobufLibrary() {
-  internal::InitShutdownFunctionsOnce();
-
-  // We don't need to lock shutdown_functions_mutex because it's up to the
-  // caller to make sure that no one is using the library before this is
-  // called.
-
-  // Make it safe to call this multiple times.
-  if (internal::shutdown_functions == NULL) return;
-
-  for (int i = 0; i < internal::shutdown_functions->size(); i++) {
-    internal::shutdown_functions->at(i)();
+  // This function should be called only once, but accepts multiple calls.
+  static bool is_shutdown = false;
+  if (!is_shutdown) {
+    delete internal::ShutdownData::get();
+    is_shutdown = true;
   }
-  delete internal::shutdown_functions;
-  internal::shutdown_functions = NULL;
-  delete internal::shutdown_functions_mutex;
-  internal::shutdown_functions_mutex = NULL;
 }
 
 #if PROTOBUF_USE_EXCEPTIONS

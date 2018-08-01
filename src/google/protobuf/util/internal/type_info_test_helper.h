@@ -32,9 +32,6 @@
 #define GOOGLE_PROTOBUF_UTIL_CONVERTER_TYPE_INFO_TEST_HELPER_H__
 
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <vector>
 
 #include <google/protobuf/io/coded_stream.h>
@@ -64,7 +61,7 @@ class TypeInfoTestHelper {
   explicit TypeInfoTestHelper(TypeInfoSource type) : type_(type) {}
 
   // Creates a TypeInfo object for the given set of descriptors.
-  void ResetTypeInfo(const vector<const Descriptor*>& descriptors);
+  void ResetTypeInfo(const std::vector<const Descriptor*>& descriptors);
 
   // Convinent overloads.
   void ResetTypeInfo(const Descriptor* descriptor);
@@ -86,8 +83,8 @@ class TypeInfoTestHelper {
 
  private:
   TypeInfoSource type_;
-  google::protobuf::scoped_ptr<TypeInfo> typeinfo_;
-  google::protobuf::scoped_ptr<TypeResolver> type_resolver_;
+  std::unique_ptr<TypeInfo> typeinfo_;
+  std::unique_ptr<TypeResolver> type_resolver_;
 };
 }  // namespace testing
 }  // namespace converter
