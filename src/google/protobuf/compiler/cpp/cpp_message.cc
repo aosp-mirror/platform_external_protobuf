@@ -2313,7 +2313,7 @@ GenerateStructors(io::Printer* printer) {
       GlobalAddDescriptorsName(descriptor_->file()->name()));
 
   printer->Print(
-    "  return *default_instance_;\n"
+    "  return *default_instance_; /* NOLINT */\n"
     "}\n"
     "\n"
     "$classname$* $classname$::default_instance_ = NULL;\n"
