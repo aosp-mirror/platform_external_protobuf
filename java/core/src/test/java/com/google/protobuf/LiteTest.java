@@ -33,9 +33,9 @@ package com.google.protobuf;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
+import com.google.protobuf.FieldPresenceTestProto.TestAllTypes;
 import com.google.protobuf.UnittestImportLite.ImportEnumLite;
 import com.google.protobuf.UnittestImportPublicLite.PublicImportMessageLite;
-import com.google.protobuf.UnittestLite;
 import com.google.protobuf.UnittestLite.ForeignEnumLite;
 import com.google.protobuf.UnittestLite.ForeignMessageLite;
 import com.google.protobuf.UnittestLite.TestAllExtensionsLite;
@@ -46,20 +46,20 @@ import com.google.protobuf.UnittestLite.TestAllTypesLite.OneofFieldCase;
 import com.google.protobuf.UnittestLite.TestAllTypesLite.OptionalGroup;
 import com.google.protobuf.UnittestLite.TestAllTypesLite.RepeatedGroup;
 import com.google.protobuf.UnittestLite.TestAllTypesLiteOrBuilder;
+import com.google.protobuf.UnittestLite.TestHugeFieldNumbersLite;
 import com.google.protobuf.UnittestLite.TestNestedExtensionLite;
 import protobuf_unittest.lite_equals_and_hash.LiteEqualsAndHash.Bar;
 import protobuf_unittest.lite_equals_and_hash.LiteEqualsAndHash.BarPrime;
 import protobuf_unittest.lite_equals_and_hash.LiteEqualsAndHash.Foo;
 import protobuf_unittest.lite_equals_and_hash.LiteEqualsAndHash.TestOneofEquals;
 import protobuf_unittest.lite_equals_and_hash.LiteEqualsAndHash.TestRecursiveOneof;
-
+import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import junit.framework.TestCase;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.NotSerializableException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 
 /**
  * Test lite runtime.
@@ -139,7 +139,6 @@ public class LiteTest extends TestCase {
         UnittestLite.optionalNestedMessageExtensionLite).getBb());
   }
   
-  
   public void testClone() {
     TestAllTypesLite.Builder expected = TestAllTypesLite.newBuilder()
         .setOptionalInt32(123);
@@ -161,6 +160,31 @@ public class LiteTest extends TestCase {
     } catch (NullPointerException e) {
       // expected.
     }
+  }
+
+  public void testMemoization() throws Exception {
+    TestAllExtensionsLite message = TestUtilLite.getAllLiteExtensionsSet();
+
+    // Test serialized size is memoized
+    message.memoizedSerializedSize = -1;
+    int size = message.getSerializedSize();
+    assertTrue(size > 0);
+    assertEquals(size, message.memoizedSerializedSize);
+
+    // Test hashCode is memoized
+    assertEquals(0, message.memoizedHashCode);
+    int hashCode = message.hashCode();
+    assertTrue(hashCode != 0);
+    assertEquals(hashCode, message.memoizedHashCode);
+
+    // Test isInitialized is memoized
+    Field memo = message.getClass().getDeclaredField("memoizedIsInitialized");
+    memo.setAccessible(true);
+    memo.set(message, (byte) -1);
+    boolean initialized = message.isInitialized();
+    assertTrue(initialized);
+    // We have to cast to Byte first. Casting to byte causes a type error
+    assertEquals(1, ((Byte) memo.get(message)).intValue());
   }
   
   public void testSanityCopyOnWrite() throws InvalidProtocolBufferException {
@@ -1429,8 +1453,53 @@ public class LiteTest extends TestCase {
             UnittestLite.optionalFixed32ExtensionLite));
   }
 
+  public void testBuilderMergeFromNull() throws Exception {
+    try {
+      TestAllTypesLite.newBuilder().mergeFrom((TestAllTypesLite) null);
+      fail("Expected exception");
+    } catch (NullPointerException e) {
+      // Pass.
+    }
+  }
+
+  // Builder.mergeFrom() should keep existing extensions.
+  public void testBuilderMergeFromWithExtensions() throws Exception {
+    TestAllExtensionsLite message =
+        TestAllExtensionsLite.newBuilder()
+            .addExtension(UnittestLite.repeatedInt32ExtensionLite, 12)
+            .build();
+
+    ExtensionRegistryLite registry = ExtensionRegistryLite.newInstance();
+    UnittestLite.registerAllExtensions(registry);
+
+    TestAllExtensionsLite.Builder builder = TestAllExtensionsLite.newBuilder();
+    builder.mergeFrom(message.toByteArray(), registry);
+    builder.mergeFrom(message.toByteArray(), registry);
+    TestAllExtensionsLite result = builder.build();
+    assertEquals(2, result.getExtensionCount(UnittestLite.repeatedInt32ExtensionLite));
+    assertEquals(12, result.getExtension(UnittestLite.repeatedInt32ExtensionLite, 0).intValue());
+    assertEquals(12, result.getExtension(UnittestLite.repeatedInt32ExtensionLite, 1).intValue());
+  }
+
+  // Builder.mergeFrom() should keep existing unknown fields.
+  public void testBuilderMergeFromWithUnknownFields() throws Exception {
+    TestAllTypesLite message = TestAllTypesLite.newBuilder().addRepeatedInt32(1).build();
+
+    NestedMessage.Builder builder = NestedMessage.newBuilder();
+    builder.mergeFrom(message.toByteArray());
+    builder.mergeFrom(message.toByteArray());
+    NestedMessage result = builder.build();
+    assertEquals(message.getSerializedSize() * 2, result.getSerializedSize());
+  }
+
   public void testToStringDefaultInstance() throws Exception {
     assertToStringEquals("", TestAllTypesLite.getDefaultInstance());
+  }
+
+  public void testToStringScalarFieldsSuffixedWithList() throws Exception {
+    assertToStringEquals("deceptively_named_list: 7", TestAllTypesLite.newBuilder()
+        .setDeceptivelyNamedList(7)
+        .build());
   }
 
   public void testToStringPrimitives() throws Exception {
@@ -1630,7 +1699,7 @@ public class LiteTest extends TestCase {
       fail();
     } catch (InvalidProtocolBufferException expected) {}
   }
-  
+
   public void testMergeFrom_sanity() throws Exception {
     TestAllTypesLite one = TestUtilLite.getAllLiteSetBuilder().build();
     byte[] bytes = one.toByteArray();
@@ -1642,7 +1711,19 @@ public class LiteTest extends TestCase {
     assertEquals(two, one);
     assertEquals(one.hashCode(), two.hashCode());
   }
-  
+
+  public void testMergeFromNoLazyFieldSharing() throws Exception {
+    TestAllTypesLite.Builder sourceBuilder = TestAllTypesLite.newBuilder().setOptionalLazyMessage(
+        TestAllTypesLite.NestedMessage.newBuilder().setBb(1));
+    TestAllTypesLite.Builder targetBuilder =
+        TestAllTypesLite.newBuilder().mergeFrom(sourceBuilder.build());
+    assertEquals(1, sourceBuilder.getOptionalLazyMessage().getBb());
+    // now change the sourceBuilder, and target value shouldn't be affected.
+    sourceBuilder.setOptionalLazyMessage(
+        TestAllTypesLite.NestedMessage.newBuilder().setBb(2));
+    assertEquals(1, targetBuilder.getOptionalLazyMessage().getBb());
+  }
+
   public void testEquals_notEqual() throws Exception {
     TestAllTypesLite one = TestUtilLite.getAllLiteSetBuilder().build();
     byte[] bytes = one.toByteArray();
@@ -2164,6 +2245,24 @@ public class LiteTest extends TestCase {
     assertFalse(bar.equals(barPrime));
   }
 
+  public void testEqualsAndHashCodeForTrickySchemaTypes() {
+    Foo foo1 = Foo.newBuilder()
+        .build();
+    Foo foo2 = Foo.newBuilder()
+        .setSint64(1)
+        .build();
+    Foo foo3 = Foo.newBuilder()
+        .putMyMap("key", "value2")
+        .build();
+    Foo foo4 = Foo.newBuilder()
+        .setMyGroup(Foo.MyGroup.newBuilder().setValue(4).build())
+        .build();
+
+    assertEqualsAndHashCodeAreFalse(foo1, foo2);
+    assertEqualsAndHashCodeAreFalse(foo1, foo3);
+    assertEqualsAndHashCodeAreFalse(foo1, foo4);
+  }
+
   public void testOneofEquals() throws Exception {
     TestOneofEquals.Builder builder = TestOneofEquals.newBuilder();
     TestOneofEquals message1 = builder.build();
@@ -2202,6 +2301,21 @@ public class LiteTest extends TestCase {
     assertEqualsAndHashCodeAreFalse(fooWithOnlyValue, fooWithValueAndUnknownFields);
     assertEqualsAndHashCodeAreFalse(fooWithValueAndExtension, fooWithValueAndUnknownFields);
   }
+
+  public void testEqualsAndHashCodeWithExtensions() throws InvalidProtocolBufferException {
+    Foo fooWithOnlyValue = Foo.newBuilder()
+        .setValue(1)
+        .build();
+
+    Foo fooWithValueAndExtension = fooWithOnlyValue.toBuilder()
+        .setValue(1)
+        .setExtension(Bar.fooExt, Bar.newBuilder()
+            .setName("name")
+            .build())
+        .build();
+
+    assertEqualsAndHashCodeAreFalse(fooWithOnlyValue, fooWithValueAndExtension);
+  }
   
   // Test to ensure we avoid a class cast exception with oneofs.
   public void testEquals_oneOfMessages() {
@@ -2217,6 +2331,25 @@ public class LiteTest extends TestCase {
     assertFalse(other.equals(mine));
   }
 
+  public void testHugeFieldNumbers() throws InvalidProtocolBufferException {
+    TestHugeFieldNumbersLite message =
+        TestHugeFieldNumbersLite.newBuilder()
+            .setOptionalInt32(1)
+            .addRepeatedInt32(2)
+            .setOptionalEnum(ForeignEnumLite.FOREIGN_LITE_FOO)
+            .setOptionalString("xyz")
+            .setOptionalMessage(ForeignMessageLite.newBuilder().setC(3).build())
+            .build();
+
+    TestHugeFieldNumbersLite parsedMessage =
+        TestHugeFieldNumbersLite.parseFrom(message.toByteArray());
+    assertEquals(1, parsedMessage.getOptionalInt32());
+    assertEquals(2, parsedMessage.getRepeatedInt32(0));
+    assertEquals(ForeignEnumLite.FOREIGN_LITE_FOO, parsedMessage.getOptionalEnum());
+    assertEquals("xyz", parsedMessage.getOptionalString());
+    assertEquals(3, parsedMessage.getOptionalMessage().getC());
+  }
+
   private void assertEqualsAndHashCodeAreFalse(Object o1, Object o2) {
     assertFalse(o1.equals(o2));
     assertFalse(o1.hashCode() == o2.hashCode());
@@ -2225,5 +2358,285 @@ public class LiteTest extends TestCase {
   public void testRecursiveHashcode() {
     // This tests that we don't infinite loop.
     TestRecursiveOneof.getDefaultInstance().hashCode();
+  }
+
+  public void testParseFromByteBuffer() throws Exception {
+    TestAllTypesLite message =
+        TestAllTypesLite.newBuilder()
+            .setOptionalInt32(123)
+            .addRepeatedString("hello")
+            .setOptionalNestedMessage(TestAllTypesLite.NestedMessage.newBuilder().setBb(7))
+            .build();
+
+    TestAllTypesLite copy =
+        TestAllTypesLite.parseFrom(message.toByteString().asReadOnlyByteBuffer());
+
+    assertEquals(message, copy);
+  }
+
+  public void testParseFromByteBufferThrows() {
+    try {
+      TestAllTypesLite.parseFrom(ByteBuffer.wrap(new byte[] { 0x5 }));
+      fail();
+    } catch (InvalidProtocolBufferException expected) {
+    }
+
+    TestAllTypesLite message =
+        TestAllTypesLite.newBuilder()
+            .setOptionalInt32(123)
+            .addRepeatedString("hello")
+            .build();
+
+    ByteBuffer buffer = ByteBuffer.wrap(message.toByteArray(), 0, message.getSerializedSize() - 1);
+    try {
+      TestAllTypesLite.parseFrom(buffer);
+      fail();
+    } catch (InvalidProtocolBufferException expected) {
+      assertEquals(
+          TestAllTypesLite.newBuilder()
+              .setOptionalInt32(123)
+              .build(),
+          expected.getUnfinishedMessage());
+    }
+  }
+
+  public void testParseFromByteBuffer_extensions() throws Exception {
+    TestAllExtensionsLite message =
+        TestAllExtensionsLite.newBuilder()
+            .setExtension(UnittestLite.optionalInt32ExtensionLite, 123)
+            .addExtension(UnittestLite.repeatedStringExtensionLite, "hello")
+            .setExtension(
+                UnittestLite.optionalNestedEnumExtensionLite, TestAllTypesLite.NestedEnum.BAZ)
+            .setExtension(
+                UnittestLite.optionalNestedMessageExtensionLite,
+                TestAllTypesLite.NestedMessage.newBuilder().setBb(7).build())
+            .build();
+
+    ExtensionRegistryLite registry = ExtensionRegistryLite.newInstance();
+    UnittestLite.registerAllExtensions(registry);
+
+    TestAllExtensionsLite copy =
+        TestAllExtensionsLite.parseFrom(message.toByteString().asReadOnlyByteBuffer(), registry);
+
+    assertEquals(message, copy);
+  }
+
+  public void testParseFromByteBufferThrows_extensions() {
+    ExtensionRegistryLite registry = ExtensionRegistryLite.newInstance();
+    UnittestLite.registerAllExtensions(registry);
+    try {
+      TestAllExtensionsLite.parseFrom(ByteBuffer.wrap(new byte[] { 0x5 }), registry);
+      fail();
+    } catch (InvalidProtocolBufferException expected) {
+    }
+
+    TestAllExtensionsLite message =
+        TestAllExtensionsLite.newBuilder()
+            .setExtension(UnittestLite.optionalInt32ExtensionLite, 123)
+            .addExtension(UnittestLite.repeatedStringExtensionLite, "hello")
+            .build();
+
+    ByteBuffer buffer = ByteBuffer.wrap(message.toByteArray(), 0, message.getSerializedSize() - 1);
+    try {
+      TestAllExtensionsLite.parseFrom(buffer, registry);
+      fail();
+    } catch (InvalidProtocolBufferException expected) {
+      assertEquals(
+          TestAllExtensionsLite.newBuilder()
+              .setExtension(UnittestLite.optionalInt32ExtensionLite, 123)
+              .build(),
+          expected.getUnfinishedMessage());
+    }
+  }
+
+  // Make sure we haven't screwed up the code generation for packing fields by default.
+  public void testPackedSerialization() throws Exception {
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    builder.addRepeatedInt32(4321);
+    builder.addRepeatedNestedEnum(TestAllTypes.NestedEnum.BAZ);
+    TestAllTypes message = builder.build();
+
+    CodedInputStream in = CodedInputStream.newInstance(message.toByteArray());
+
+    while (!in.isAtEnd()) {
+      int tag = in.readTag();
+      assertEquals(WireFormat.WIRETYPE_LENGTH_DELIMITED, WireFormat.getTagWireType(tag));
+      in.skipField(tag);
+    }
+  }
+
+  public void testAddAllIteratesOnce() {
+    TestAllTypesLite message =
+        TestAllTypesLite.newBuilder()
+            .addAllRepeatedBool(new OneTimeIterableList(false))
+            .addAllRepeatedInt32(new OneTimeIterableList(0))
+            .addAllRepeatedInt64(new OneTimeIterableList(0L))
+            .addAllRepeatedFloat(new OneTimeIterableList(0f))
+            .addAllRepeatedDouble(new OneTimeIterableList(0d))
+            .addAllRepeatedBytes(new OneTimeIterableList(ByteString.EMPTY))
+            .addAllRepeatedString(new OneTimeIterableList(""))
+            .addAllRepeatedNestedMessage(
+                new OneTimeIterableList(NestedMessage.getDefaultInstance()))
+            .addAllRepeatedBool(new OneTimeIterable(false))
+            .addAllRepeatedInt32(new OneTimeIterable(0))
+            .addAllRepeatedInt64(new OneTimeIterable(0L))
+            .addAllRepeatedFloat(new OneTimeIterable(0f))
+            .addAllRepeatedDouble(new OneTimeIterable(0d))
+            .addAllRepeatedBytes(new OneTimeIterable(ByteString.EMPTY))
+            .addAllRepeatedString(new OneTimeIterable(""))
+            .addAllRepeatedNestedMessage(new OneTimeIterable(NestedMessage.getDefaultInstance()))
+            .build();
+  }
+
+  public void testAddAllIteratesOnce_throwsOnNull() {
+    TestAllTypesLite.Builder builder = TestAllTypesLite.newBuilder();
+    try {
+      builder.addAllRepeatedBool(new OneTimeIterableList(true, false, (Boolean) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 2 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedBoolCount());
+    }
+
+    try {
+      builder.addAllRepeatedBool(new OneTimeIterable(true, false, (Boolean) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 2 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedBoolCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedBool(new OneTimeIterableList((Boolean) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedBoolCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedInt32(new OneTimeIterableList((Integer) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedInt32Count());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedInt64(new OneTimeIterableList((Long) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedInt64Count());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedFloat(new OneTimeIterableList((Float) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedFloatCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedDouble(new OneTimeIterableList((Double) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedDoubleCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedBytes(new OneTimeIterableList((ByteString) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedBytesCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedString(new OneTimeIterableList("", "", (String) null, ""));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 2 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedStringCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedString(new OneTimeIterable("", "", (String) null, ""));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 2 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedStringCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedString(new OneTimeIterableList((String) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedStringCount());
+    }
+
+    try {
+      builder = TestAllTypesLite.newBuilder();
+      builder.addAllRepeatedNestedMessage(new OneTimeIterableList((NestedMessage) null));
+      fail();
+    } catch (NullPointerException expected) {
+      assertEquals("Element at index 0 is null.", expected.getMessage());
+      assertEquals(0, builder.getRepeatedNestedMessageCount());
+    }
+  }
+
+  private static final class OneTimeIterableList<T> extends ArrayList<T> {
+    private boolean wasIterated = false;
+
+    OneTimeIterableList(T... contents) {
+      addAll(Arrays.asList(contents));
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+      if (wasIterated) {
+        fail();
+      }
+      wasIterated = true;
+      return super.iterator();
+    }
+  }
+
+  private static final class OneTimeIterable<T> implements Iterable<T> {
+    private final List<T> list;
+    private boolean wasIterated = false;
+
+    OneTimeIterable(T... contents) {
+      list = Arrays.asList(contents);
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+      if (wasIterated) {
+        fail();
+      }
+      wasIterated = true;
+      return list.iterator();
+    }
+  }
+
+  public void testNullExtensionRegistry() throws Exception {
+    try {
+      TestAllTypesLite.parseFrom(new byte[] {}, null);
+      fail();
+    } catch (NullPointerException expected) {
+    }
   }
 }
