@@ -71,7 +71,7 @@ void PrimitiveFieldGenerator::GenerateMembers(io::Printer* printer) {
     variables_,
     "private $type_name$ $name_def_message$;\n");
   WritePropertyDocComment(printer, descriptor_);
-  AddDeprecatedFlag(printer);
+  AddPublicMemberAttributes(printer);
   printer->Print(
     variables_,
     "$access_level$ $type_name$ $property_name$ {\n"
@@ -137,14 +137,22 @@ void PrimitiveFieldGenerator::GenerateSerializedSizeCode(io::Printer* printer) {
 }
 
 void PrimitiveFieldGenerator::WriteHash(io::Printer* printer) {
-  printer->Print(
-    variables_,
-    "if ($has_property_check$) hash ^= $property_name$.GetHashCode();\n");
+  const char *text = "if ($has_property_check$) hash ^= $property_name$.GetHashCode();\n";
+  if (descriptor_->type() == FieldDescriptor::TYPE_FLOAT) {
+    text = "if ($has_property_check$) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode($property_name$);\n";
+  } else if (descriptor_->type() == FieldDescriptor::TYPE_DOUBLE) {
+    text = "if ($has_property_check$) hash ^= pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.GetHashCode($property_name$);\n";
+  }
+	printer->Print(variables_, text);
 }
 void PrimitiveFieldGenerator::WriteEquals(io::Printer* printer) {
-  printer->Print(
-    variables_,
-    "if ($property_name$ != other.$property_name$) return false;\n");
+  const char *text = "if ($property_name$ != other.$property_name$) return false;\n";
+  if (descriptor_->type() == FieldDescriptor::TYPE_FLOAT) {
+    text = "if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals($property_name$, other.$property_name$)) return false;\n";
+  } else if (descriptor_->type() == FieldDescriptor::TYPE_DOUBLE) {
+    text = "if (!pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.Equals($property_name$, other.$property_name$)) return false;\n";
+  }
+  printer->Print(variables_, text);
 }
 void PrimitiveFieldGenerator::WriteToString(io::Printer* printer) {
   printer->Print(
@@ -174,7 +182,7 @@ PrimitiveOneofFieldGenerator::~PrimitiveOneofFieldGenerator() {
 
 void PrimitiveOneofFieldGenerator::GenerateMembers(io::Printer* printer) {
   WritePropertyDocComment(printer, descriptor_);
-  AddDeprecatedFlag(printer);
+  AddPublicMemberAttributes(printer);
   printer->Print(
     variables_,
     "$access_level$ $type_name$ $property_name$ {\n"
@@ -194,6 +202,10 @@ void PrimitiveOneofFieldGenerator::GenerateMembers(io::Printer* printer) {
       "    $oneof_name$Case_ = $oneof_property_name$OneofCase.$property_name$;\n"
       "  }\n"
       "}\n");
+}
+
+void PrimitiveOneofFieldGenerator::GenerateMergingCode(io::Printer* printer) {
+  printer->Print(variables_, "$property_name$ = other.$property_name$;\n");
 }
 
 void PrimitiveOneofFieldGenerator::WriteToString(io::Printer* printer) {

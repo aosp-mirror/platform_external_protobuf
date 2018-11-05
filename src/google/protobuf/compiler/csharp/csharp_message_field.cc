@@ -65,7 +65,7 @@ void MessageFieldGenerator::GenerateMembers(io::Printer* printer) {
     variables_,
     "private $type_name$ $name$_;\n");
   WritePropertyDocComment(printer, descriptor_);
-  AddDeprecatedFlag(printer);
+  AddPublicMemberAttributes(printer);
   printer->Print(
     variables_,
     "$access_level$ $type_name$ $property_name$ {\n"
@@ -159,7 +159,7 @@ MessageOneofFieldGenerator::~MessageOneofFieldGenerator() {
 
 void MessageOneofFieldGenerator::GenerateMembers(io::Printer* printer) {
   WritePropertyDocComment(printer, descriptor_);
-  AddDeprecatedFlag(printer);
+  AddPublicMemberAttributes(printer);
   printer->Print(
     variables_,
     "$access_level$ $type_name$ $property_name$ {\n"
@@ -169,6 +169,14 @@ void MessageOneofFieldGenerator::GenerateMembers(io::Printer* printer) {
     "    $oneof_name$Case_ = value == null ? $oneof_property_name$OneofCase.None : $oneof_property_name$OneofCase.$property_name$;\n"
     "  }\n"
     "}\n");
+}
+
+void MessageOneofFieldGenerator::GenerateMergingCode(io::Printer* printer) {
+  printer->Print(variables_, 
+    "if ($property_name$ == null) {\n"
+    "  $property_name$ = new $type_name$();\n"
+    "}\n"
+    "$property_name$.MergeFrom(other.$property_name$);\n");
 }
 
 void MessageOneofFieldGenerator::GenerateParsingCode(io::Printer* printer) {
