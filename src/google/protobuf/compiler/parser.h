@@ -71,7 +71,7 @@ class LIBPROTOBUF_EXPORT Parser {
   // it.  Returns true if no errors occurred, false otherwise.
   bool Parse(io::Tokenizer* input, FileDescriptorProto* file);
 
-  // Optional features:
+  // Optional fetaures:
 
   // DEPRECATED:  New code should use the SourceCodeInfo embedded in the
   //   FileDescriptorProto.
@@ -257,7 +257,7 @@ class LIBPROTOBUF_EXPORT Parser {
     // TODO(kenton):  See comment on TryConsumeEndOfDeclaration(), above, for
     //   why this is const.
     void AttachComments(string* leading, string* trailing,
-                        std::vector<string>* detached_comments) const;
+                        vector<string>* detached_comments) const;
 
    private:
     // Indexes of parent and current location in the parent
@@ -370,12 +370,6 @@ class LIBPROTOBUF_EXPORT Parser {
   bool ParseReservedNames(DescriptorProto* message,
                           const LocationRecorder& parent_location);
   bool ParseReservedNumbers(DescriptorProto* message,
-                            const LocationRecorder& parent_location);
-  bool ParseReserved(EnumDescriptorProto* message,
-                     const LocationRecorder& message_location);
-  bool ParseReservedNames(EnumDescriptorProto* message,
-                          const LocationRecorder& parent_location);
-  bool ParseReservedNumbers(EnumDescriptorProto* message,
                             const LocationRecorder& parent_location);
 
   // Parse an "extend" declaration.  (See also comments for
@@ -526,7 +520,7 @@ class LIBPROTOBUF_EXPORT Parser {
   // detached comments will be put into the leading_detached_comments field for
   // the next element (See SourceCodeInfo.Location in descriptor.proto), when
   // ConsumeEndOfDeclaration() is called.
-  std::vector<string> upcoming_detached_comments_;
+  vector<string> upcoming_detached_comments_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Parser);
 };
@@ -562,9 +556,9 @@ class LIBPROTOBUF_EXPORT SourceLocationTable {
   void Clear();
 
  private:
-  typedef std::map<
-    std::pair<const Message*, DescriptorPool::ErrorCollector::ErrorLocation>,
-    std::pair<int, int> > LocationMap;
+  typedef map<
+    pair<const Message*, DescriptorPool::ErrorCollector::ErrorLocation>,
+    pair<int, int> > LocationMap;
   LocationMap location_map_;
 };
 

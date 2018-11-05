@@ -36,7 +36,14 @@
 #include <set>
 
 #ifdef _WIN32
+#include <io.h>
 #include <fcntl.h>
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#endif
+#ifndef STDOUT_FILENO
+#define STDOUT_FILENO 1
+#endif
 #else
 #include <unistd.h>
 #endif
@@ -47,27 +54,17 @@
 #include <google/protobuf/compiler/code_generator.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/stubs/io_win32.h>
 
 
 namespace google {
 namespace protobuf {
 namespace compiler {
 
-#if defined(_WIN32)
-// DO NOT include <io.h>, instead create functions in io_win32.{h,cc} and import
-// them like we do below.
-using google::protobuf::internal::win32::setmode;
-#endif
-
 class GeneratorResponseContext : public GeneratorContext {
  public:
-  GeneratorResponseContext(
-      const Version& compiler_version,
-      CodeGeneratorResponse* response,
-      const std::vector<const FileDescriptor*>& parsed_files)
-      : compiler_version_(compiler_version),
-        response_(response),
+  GeneratorResponseContext(CodeGeneratorResponse* response,
+                           const vector<const FileDescriptor*>& parsed_files)
+      : response_(response),
         parsed_files_(parsed_files) {}
   virtual ~GeneratorResponseContext() {}
 
@@ -87,18 +84,13 @@ class GeneratorResponseContext : public GeneratorContext {
     return new io::StringOutputStream(file->mutable_content());
   }
 
-  void ListParsedFiles(std::vector<const FileDescriptor*>* output) {
+  void ListParsedFiles(vector<const FileDescriptor*>* output) {
     *output = parsed_files_;
   }
 
-  void GetCompilerVersion(Version* version) const {
-    *version = compiler_version_;
-  }
-
  private:
-  Version compiler_version_;
   CodeGeneratorResponse* response_;
-  const std::vector<const FileDescriptor*>& parsed_files_;
+  const vector<const FileDescriptor*>& parsed_files_;
 };
 
 bool GenerateCode(const CodeGeneratorRequest& request,
@@ -113,7 +105,7 @@ bool GenerateCode(const CodeGeneratorRequest& request,
     }
   }
 
-  std::vector<const FileDescriptor*> parsed_files;
+  vector<const FileDescriptor*> parsed_files;
   for (int i = 0; i < request.file_to_generate_size(); i++) {
     parsed_files.push_back(pool.FindFileByName(request.file_to_generate(i)));
     if (parsed_files.back() == NULL) {
@@ -124,20 +116,37 @@ bool GenerateCode(const CodeGeneratorRequest& request,
     }
   }
 
-  GeneratorResponseContext context(
-      request.compiler_version(), response, parsed_files);
+  GeneratorResponseContext context(response, parsed_files);
 
+  if (generator.HasGenerateAll()) {
+    string error;
+    bool succeeded = generator.GenerateAll(
+        parsed_files, request.parameter(), &context, &error);
 
-  string error;
-  bool succeeded = generator.GenerateAll(
-      parsed_files, request.parameter(), &context, &error);
+    if (!succeeded && error.empty()) {
+      error = "Code generator returned false but provided no error "
+              "description.";
+    }
+    if (!error.empty()) {
+      response->set_error(error);
+    }
+  } else {
+    for (int i = 0; i < parsed_files.size(); i++) {
+      const FileDescriptor* file = parsed_files[i];
 
-  if (!succeeded && error.empty()) {
-    error = "Code generator returned false but provided no error "
-            "description.";
-  }
-  if (!error.empty()) {
-    response->set_error(error);
+      string error;
+      bool succeeded = generator.Generate(
+          file, request.parameter(), &context, &error);
+
+      if (!succeeded && error.empty()) {
+        error = "Code generator returned false but provided no error "
+                "description.";
+      }
+      if (!error.empty()) {
+        response->set_error(file->name() + ": " + error);
+        break;
+      }
+    }
   }
 
   return true;
@@ -151,8 +160,8 @@ int PluginMain(int argc, char* argv[], const CodeGenerator* generator) {
   }
 
 #ifdef _WIN32
-  setmode(STDIN_FILENO, _O_BINARY);
-  setmode(STDOUT_FILENO, _O_BINARY);
+  _setmode(STDIN_FILENO, _O_BINARY);
+  _setmode(STDOUT_FILENO, _O_BINARY);
 #endif
 
   CodeGeneratorRequest request;

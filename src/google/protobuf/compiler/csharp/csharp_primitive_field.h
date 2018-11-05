@@ -78,7 +78,6 @@ class PrimitiveOneofFieldGenerator : public PrimitiveFieldGenerator {
 
   virtual void GenerateCloningCode(io::Printer* printer);
   virtual void GenerateMembers(io::Printer* printer);
-  virtual void GenerateMergingCode(io::Printer* printer);
   virtual void WriteToString(io::Printer* printer);
   virtual void GenerateParsingCode(io::Printer* printer);
 
