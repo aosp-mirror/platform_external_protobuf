@@ -284,6 +284,20 @@ namespace Google.Protobuf
             Assert.Throws<InvalidProtocolBufferException>(() => input.ReadBytes());
         }
 
+        // Representations of a tag for field 0 with various wire types
+        [Test]
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void ReadTag_ZeroFieldRejected(byte tag)
+        {
+            CodedInputStream cis = new CodedInputStream(new byte[] { tag });
+            Assert.Throws<InvalidProtocolBufferException>(() => cis.ReadTag());
+        }
+
         internal static TestRecursiveMessage MakeRecursiveMessage(int depth)
         {
             if (depth == 0)
@@ -403,7 +417,7 @@ namespace Google.Protobuf
                 output.Flush();
 
                 ms.Position = 0;
-                CodedInputStream input = new CodedInputStream(ms, new byte[ms.Length / 2], 0, 0);
+                CodedInputStream input = new CodedInputStream(ms, new byte[ms.Length / 2], 0, 0, false);
 
                 uint tag = input.ReadTag();
                 Assert.AreEqual(1, WireFormat.GetTagFieldNumber(tag));
@@ -593,6 +607,13 @@ namespace Google.Protobuf
             {
             }
             Assert.IsTrue(memoryStream.CanRead); // We left the stream open
+        }
+
+        [Test]
+        public void Dispose_FromByteArray()
+        {
+            var stream = new CodedInputStream(new byte[10]);
+            stream.Dispose();
         }
     }
 }
