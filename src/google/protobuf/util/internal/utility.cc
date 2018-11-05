@@ -49,9 +49,9 @@ namespace converter {
 namespace {
 const StringPiece SkipWhiteSpace(StringPiece str) {
   StringPiece::size_type i;
-  for (i = 0; i < str.size() && ascii_isspace(str[i]); ++i) {
+  for (i = 0; i < str.size() && isspace(str[i]); ++i) {
   }
-  GOOGLE_DCHECK(i == str.size() || !ascii_isspace(str[i]));
+  GOOGLE_DCHECK(i == str.size() || !isspace(str[i]));
   return StringPiece(str, i);
 }
 }  // namespace
