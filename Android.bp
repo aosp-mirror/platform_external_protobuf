@@ -14,37 +14,20 @@
 //
 //
 
-IGNORED_WARNINGS = [
-    "-Wno-sign-compare",
-    "-Wno-unused-parameter",
-    "-Wno-sign-promo",
-    "-Wno-error=return-type",
-]
-
 cc_defaults {
     name: "protobuf-cflags-defaults",
-    clang_cflags: [
-        "-Wno-error=unused-const-variable",
-        "-Wno-error=user-defined-warnings",
-    ],
     cflags: [
         "-Wall",
-        "-Wno-error=format",
-        "-Wno-error=format-extra-args",
-        "-Wno-error=ignored-qualifiers",
-        "-Wno-error=sign-promo",
+        "-Werror",
         "-Wno-unused-function",
+        "-Wno-sign-compare",
+        "-Wno-unused-parameter",
+        "-Wno-sign-promo",
     ],
+
     target: {
         windows: {
-            cflags: ["-Wno-error"],
-        },
-        // cannot suppress gcc warning on redefined macros
-        not_windows: {
-            cflags: ["-Werror"],
-        },
-        android: {
-            cflags: ["-Werror"],
+            cflags: ["-Wno-macro-redefined"],
         },
     },
 }
@@ -53,11 +36,22 @@ cc_defaults {
     name: "libprotobuf-cpp-lite-defaults",
     defaults: ["protobuf-cflags-defaults"],
     srcs: [
+        "src/google/protobuf/arena.cc",
+        "src/google/protobuf/arenastring.cc",
+        "src/google/protobuf/extension_set.cc",
+        "src/google/protobuf/generated_message_table_driven_lite.cc",
+        "src/google/protobuf/generated_message_util.cc",
+        "src/google/protobuf/io/coded_stream.cc",
+        "src/google/protobuf/io/zero_copy_stream.cc",
+        "src/google/protobuf/io/zero_copy_stream_impl_lite.cc",
+        "src/google/protobuf/message_lite.cc",
+        "src/google/protobuf/repeated_field.cc",
         "src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc",
         "src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc",
         "src/google/protobuf/stubs/bytestream.cc",
         "src/google/protobuf/stubs/common.cc",
         "src/google/protobuf/stubs/int128.cc",
+        "src/google/protobuf/stubs/io_win32.cc",
         "src/google/protobuf/stubs/once.cc",
         "src/google/protobuf/stubs/status.cc",
         "src/google/protobuf/stubs/statusor.cc",
@@ -66,16 +60,7 @@ cc_defaults {
         "src/google/protobuf/stubs/structurally_valid.cc",
         "src/google/protobuf/stubs/strutil.cc",
         "src/google/protobuf/stubs/time.cc",
-        "src/google/protobuf/arena.cc",
-        "src/google/protobuf/arenastring.cc",
-        "src/google/protobuf/extension_set.cc",
-        "src/google/protobuf/generated_message_util.cc",
-        "src/google/protobuf/message_lite.cc",
-        "src/google/protobuf/repeated_field.cc",
         "src/google/protobuf/wire_format_lite.cc",
-        "src/google/protobuf/io/coded_stream.cc",
-        "src/google/protobuf/io/zero_copy_stream.cc",
-        "src/google/protobuf/io/zero_copy_stream_impl_lite.cc",
     ],
 
     local_include_dirs: [
@@ -84,7 +69,30 @@ cc_defaults {
     ],
     export_include_dirs: ["src"],
 
-    cflags: IGNORED_WARNINGS,
+    target: {
+        android: {
+            shared_libs: ["liblog"],
+        },
+    },
+}
+
+cc_binary_host {
+    name: "js_embed",
+    defaults: ["protobuf-cflags-defaults"],
+    srcs: ["src/google/protobuf/compiler/js/embed.cc"],
+    cflags: ["-Wno-unused-const-variable"],
+}
+
+genrule {
+    name: "generate_js_well_known_types_embed",
+    srcs: [
+        "src/google/protobuf/compiler/js/well_known_types/any.js",
+        "src/google/protobuf/compiler/js/well_known_types/struct.js",
+        "src/google/protobuf/compiler/js/well_known_types/timestamp.js",
+    ],
+    out: ["src/google/protobuf/compiler/js/well_known_types_embed.cc"],
+    cmd: "$(location :js_embed) $(in) > $(out)",
+    tools: [":js_embed"],
 }
 
 // C++ lite library for the NDK.
@@ -148,39 +156,39 @@ cc_defaults {
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
     srcs: [
+        "src/google/protobuf/any.cc",
         "src/google/protobuf/any.pb.cc",
         "src/google/protobuf/api.pb.cc",
-        "src/google/protobuf/stubs/mathlimits.cc",
-        "src/google/protobuf/any.cc",
+        "src/google/protobuf/compiler/importer.cc",
+        "src/google/protobuf/compiler/parser.cc",
         "src/google/protobuf/descriptor.cc",
-        "src/google/protobuf/descriptor_database.cc",
         "src/google/protobuf/descriptor.pb.cc",
+        "src/google/protobuf/descriptor_database.cc",
         "src/google/protobuf/duration.pb.cc",
         "src/google/protobuf/dynamic_message.cc",
         "src/google/protobuf/empty.pb.cc",
         "src/google/protobuf/extension_set_heavy.cc",
         "src/google/protobuf/field_mask.pb.cc",
         "src/google/protobuf/generated_message_reflection.cc",
+        "src/google/protobuf/generated_message_table_driven.cc",
+        "src/google/protobuf/io/gzip_stream.cc",
+        "src/google/protobuf/io/printer.cc",
+        "src/google/protobuf/io/strtod.cc",
+        "src/google/protobuf/io/tokenizer.cc",
+        "src/google/protobuf/io/zero_copy_stream_impl.cc",
         "src/google/protobuf/map_field.cc",
         "src/google/protobuf/message.cc",
         "src/google/protobuf/reflection_ops.cc",
         "src/google/protobuf/service.cc",
         "src/google/protobuf/source_context.pb.cc",
         "src/google/protobuf/struct.pb.cc",
+        "src/google/protobuf/stubs/mathlimits.cc",
         "src/google/protobuf/stubs/substitute.cc",
         "src/google/protobuf/text_format.cc",
         "src/google/protobuf/timestamp.pb.cc",
         "src/google/protobuf/type.pb.cc",
         "src/google/protobuf/unknown_field_set.cc",
-        "src/google/protobuf/wire_format.cc",
-        "src/google/protobuf/wrappers.pb.cc",
-        "src/google/protobuf/io/gzip_stream.cc",
-        "src/google/protobuf/io/printer.cc",
-        "src/google/protobuf/io/strtod.cc",
-        "src/google/protobuf/io/tokenizer.cc",
-        "src/google/protobuf/io/zero_copy_stream_impl.cc",
-        "src/google/protobuf/compiler/importer.cc",
-        "src/google/protobuf/compiler/parser.cc",
+        "src/google/protobuf/util/delimited_message_util.cc",
         "src/google/protobuf/util/field_comparator.cc",
         "src/google/protobuf/util/field_mask_util.cc",
         "src/google/protobuf/util/internal/datapiece.cc",
@@ -191,9 +199,9 @@ cc_defaults {
         "src/google/protobuf/util/internal/json_objectwriter.cc",
         "src/google/protobuf/util/internal/json_stream_parser.cc",
         "src/google/protobuf/util/internal/object_writer.cc",
+        "src/google/protobuf/util/internal/proto_writer.cc",
         "src/google/protobuf/util/internal/protostream_objectsource.cc",
         "src/google/protobuf/util/internal/protostream_objectwriter.cc",
-        "src/google/protobuf/util/internal/proto_writer.cc",
         "src/google/protobuf/util/internal/type_info.cc",
         "src/google/protobuf/util/internal/type_info_test_helper.cc",
         "src/google/protobuf/util/internal/utility.cc",
@@ -201,6 +209,8 @@ cc_defaults {
         "src/google/protobuf/util/message_differencer.cc",
         "src/google/protobuf/util/time_util.cc",
         "src/google/protobuf/util/type_resolver_util.cc",
+        "src/google/protobuf/wire_format.cc",
+        "src/google/protobuf/wrappers.pb.cc",
     ],
 
     cflags: ["-DHAVE_ZLIB=1"],
@@ -232,11 +242,6 @@ cc_library_shared {
     },
 
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
-    target: {
-        android: {
-            shared_libs: ["liblog"],
-        },
-    },
 }
 
 // C++ full library + rtti for the platform and host
@@ -256,8 +261,11 @@ cc_library_shared {
 
 // Compiler library for the host
 // =======================================================
-cc_library_host_shared {
+cc_library {
     name: "libprotoc",
+    host_supported: true,
+    device_supported: false,
+
     defaults: ["libprotobuf-cpp-full-defaults"],
 
     srcs: [
@@ -274,6 +282,14 @@ cc_library_host_shared {
         "config",
     ],
 
+    target: {
+        windows: {
+            enabled: true,
+            // defined by the global cflags, but redefined by protobuf
+            cflags: ["-UWIN32_LEAN_AND_MEAN"],
+        },
+    },
+
     rtti: true,
 }
 
@@ -288,6 +304,8 @@ cc_binary_host {
     target: {
         windows: {
             enabled: true,
+            // defined by the global cflags, but redefined by protobuf
+            cflags: ["-UWIN32_LEAN_AND_MEAN"],
         },
     },
 
@@ -296,27 +314,8 @@ cc_binary_host {
     stl: "libc++_static",
 
     srcs: [
-        "src/google/protobuf/any.cc",
-        "src/google/protobuf/arena.cc",
-        "src/google/protobuf/arenastring.cc",
-        "src/google/protobuf/descriptor.cc",
-        "src/google/protobuf/descriptor.pb.cc",
-        "src/google/protobuf/descriptor_database.cc",
-        "src/google/protobuf/dynamic_message.cc",
-        "src/google/protobuf/extension_set.cc",
-        "src/google/protobuf/extension_set_heavy.cc",
-        "src/google/protobuf/generated_message_reflection.cc",
-        "src/google/protobuf/generated_message_util.cc",
-        "src/google/protobuf/map_field.cc",
-        "src/google/protobuf/message.cc",
-        "src/google/protobuf/message_lite.cc",
-        "src/google/protobuf/reflection_ops.cc",
-        "src/google/protobuf/repeated_field.cc",
-        "src/google/protobuf/service.cc",
-        "src/google/protobuf/text_format.cc",
-        "src/google/protobuf/unknown_field_set.cc",
-        "src/google/protobuf/wire_format.cc",
-        "src/google/protobuf/wire_format_lite.cc",
+        "src/google/protobuf/compiler/main.cc",
+        ":generate_js_well_known_types_embed",
         "src/google/protobuf/compiler/code_generator.cc",
         "src/google/protobuf/compiler/command_line_interface.cc",
         "src/google/protobuf/compiler/cpp/cpp_enum.cc",
@@ -329,6 +328,7 @@ cc_binary_host {
         "src/google/protobuf/compiler/cpp/cpp_map_field.cc",
         "src/google/protobuf/compiler/cpp/cpp_message.cc",
         "src/google/protobuf/compiler/cpp/cpp_message_field.cc",
+        "src/google/protobuf/compiler/cpp/cpp_padding_optimizer.cc",
         "src/google/protobuf/compiler/cpp/cpp_primitive_field.cc",
         "src/google/protobuf/compiler/cpp/cpp_service.cc",
         "src/google/protobuf/compiler/cpp/cpp_string_field.cc",
@@ -348,7 +348,6 @@ cc_binary_host {
         "src/google/protobuf/compiler/csharp/csharp_repeated_primitive_field.cc",
         "src/google/protobuf/compiler/csharp/csharp_source_generator_base.cc",
         "src/google/protobuf/compiler/csharp/csharp_wrapper_field.cc",
-        "src/google/protobuf/compiler/importer.cc",
         "src/google/protobuf/compiler/java/java_context.cc",
         "src/google/protobuf/compiler/java/java_doc_comment.cc",
         "src/google/protobuf/compiler/java/java_enum.cc",
@@ -366,9 +365,9 @@ cc_binary_host {
         "src/google/protobuf/compiler/java/java_lazy_message_field_lite.cc",
         "src/google/protobuf/compiler/java/java_map_field.cc",
         "src/google/protobuf/compiler/java/java_map_field_lite.cc",
+        "src/google/protobuf/compiler/java/java_message.cc",
         "src/google/protobuf/compiler/java/java_message_builder.cc",
         "src/google/protobuf/compiler/java/java_message_builder_lite.cc",
-        "src/google/protobuf/compiler/java/java_message.cc",
         "src/google/protobuf/compiler/java/java_message_field.cc",
         "src/google/protobuf/compiler/java/java_message_field_lite.cc",
         "src/google/protobuf/compiler/java/java_message_lite.cc",
@@ -400,7 +399,6 @@ cc_binary_host {
         "src/google/protobuf/compiler/javanano/javanano_message_field.cc",
         "src/google/protobuf/compiler/javanano/javanano_primitive_field.cc",
         "src/google/protobuf/compiler/js/js_generator.cc",
-        "src/google/protobuf/compiler/main.cc",
         "src/google/protobuf/compiler/objectivec/objectivec_enum.cc",
         "src/google/protobuf/compiler/objectivec/objectivec_enum_field.cc",
         "src/google/protobuf/compiler/objectivec/objectivec_extension.cc",
@@ -413,32 +411,13 @@ cc_binary_host {
         "src/google/protobuf/compiler/objectivec/objectivec_message_field.cc",
         "src/google/protobuf/compiler/objectivec/objectivec_oneof.cc",
         "src/google/protobuf/compiler/objectivec/objectivec_primitive_field.cc",
-        "src/google/protobuf/compiler/parser.cc",
+        "src/google/protobuf/compiler/php/php_generator.cc",
         "src/google/protobuf/compiler/plugin.cc",
         "src/google/protobuf/compiler/plugin.pb.cc",
         "src/google/protobuf/compiler/python/python_generator.cc",
         "src/google/protobuf/compiler/ruby/ruby_generator.cc",
         "src/google/protobuf/compiler/subprocess.cc",
         "src/google/protobuf/compiler/zip_writer.cc",
-        "src/google/protobuf/io/coded_stream.cc",
-        "src/google/protobuf/io/gzip_stream.cc",
-        "src/google/protobuf/io/printer.cc",
-        "src/google/protobuf/io/strtod.cc",
-        "src/google/protobuf/io/tokenizer.cc",
-        "src/google/protobuf/io/zero_copy_stream.cc",
-        "src/google/protobuf/io/zero_copy_stream_impl.cc",
-        "src/google/protobuf/io/zero_copy_stream_impl_lite.cc",
-        "src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc",
-        "src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc",
-        "src/google/protobuf/stubs/common.cc",
-        "src/google/protobuf/stubs/int128.cc",
-        "src/google/protobuf/stubs/once.cc",
-        "src/google/protobuf/stubs/status.cc",
-        "src/google/protobuf/stubs/stringpiece.cc",
-        "src/google/protobuf/stubs/structurally_valid.cc",
-        "src/google/protobuf/stubs/strutil.cc",
-        "src/google/protobuf/stubs/substitute.cc",
-        "src/google/protobuf/stubs/stringprintf.cc",
     ],
 
     local_include_dirs: [
@@ -446,12 +425,16 @@ cc_binary_host {
         "src",
     ],
 
-    static_libs: ["libz"],
+    static_libs: [
+        "libprotoc",
+        "libz",
+    ],
 
-    cflags: IGNORED_WARNINGS + [
+    cflags: [
         "-DHAVE_ZLIB=1",
     ],
 
+    rtti: true,
 }
 
 java_defaults {
@@ -522,6 +505,7 @@ java_library_static {
         "java/core/src/main/java/com/google/protobuf/AbstractMessageLite.java",
         "java/core/src/main/java/com/google/protobuf/AbstractParser.java",
         "java/core/src/main/java/com/google/protobuf/AbstractProtobufList.java",
+        "java/core/src/main/java/com/google/protobuf/ByteBufferWriter.java",
         "java/core/src/main/java/com/google/protobuf/ByteOutput.java",
         "java/core/src/main/java/com/google/protobuf/ByteString.java",
         "java/core/src/main/java/com/google/protobuf/BooleanArrayList.java",
@@ -530,6 +514,7 @@ java_library_static {
         "java/core/src/main/java/com/google/protobuf/DoubleArrayList.java",
         "java/core/src/main/java/com/google/protobuf/ExperimentalApi.java",
         "java/core/src/main/java/com/google/protobuf/ExtensionLite.java",
+        "java/core/src/main/java/com/google/protobuf/ExtensionRegistryFactory.java",
         "java/core/src/main/java/com/google/protobuf/ExtensionRegistryLite.java",
         "java/core/src/main/java/com/google/protobuf/FieldSet.java",
         "java/core/src/main/java/com/google/protobuf/FloatArrayList.java",
@@ -537,6 +522,7 @@ java_library_static {
         "java/core/src/main/java/com/google/protobuf/IntArrayList.java",
         "java/core/src/main/java/com/google/protobuf/Internal.java",
         "java/core/src/main/java/com/google/protobuf/InvalidProtocolBufferException.java",
+        "java/core/src/main/java/com/google/protobuf/IterableByteBufferInputStream.java",
         "java/core/src/main/java/com/google/protobuf/LazyField.java",
         "java/core/src/main/java/com/google/protobuf/LazyFieldLite.java",
         "java/core/src/main/java/com/google/protobuf/LazyStringArrayList.java",
@@ -547,7 +533,9 @@ java_library_static {
         "java/core/src/main/java/com/google/protobuf/MessageLiteToString.java",
         "java/core/src/main/java/com/google/protobuf/MessageLiteOrBuilder.java",
         "java/core/src/main/java/com/google/protobuf/MutabilityOracle.java",
+        "java/core/src/main/java/com/google/protobuf/NioByteString.java",
         "java/core/src/main/java/com/google/protobuf/Parser.java",
+        "java/core/src/main/java/com/google/protobuf/PrimitiveNonBoxingCollection.java",
         "java/core/src/main/java/com/google/protobuf/ProtobufArrayList.java",
         "java/core/src/main/java/com/google/protobuf/ProtocolStringList.java",
         "java/core/src/main/java/com/google/protobuf/RopeByteString.java",
@@ -556,6 +544,7 @@ java_library_static {
         "java/core/src/main/java/com/google/protobuf/UninitializedMessageException.java",
         "java/core/src/main/java/com/google/protobuf/UnknownFieldSetLite.java",
         "java/core/src/main/java/com/google/protobuf/UnmodifiableLazyStringList.java",
+        "java/core/src/main/java/com/google/protobuf/UnsafeUtil.java",
         "java/core/src/main/java/com/google/protobuf/Utf8.java",
         "java/core/src/main/java/com/google/protobuf/WireFormat.java",
     ],
