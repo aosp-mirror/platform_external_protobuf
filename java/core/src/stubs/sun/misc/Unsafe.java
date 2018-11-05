@@ -34,12 +34,34 @@ package sun.misc;
  * in the bootclasspath and protobuf is linked to the class loaded there.
  */
 public class Unsafe {
+  public Object allocateInstance(Class<?> clazz) throws InstantiationException { /* null implementation */ return null; }
+  public int arrayIndexScale(Class arrayClass) { /* null implementation */ return 0; }
+  public int arrayBaseOffset(Class arrayClass) { /* null implementation */ return 0; }
+  public void copyMemory(long srcAddress, long targetAddress, long length) { /* null implmentation */ }
+  public void copyMemory(byte[] src, long srcIndex, byte[] target, long targetIndex, long length) { /* null implmentation */ }
+  public boolean getBoolean(Object o, long offset) { /* null implementation */ return false; }
+  public boolean getBoolean(long address) { /* null implementation */ return false; }
   public byte getByte(Object o, long offset) { /* null implementation */ return 0; }
   public byte getByte(long address) { /* null implementation */ return 0; }
-  public int arrayBaseOffset(Class arrayClass) { /* null implementation */ return 0; }
+  public float getFloat(Object o, long offset) { /* null implementation */ return 0; }
+  public double getDouble(Object o, long offset) { /* null implementation */ return 0; }
+  public int getInt(Object o, long offset) { /* null implementation */ return 0; }
+  public int getInt(long address) { /* null implementation */ return 0; }
   public long getLong(Object o, long offset) { /* null implementation */ return 0; }
   public long getLong(long address) { /* null implementation */ return 0; }
+  public Object getObject(Object o, long offset) { /* null implementation */ return null; }
   public long objectFieldOffset(java.lang.reflect.Field f) { /* null implementation */ return 0; }
+  public void putBoolean(Object o, long offset, boolean x) { /* null implementation */ }
+  public void putBoolean(long address, boolean x) { /* null implmentation */ }
   public void putByte(Object o, long offset, byte x) { /* null implementation */ }
   public void putByte(long address, byte x) { /* null implmentation */ }
+  public void putFloat(Object o, long offset, float x) { /* null implementation */ }
+  public void putDouble(Object o, long offset, double x) { /* null implementation */ }
+  public void putInt(Object o, long offset, int x) { /* null implementation */ }
+  public void putInt(long address, int x) { /* null implmentation */ }
+  public void putLong(Object o, long offset, long x) { /* null implementation */ }
+  public void putLong(long address, long x) { /* null implmentation */ }
+  public void putObject(Object o, long offset, Object x) { /* null implementation */ }
+  public Object staticFieldBase(java.lang.reflect.Field f) { /* null implementation */ return null; }
+  public long staticFieldOffset(java.lang.reflect.Field f) { /* null implementation */ return 0; }
 }
