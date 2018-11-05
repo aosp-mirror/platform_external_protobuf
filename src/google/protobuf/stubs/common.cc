@@ -54,9 +54,7 @@
 #error "No suitable threading library available."
 #endif
 #if defined(__ANDROID__)
-#ifdef GOOGLE_PROTOBUF_MIN_LOG_LEVEL
 #include <android/log.h>
-#endif
 #endif
 
 namespace google {
