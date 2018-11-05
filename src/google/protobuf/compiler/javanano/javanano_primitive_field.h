@@ -67,7 +67,7 @@ class PrimitiveFieldGenerator : public FieldGenerator {
   void GenerateComputeSizeCode(io::Printer* printer) const;
 
   const FieldDescriptor* descriptor_;
-  map<string, string> variables_;
+  std::map<string, string> variables_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(PrimitiveFieldGenerator);
 };
@@ -91,7 +91,7 @@ class AccessorPrimitiveFieldGenerator : public FieldGenerator {
 
  private:
   const FieldDescriptor* descriptor_;
-  map<string, string> variables_;
+  std::map<string, string> variables_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(AccessorPrimitiveFieldGenerator);
 };
@@ -113,7 +113,7 @@ class PrimitiveOneofFieldGenerator : public FieldGenerator {
 
  private:
   const FieldDescriptor* descriptor_;
-  map<string, string> variables_;
+  std::map<string, string> variables_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(PrimitiveOneofFieldGenerator);
 };
@@ -139,7 +139,7 @@ class RepeatedPrimitiveFieldGenerator : public FieldGenerator {
   void GenerateRepeatedDataSizeCode(io::Printer* printer) const;
 
   const FieldDescriptor* descriptor_;
-  map<string, string> variables_;
+  std::map<string, string> variables_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(RepeatedPrimitiveFieldGenerator);
 };
