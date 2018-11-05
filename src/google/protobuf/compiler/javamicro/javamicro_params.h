@@ -48,8 +48,8 @@ enum eMultipleFiles { JAVAMICRO_MUL_UNSET, JAVAMICRO_MUL_FALSE, JAVAMICRO_MUL_TR
 // Parameters for used by the generators
 class Params {
  public:
-  typedef map<string, string> NameMap;
-  typedef set<string> NameSet;
+  typedef std::map<string, string> NameMap;
+  typedef std::set<string> NameSet;
  private:
   string empty_;
   string base_name_;
