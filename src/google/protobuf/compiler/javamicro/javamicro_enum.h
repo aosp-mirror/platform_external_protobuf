@@ -68,13 +68,13 @@ class EnumGenerator {
   // considered equivalent.  We treat the first defined constant for any
   // given numeric value as "canonical" and the rest as aliases of that
   // canonical value.
-  std::vector<const EnumValueDescriptor*> canonical_values_;
+  vector<const EnumValueDescriptor*> canonical_values_;
 
   struct Alias {
     const EnumValueDescriptor* value;
     const EnumValueDescriptor* canonical_value;
   };
-  std::vector<Alias> aliases_;
+  vector<Alias> aliases_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(EnumGenerator);
 };

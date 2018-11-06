@@ -42,15 +42,15 @@ namespace protobuf {
 namespace compiler {
 namespace java {
 
-Context::Context(const FileDescriptor* file, const Options& options)
-    : name_resolver_(new ClassNameResolver), options_(options) {
+Context::Context(const FileDescriptor* file)
+    : name_resolver_(new ClassNameResolver), enforce_lite_(false) {
   InitializeFieldGeneratorInfo(file);
 }
 
 Context::~Context() {
 }
 
-ClassNameResolver* Context::GetNameResolver() const {
+ClassNameResolver* Context::GetNameResolver() {
   return name_resolver_.get();
 }
 
@@ -108,7 +108,7 @@ void Context::InitializeFieldGeneratorInfoForMessage(
   for (int i = 0; i < message->nested_type_count(); ++i) {
     InitializeFieldGeneratorInfoForMessage(message->nested_type(i));
   }
-  std::vector<const FieldDescriptor*> fields;
+  vector<const FieldDescriptor*> fields;
   for (int i = 0; i < message->field_count(); ++i) {
     fields.push_back(message->field(i));
   }
@@ -124,11 +124,11 @@ void Context::InitializeFieldGeneratorInfoForMessage(
 }
 
 void Context::InitializeFieldGeneratorInfoForFields(
-    const std::vector<const FieldDescriptor*>& fields) {
+    const vector<const FieldDescriptor*>& fields) {
   // Find out all fields that conflict with some other field in the same
   // message.
-  std::vector<bool> is_conflict(fields.size());
-  std::vector<string> conflict_reason(fields.size());
+  vector<bool> is_conflict(fields.size());
+  vector<string> conflict_reason(fields.size());
   for (int i = 0; i < fields.size(); ++i) {
     const FieldDescriptor* field = fields[i];
     const string& name = UnderscoresToCapitalizedCamelCase(field);
@@ -154,7 +154,7 @@ void Context::InitializeFieldGeneratorInfoForFields(
   for (int i = 0; i < fields.size(); ++i) {
     const FieldDescriptor* field = fields[i];
     FieldGeneratorInfo info;
-    info.name = CamelCaseFieldName(field);
+    info.name = UnderscoresToCamelCase(field);
     info.capitalized_name = UnderscoresToCapitalizedCamelCase(field);
     // For fields conflicting with some other fields, we append the field
     // number to their field names in generated code to avoid conflicts.
@@ -192,8 +192,8 @@ const OneofGeneratorInfo* Context::GetOneofGeneratorInfo(
 // Does this message class have generated parsing, serialization, and other
 // standard methods for which reflection-based fallback implementations exist?
 bool Context::HasGeneratedMethods(const Descriptor* descriptor) const {
-  return options_.enforce_lite ||
-         descriptor->file()->options().optimize_for() != FileOptions::CODE_SIZE;
+  return enforce_lite_ || descriptor->file()->options().optimize_for() !=
+           FileOptions::CODE_SIZE;
 }
 
 }  // namespace java
