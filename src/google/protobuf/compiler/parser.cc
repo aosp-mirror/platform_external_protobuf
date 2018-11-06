@@ -249,11 +249,11 @@ bool Parser::ConsumeNumber(double* output, const char* error) {
     input_->Next();
     return true;
   } else if (LookingAt("inf")) {
-    *output = numeric_limits<double>::infinity();
+    *output = std::numeric_limits<double>::infinity();
     input_->Next();
     return true;
   } else if (LookingAt("nan")) {
-    *output = numeric_limits<double>::quiet_NaN();
+    *output = std::numeric_limits<double>::quiet_NaN();
     input_->Next();
     return true;
   } else {
@@ -282,7 +282,7 @@ bool Parser::TryConsumeEndOfDeclaration(
     const char* text, const LocationRecorder* location) {
   if (LookingAt(text)) {
     string leading, trailing;
-    vector<string> detached;
+    std::vector<string> detached;
     input_->NextWithComments(&trailing, &detached, &leading);
 
     // Save the leading comments for next time, and recall the leading comments
@@ -404,7 +404,7 @@ void Parser::LocationRecorder::RecordLegacyLocation(const Message* descriptor,
 
 void Parser::LocationRecorder::AttachComments(
     string* leading, string* trailing,
-    vector<string>* detached_comments) const {
+    std::vector<string>* detached_comments) const {
   GOOGLE_CHECK(!location_->has_leading_comments());
   GOOGLE_CHECK(!location_->has_trailing_comments());
 
@@ -487,7 +487,7 @@ bool Parser::ValidateEnum(const EnumDescriptorProto* proto) {
     return false;
   }
 
-  set<int> used_values;
+  std::set<int> used_values;
   bool has_duplicates = false;
   for (int i = 0; i < proto->value_size(); ++i) {
     const EnumValueDescriptorProto enum_value = proto->value(i);
@@ -525,7 +525,6 @@ bool Parser::Parse(io::Tokenizer* input, FileDescriptorProto* file) {
   SourceCodeInfo source_code_info;
   source_code_info_ = &source_code_info;
 
-  vector<string> top_doc_comments;
   if (LookingAtType(io::Tokenizer::TYPE_START)) {
     // Advance to first token.
     input_->NextWithComments(NULL, &upcoming_detached_comments_,
@@ -571,6 +570,7 @@ bool Parser::Parse(io::Tokenizer* input, FileDescriptorProto* file) {
 
   input_ = NULL;
   source_code_info_ = NULL;
+  assert(file != NULL);
   source_code_info.Swap(file->mutable_source_code_info());
   return !had_errors_;
 }
@@ -664,7 +664,7 @@ bool Parser::ParseMessageDefinition(
 
 namespace {
 
-const int kMaxExtensionRangeSentinel = -1;
+const int kMaxRangeSentinel = -1;
 
 bool IsMessageSetWireFormatMessage(const DescriptorProto& message) {
   const MessageOptions& options = message.options();
@@ -688,8 +688,23 @@ void AdjustExtensionRangesWithMaxEndNumber(DescriptorProto* message) {
       kint32max :
       FieldDescriptor::kMaxNumber + 1;
   for (int i = 0; i < message->extension_range_size(); ++i) {
-    if (message->extension_range(i).end() == kMaxExtensionRangeSentinel) {
+    if (message->extension_range(i).end() == kMaxRangeSentinel) {
       message->mutable_extension_range(i)->set_end(max_extension_number);
+    }
+  }
+}
+
+// Modifies any reserved ranges that specified 'max' as the end of the
+// reserved range, and sets them to the type-specific maximum. The actual max
+// tag number can only be determined after all options have been parsed.
+void AdjustReservedRangesWithMaxEndNumber(DescriptorProto* message) {
+  const bool is_message_set = IsMessageSetWireFormatMessage(*message);
+  const int max_field_number = is_message_set ?
+      kint32max :
+      FieldDescriptor::kMaxNumber + 1;
+  for (int i = 0; i < message->reserved_range_size(); ++i) {
+    if (message->reserved_range(i).end() == kMaxRangeSentinel) {
+      message->mutable_reserved_range(i)->set_end(max_field_number);
     }
   }
 }
@@ -716,6 +731,9 @@ bool Parser::ParseMessageBlock(DescriptorProto* message,
 
   if (message->extension_range_size() > 0) {
     AdjustExtensionRangesWithMaxEndNumber(message);
+  }
+  if (message->reserved_range_size() > 0) {
+    AdjustReservedRangesWithMaxEndNumber(message);
   }
   return true;
 }
@@ -1373,7 +1391,7 @@ bool Parser::ParseOption(Message* options,
           value_location.AddPath(
               UninterpretedOption::kNegativeIntValueFieldNumber);
           uninterpreted_option->set_negative_int_value(
-              -static_cast<int64>(value));
+              static_cast<int64>(-value));
         } else {
           value_location.AddPath(
               UninterpretedOption::kPositiveIntValueFieldNumber);
@@ -1429,6 +1447,8 @@ bool Parser::ParseExtensions(DescriptorProto* message,
   // Parse the declaration.
   DO(Consume("extensions"));
 
+  int old_range_size = message->extension_range_size();
+
   do {
     // Note that kExtensionRangeFieldNumber was already pushed by the parent.
     LocationRecorder location(extensions_location,
@@ -1455,7 +1475,7 @@ bool Parser::ParseExtensions(DescriptorProto* message,
         // Set to the sentinel value - 1 since we increment the value below.
         // The actual value of the end of the range should be set with
         // AdjustExtensionRangesWithMaxEndNumber.
-        end = kMaxExtensionRangeSentinel - 1;
+        end = kMaxRangeSentinel - 1;
       } else {
         DO(ConsumeInteger(&end, "Expected integer."));
       }
@@ -1475,12 +1495,36 @@ bool Parser::ParseExtensions(DescriptorProto* message,
     range->set_end(end);
   } while (TryConsume(","));
 
+  if (LookingAt("[")) {
+    LocationRecorder location(
+        extensions_location,
+        DescriptorProto::ExtensionRange::kOptionsFieldNumber);
+
+    DO(Consume("["));
+
+    // Parse extension range options in the first range.
+    ExtensionRangeOptions* options =
+        message->mutable_extension_range(old_range_size)->mutable_options();
+    do {
+      DO(ParseOption(options, location, containing_file, OPTION_ASSIGNMENT));
+    } while (TryConsume(","));
+
+    DO(Consume("]"));
+
+    // Then copy the extension range options to all of the other ranges we've
+    // parsed.
+    for (int i = old_range_size + 1; i < message->extension_range_size(); i++) {
+      message->mutable_extension_range(i)->mutable_options()
+          ->CopyFrom(*options);
+    }
+  }
+
   DO(ConsumeEndOfDeclaration(";", &extensions_location));
   return true;
 }
 
-// This is similar to extension range parsing, except that "max" is not
-// supported, and accepts field name literals.
+// This is similar to extension range parsing, except that it accepts field
+// name literals.
 bool Parser::ParseReserved(DescriptorProto* message,
                            const LocationRecorder& message_location) {
   // Parse the declaration.
@@ -1495,7 +1539,6 @@ bool Parser::ParseReserved(DescriptorProto* message,
     return ParseReservedNumbers(message, location);
   }
 }
-
 
 bool Parser::ParseReservedNames(DescriptorProto* message,
                                 const LocationRecorder& parent_location) {
@@ -1528,7 +1571,14 @@ bool Parser::ParseReservedNumbers(DescriptorProto* message,
     if (TryConsume("to")) {
       LocationRecorder end_location(
           location, DescriptorProto::ReservedRange::kEndFieldNumber);
-      DO(ConsumeInteger(&end, "Expected integer."));
+      if (TryConsume("max")) {
+        // Set to the sentinel value - 1 since we increment the value below.
+        // The actual value of the end of the range should be set with
+        // AdjustExtensionRangesWithMaxEndNumber.
+        end = kMaxRangeSentinel - 1;
+      } else {
+        DO(ConsumeInteger(&end, "Expected integer."));
+      }
     } else {
       LocationRecorder end_location(
           location, DescriptorProto::ReservedRange::kEndFieldNumber);
@@ -1540,6 +1590,81 @@ bool Parser::ParseReservedNumbers(DescriptorProto* message,
     // Users like to specify inclusive ranges, but in code we like the end
     // number to be exclusive.
     ++end;
+
+    range->set_start(start);
+    range->set_end(end);
+    first = false;
+  } while (TryConsume(","));
+
+  DO(ConsumeEndOfDeclaration(";", &parent_location));
+  return true;
+}
+
+bool Parser::ParseReserved(EnumDescriptorProto* message,
+                          const LocationRecorder& message_location) {
+  // Parse the declaration.
+  DO(Consume("reserved"));
+  if (LookingAtType(io::Tokenizer::TYPE_STRING)) {
+    LocationRecorder location(message_location,
+                              DescriptorProto::kReservedNameFieldNumber);
+    return ParseReservedNames(message, location);
+  } else {
+    LocationRecorder location(message_location,
+                              DescriptorProto::kReservedRangeFieldNumber);
+    return ParseReservedNumbers(message, location);
+  }
+}
+
+bool Parser::ParseReservedNames(EnumDescriptorProto* message,
+                                const LocationRecorder& parent_location) {
+  do {
+    LocationRecorder location(parent_location, message->reserved_name_size());
+    DO(ConsumeString(message->add_reserved_name(), "Expected enum value."));
+  } while (TryConsume(","));
+  DO(ConsumeEndOfDeclaration(";", &parent_location));
+  return true;
+}
+
+bool Parser::ParseReservedNumbers(EnumDescriptorProto* message,
+                                  const LocationRecorder& parent_location) {
+  bool first = true;
+  do {
+    LocationRecorder location(parent_location, message->reserved_range_size());
+
+    EnumDescriptorProto::EnumReservedRange* range =
+        message->add_reserved_range();
+    int start, end;
+    io::Tokenizer::Token start_token;
+    {
+      LocationRecorder start_location(
+          location, EnumDescriptorProto::EnumReservedRange::kStartFieldNumber);
+      start_token = input_->current();
+      DO(ConsumeSignedInteger(&start, (first ?
+                                 "Expected enum value or number range." :
+                                 "Expected enum number range.")));
+    }
+
+    if (TryConsume("to")) {
+      LocationRecorder end_location(
+          location, EnumDescriptorProto::EnumReservedRange::kEndFieldNumber);
+      if (TryConsume("max")) {
+        // This is in the enum descriptor path, which doesn't have the message
+        // set duality to fix up, so it doesn't integrate with the sentinel.
+
+        // Evaluate 'max' to INT_MAX - 1 so that incrementing to create the
+        // exclusive range end doesn't cause an overflow.
+        // Note, this prevents reserving the actual INT_MAX enum value.
+        end = INT_MAX;
+      } else {
+        DO(ConsumeSignedInteger(&end, "Expected integer."));
+      }
+    } else {
+      LocationRecorder end_location(
+          location, EnumDescriptorProto::EnumReservedRange::kEndFieldNumber);
+      end_location.StartAt(start_token);
+      end_location.EndAt(start_token);
+      end = start;
+    }
 
     range->set_start(start);
     range->set_end(end);
@@ -1628,6 +1753,16 @@ bool Parser::ParseOneof(OneofDescriptorProto* oneof_decl,
     if (AtEnd()) {
       AddError("Reached end of input in oneof definition (missing '}').");
       return false;
+    }
+
+    if (LookingAt("option")) {
+      LocationRecorder option_location(
+          oneof_location, OneofDescriptorProto::kOptionsFieldNumber);
+      if (!ParseOption(oneof_decl->mutable_options(), option_location,
+                       containing_file, OPTION_STATEMENT)) {
+        return false;
+      }
+      continue;
     }
 
     // Print a nice error if the user accidentally tries to place a label
@@ -1720,6 +1855,8 @@ bool Parser::ParseEnumStatement(EnumDescriptorProto* enum_type,
                               EnumDescriptorProto::kOptionsFieldNumber);
     return ParseOption(enum_type->mutable_options(), location,
                        containing_file, OPTION_STATEMENT);
+  } else if (LookingAt("reserved")) {
+    return ParseReserved(enum_type, enum_location);
   } else {
     LocationRecorder location(enum_location,
         EnumDescriptorProto::kValueFieldNumber, enum_type->value_size());
@@ -2079,7 +2216,7 @@ bool SourceLocationTable::Find(
     const Message* descriptor,
     DescriptorPool::ErrorCollector::ErrorLocation location,
     int* line, int* column) const {
-  const pair<int, int>* result =
+  const std::pair<int, int>* result =
       FindOrNull(location_map_, std::make_pair(descriptor, location));
   if (result == NULL) {
     *line   = -1;
@@ -2106,4 +2243,5 @@ void SourceLocationTable::Clear() {
 
 }  // namespace compiler
 }  // namespace protobuf
+
 }  // namespace google

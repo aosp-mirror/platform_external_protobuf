@@ -337,7 +337,8 @@ bool InsertIfNotPresent(
 template <class Collection>
 void InsertOrDie(Collection* const collection,
                  const typename Collection::value_type& value) {
-  GOOGLE_CHECK(InsertIfNotPresent(collection, value)) << "duplicate value: " << value;
+  GOOGLE_CHECK(InsertIfNotPresent(collection, value))
+      << "duplicate value: " << value;
 }
 
 // Same as above except doesn't log the value on error.
