@@ -30,7 +30,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-using Google.Protobuf.Collections;
 using Google.Protobuf.Compatibility;
 using Google.Protobuf.WellKnownTypes;
 using System;
@@ -347,10 +346,8 @@ namespace Google.Protobuf
     /// </remarks>
     public sealed class FieldCodec<T>
     {
-        private static readonly EqualityComparer<T> EqualityComparer = ProtobufEqualityComparers.GetEqualityComparer<T>();
         private static readonly T DefaultDefault;
-        // Only non-nullable value types support packing. This is the simplest way of detecting that.
-        private static readonly bool TypeSupportsPacking = default(T) != null;
+        private static readonly bool TypeSupportsPacking = typeof(T).IsValueType() && Nullable.GetUnderlyingType(typeof(T)) == null;
 
         static FieldCodec()
         {
@@ -471,6 +468,6 @@ namespace Google.Protobuf
         /// </summary>
         public int CalculateSizeWithTag(T value) => IsDefault(value) ? 0 : ValueSizeCalculator(value) + tagSize;
 
-        private bool IsDefault(T value) => EqualityComparer.Equals(value, DefaultValue);
+        private bool IsDefault(T value) => EqualityComparer<T>.Default.Equals(value, DefaultValue);
     }
 }
