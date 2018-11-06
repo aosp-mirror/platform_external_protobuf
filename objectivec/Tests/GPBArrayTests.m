@@ -32,14 +32,12 @@
 #import <XCTest/XCTest.h>
 
 #import "GPBArray.h"
-#import "GPBArray_PackagePrivate.h"
 
 #import "GPBTestUtilities.h"
 
 // To let the testing macros work, add some extra methods to simplify things.
 @interface GPBEnumArray (TestingTweak)
 + (instancetype)arrayWithValue:(int32_t)value;
-+ (instancetype)arrayWithCapacity:(NSUInteger)count;
 - (instancetype)initWithValues:(const int32_t [])values
                          count:(NSUInteger)count;
 @end
@@ -72,10 +70,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   return [[[self alloc] initWithValidationFunction:TestingEnum_IsValidValue
                                          rawValues:&value
                                              count:1] autorelease];
-}
-+ (instancetype)arrayWithCapacity:(NSUInteger)count {
-  return [[[self alloc] initWithValidationFunction:TestingEnum_IsValidValue
-                                          capacity:count] autorelease];
 }
 - (instancetype)initWithValues:(const int32_t [])values
                          count:(NSUInteger)count {
@@ -182,8 +176,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 //%    XCTAssertNotEqual(idx, 0U);
 //%    ++idx2;
 //%  }];
-//%  // Ensure description doesn't choke.
-//%  XCTAssertTrue(array.description.length > 10);
 //%  [array release];
 //%}
 //%
@@ -208,10 +200,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 //%            NAME$S                     count:GPBARRAYSIZE(kValues3)];
 //%  XCTAssertNotNil(array3);
 //%
-//%  // Identity
-//%  XCTAssertTrue([array1 isEqual:array1]);
-//%  // Wrong type doesn't blow up.
-//%  XCTAssertFalse([array1 isEqual:@"bogus"]);
 //%  // 1/1Prime should be different objects, but equal.
 //%  XCTAssertNotEqual(array1, array1prime);
 //%  XCTAssertEqualObjects(array1, array1prime);
@@ -280,12 +268,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 //%            NAME$S                     count:GPBARRAYSIZE(kValues2)];
 //%  XCTAssertNotNil(array2);
 //%  [array add##HELPER##ValuesFromArray:array2];
-//%  XCTAssertEqual(array.count, 5U);
-//%
-//%  // Zero/nil inputs do nothing.
-//%  [array addValues:kValues1 count:0];
-//%  XCTAssertEqual(array.count, 5U);
-//%  [array addValues:NULL count:5];
 //%  XCTAssertEqual(array.count, 5U);
 //%
 //%  XCTAssertEqual([array valueAtIndex:0], VAL1);
@@ -408,9 +390,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 //%- (void)testInternalResizing {
 //%  const TYPE kValues[] = { VAL1, VAL2, VAL3, VAL4 };
 //%  GPB##NAME##Array *array =
-//%      [GPB##NAME##Array arrayWithCapacity:GPBARRAYSIZE(kValues)];
+//%      [[GPB##NAME##Array alloc] initWithValues:kValues
+//%            NAME$S                     count:GPBARRAYSIZE(kValues)];
 //%  XCTAssertNotNil(array);
-//%  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 //%
 //%  // Add/remove to trigger the intneral buffer to grow/shrink.
 //%  for (int i = 0; i < 100; ++i) {
@@ -427,6 +409,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 //%  XCTAssertEqual(array.count, 404U);
 //%  [array removeAll];
 //%  XCTAssertEqual(array.count, 0U);
+//%  [array release];
 //%}
 //%
 //%@end
@@ -526,8 +509,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -552,10 +533,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                       count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -624,12 +601,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                       count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], 1);
@@ -752,9 +723,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const int32_t kValues[] = { 1, 2, 3, 4 };
   GPBInt32Array *array =
-      [GPBInt32Array arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBInt32Array alloc] initWithValues:kValues
+                                      count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -771,6 +742,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -870,8 +842,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -896,10 +866,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                        count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -968,12 +934,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                        count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], 11U);
@@ -1096,9 +1056,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const uint32_t kValues[] = { 11U, 12U, 13U, 14U };
   GPBUInt32Array *array =
-      [GPBUInt32Array arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBUInt32Array alloc] initWithValues:kValues
+                                       count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -1115,6 +1075,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -1214,8 +1175,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -1240,10 +1199,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                       count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -1312,12 +1267,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                       count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], 31LL);
@@ -1440,9 +1389,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const int64_t kValues[] = { 31LL, 32LL, 33LL, 34LL };
   GPBInt64Array *array =
-      [GPBInt64Array arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBInt64Array alloc] initWithValues:kValues
+                                      count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -1459,6 +1408,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -1558,8 +1508,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -1584,10 +1532,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                        count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -1656,12 +1600,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                        count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], 41ULL);
@@ -1784,9 +1722,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const uint64_t kValues[] = { 41ULL, 42ULL, 43ULL, 44ULL };
   GPBUInt64Array *array =
-      [GPBUInt64Array arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBUInt64Array alloc] initWithValues:kValues
+                                       count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -1803,6 +1741,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -1902,8 +1841,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -1928,10 +1865,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                       count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -2000,12 +1933,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                       count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], 51.f);
@@ -2128,9 +2055,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const float kValues[] = { 51.f, 52.f, 53.f, 54.f };
   GPBFloatArray *array =
-      [GPBFloatArray arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBFloatArray alloc] initWithValues:kValues
+                                      count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -2147,6 +2074,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -2246,8 +2174,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -2272,10 +2198,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                        count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -2344,12 +2266,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                        count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], 61.);
@@ -2472,9 +2388,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const double kValues[] = { 61., 62., 63., 64. };
   GPBDoubleArray *array =
-      [GPBDoubleArray arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBDoubleArray alloc] initWithValues:kValues
+                                       count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -2491,6 +2407,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -2590,8 +2507,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -2616,10 +2531,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                      count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -2688,12 +2599,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                      count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], TRUE);
@@ -2816,9 +2721,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const BOOL kValues[] = { TRUE, TRUE, FALSE, FALSE };
   GPBBoolArray *array =
-      [GPBBoolArray arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBBoolArray alloc] initWithValues:kValues
+                                     count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -2835,6 +2740,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -2934,8 +2840,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
     XCTAssertNotEqual(idx, 0U);
     ++idx2;
   }];
-  // Ensure description doesn't choke.
-  XCTAssertTrue(array.description.length > 10);
   [array release];
 }
 
@@ -2960,10 +2864,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                      count:GPBARRAYSIZE(kValues3)];
   XCTAssertNotNil(array3);
 
-  // Identity
-  XCTAssertTrue([array1 isEqual:array1]);
-  // Wrong type doesn't blow up.
-  XCTAssertFalse([array1 isEqual:@"bogus"]);
   // 1/1Prime should be different objects, but equal.
   XCTAssertNotEqual(array1, array1prime);
   XCTAssertEqualObjects(array1, array1prime);
@@ -3032,12 +2932,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
                                      count:GPBARRAYSIZE(kValues2)];
   XCTAssertNotNil(array2);
   [array addRawValuesFromArray:array2];
-  XCTAssertEqual(array.count, 5U);
-
-  // Zero/nil inputs do nothing.
-  [array addValues:kValues1 count:0];
-  XCTAssertEqual(array.count, 5U);
-  [array addValues:NULL count:5];
   XCTAssertEqual(array.count, 5U);
 
   XCTAssertEqual([array valueAtIndex:0], 71);
@@ -3160,9 +3054,9 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
 - (void)testInternalResizing {
   const int32_t kValues[] = { 71, 72, 73, 74 };
   GPBEnumArray *array =
-      [GPBEnumArray arrayWithCapacity:GPBARRAYSIZE(kValues)];
+      [[GPBEnumArray alloc] initWithValues:kValues
+                                     count:GPBARRAYSIZE(kValues)];
   XCTAssertNotNil(array);
-  [array addValues:kValues count:GPBARRAYSIZE(kValues)];
 
   // Add/remove to trigger the intneral buffer to grow/shrink.
   for (int i = 0; i < 100; ++i) {
@@ -3179,6 +3073,7 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
+  [array release];
 }
 
 @end
@@ -3537,178 +3432,6 @@ static BOOL TestingEnum_IsValidValue2(int32_t value) {
   XCTAssertEqual(array.count, 404U);
   [array removeAll];
   XCTAssertEqual(array.count, 0U);
-  [array release];
-}
-
-@end
-
-#pragma mark - GPBAutocreatedArray Tests
-
-// These are hand written tests to double check some behaviors of the
-// GPBAutocreatedArray.
-
-// NOTE: GPBAutocreatedArray is private to the library, users of the library
-// should never have to directly deal with this class.
-
-@interface GPBAutocreatedArrayTests : XCTestCase
-@end
-
-@implementation GPBAutocreatedArrayTests
-
-- (void)testEquality {
-  GPBAutocreatedArray *array = [[GPBAutocreatedArray alloc] init];
-
-  XCTAssertTrue([array isEqual:@[]]);
-  XCTAssertTrue([array isEqualToArray:@[]]);
-
-  XCTAssertFalse([array isEqual:@[ @"foo" ]]);
-  XCTAssertFalse([array isEqualToArray:@[ @"foo" ]]);
-
-  [array addObject:@"foo"];
-
-  XCTAssertFalse([array isEqual:@[]]);
-  XCTAssertFalse([array isEqualToArray:@[]]);
-  XCTAssertTrue([array isEqual:@[ @"foo" ]]);
-  XCTAssertTrue([array isEqualToArray:@[ @"foo" ]]);
-  XCTAssertFalse([array isEqual:@[ @"bar" ]]);
-  XCTAssertFalse([array isEqualToArray:@[ @"bar" ]]);
-
-  GPBAutocreatedArray *array2 = [[GPBAutocreatedArray alloc] init];
-
-  XCTAssertFalse([array isEqual:array2]);
-  XCTAssertFalse([array isEqualToArray:array2]);
-
-  [array2 addObject:@"bar"];
-  XCTAssertFalse([array isEqual:array2]);
-  XCTAssertFalse([array isEqualToArray:array2]);
-
-  [array2 replaceObjectAtIndex:0 withObject:@"foo"];
-  XCTAssertTrue([array isEqual:array2]);
-  XCTAssertTrue([array isEqualToArray:array2]);
-
-  [array2 release];
-  [array release];
-}
-
-- (void)testCopy {
-  {
-    GPBAutocreatedArray *array = [[GPBAutocreatedArray alloc] init];
-
-    NSArray *cpy = [array copy];
-    XCTAssertTrue(cpy != array); // Ptr compare
-    XCTAssertTrue([cpy isKindOfClass:[NSArray class]]);
-    XCTAssertFalse([cpy isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy.count, (NSUInteger)0);
-
-    NSArray *cpy2 = [array copy];
-    XCTAssertTrue(cpy2 != array); // Ptr compare
-    // Can't compare cpy and cpy2 because NSArray has a singleton empty
-    // array it uses, so the ptrs are the same.
-    XCTAssertTrue([cpy2 isKindOfClass:[NSArray class]]);
-    XCTAssertFalse([cpy2 isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy2.count, (NSUInteger)0);
-
-    [cpy2 release];
-    [cpy release];
-    [array release];
-  }
-
-  {
-    GPBAutocreatedArray *array = [[GPBAutocreatedArray alloc] init];
-
-    NSMutableArray *cpy = [array mutableCopy];
-    XCTAssertTrue(cpy != array); // Ptr compare
-    XCTAssertTrue([cpy isKindOfClass:[NSMutableArray class]]);
-    XCTAssertFalse([cpy isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy.count, (NSUInteger)0);
-
-    NSMutableArray *cpy2 = [array mutableCopy];
-    XCTAssertTrue(cpy2 != array); // Ptr compare
-    XCTAssertTrue(cpy2 != cpy); // Ptr compare
-    XCTAssertTrue([cpy2 isKindOfClass:[NSMutableArray class]]);
-    XCTAssertFalse([cpy2 isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy2.count, (NSUInteger)0);
-
-    [cpy2 release];
-    [cpy release];
-    [array release];
-  }
-
-  {
-    GPBAutocreatedArray *array = [[GPBAutocreatedArray alloc] init];
-    [array addObject:@"foo"];
-    [array addObject:@"bar"];
-
-    NSArray *cpy = [array copy];
-    XCTAssertTrue(cpy != array); // Ptr compare
-    XCTAssertTrue([cpy isKindOfClass:[NSArray class]]);
-    XCTAssertFalse([cpy isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy.count, (NSUInteger)2);
-    XCTAssertEqualObjects(cpy[0], @"foo");
-    XCTAssertEqualObjects(cpy[1], @"bar");
-
-    NSArray *cpy2 = [array copy];
-    XCTAssertTrue(cpy2 != array); // Ptr compare
-    XCTAssertTrue(cpy2 != cpy); // Ptr compare
-    XCTAssertTrue([cpy2 isKindOfClass:[NSArray class]]);
-    XCTAssertFalse([cpy2 isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy2.count, (NSUInteger)2);
-    XCTAssertEqualObjects(cpy2[0], @"foo");
-    XCTAssertEqualObjects(cpy2[1], @"bar");
-
-    [cpy2 release];
-    [cpy release];
-    [array release];
-  }
-
-  {
-    GPBAutocreatedArray *array = [[GPBAutocreatedArray alloc] init];
-    [array addObject:@"foo"];
-    [array addObject:@"bar"];
-
-    NSMutableArray *cpy = [array mutableCopy];
-    XCTAssertTrue(cpy != array); // Ptr compare
-    XCTAssertTrue([cpy isKindOfClass:[NSArray class]]);
-    XCTAssertFalse([cpy isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy.count, (NSUInteger)2);
-    XCTAssertEqualObjects(cpy[0], @"foo");
-    XCTAssertEqualObjects(cpy[1], @"bar");
-
-    NSMutableArray *cpy2 = [array mutableCopy];
-    XCTAssertTrue(cpy2 != array); // Ptr compare
-    XCTAssertTrue(cpy2 != cpy); // Ptr compare
-    XCTAssertTrue([cpy2 isKindOfClass:[NSArray class]]);
-    XCTAssertFalse([cpy2 isKindOfClass:[GPBAutocreatedArray class]]);
-    XCTAssertEqual(cpy2.count, (NSUInteger)2);
-    XCTAssertEqualObjects(cpy2[0], @"foo");
-    XCTAssertEqualObjects(cpy2[1], @"bar");
-
-    [cpy2 release];
-    [cpy release];
-    [array release];
-  }
-}
-
-- (void)testIndexedSubscriptSupport {
-  // The base NSArray/NSMutableArray behaviors for *IndexedSubscript methods
-  // should still work via the methods that one has to override to make an
-  // NSMutableArray subclass.  i.e. - this should "just work" and if these
-  // crash/fail, then something is wrong in how NSMutableArray is subclassed.
-
-  GPBAutocreatedArray *array = [[GPBAutocreatedArray alloc] init];
-
-  [array addObject:@"foo"];
-  [array addObject:@"bar"];
-  XCTAssertEqual(array.count, (NSUInteger)2);
-  XCTAssertEqualObjects(array[0], @"foo");
-  XCTAssertEqualObjects(array[1], @"bar");
-  array[0] = @"foo2";
-  array[2] = @"baz";
-  XCTAssertEqual(array.count, (NSUInteger)3);
-  XCTAssertEqualObjects(array[0], @"foo2");
-  XCTAssertEqualObjects(array[1], @"bar");
-  XCTAssertEqualObjects(array[2], @"baz");
-
   [array release];
 }
 

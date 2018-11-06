@@ -72,10 +72,7 @@ int main(int argc, const char** argv) {
     }
     if (inlen > 0) {
       int err = write(STDOUT_FILENO, inptr, inlen);
-      if (err != inlen) {
-        fprintf(stderr, "write unexpectedly returned %d.\n", err);
-        return 1;
-      }
+      assert(err == inlen);
     }
   }
 

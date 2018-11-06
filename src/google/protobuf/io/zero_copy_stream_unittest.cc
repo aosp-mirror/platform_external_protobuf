@@ -47,7 +47,9 @@
 //   implementations.
 
 
-#ifndef _MSC_VER
+#ifdef _MSC_VER
+#include <io.h>
+#else
 #include <unistd.h>
 #endif
 #include <stdlib.h>
@@ -74,7 +76,6 @@
 #include <google/protobuf/testing/googletest.h>
 #include <google/protobuf/testing/file.h>
 #include <gtest/gtest.h>
-#include <google/protobuf/stubs/io_win32.h>
 
 namespace google {
 namespace protobuf {
@@ -83,12 +84,6 @@ namespace {
 
 #ifdef _WIN32
 #define pipe(fds) _pipe(fds, 4096, O_BINARY)
-// DO NOT include <io.h>, instead create functions in io_win32.{h,cc} and import
-// them like we do below.
-using google::protobuf::internal::win32::access;
-using google::protobuf::internal::win32::mkdir;
-using google::protobuf::internal::win32::open;
-using google::protobuf::internal::win32::close;
 #endif
 
 #ifndef O_BINARY
@@ -887,7 +882,7 @@ TEST_F(IoTest, IostreamIo) {
   for (int i = 0; i < kBlockSizeCount; i++) {
     for (int j = 0; j < kBlockSizeCount; j++) {
       {
-        std::stringstream stream;
+        stringstream stream;
 
         {
           OstreamOutputStream output(&stream, kBlockSizes[i]);
@@ -903,7 +898,7 @@ TEST_F(IoTest, IostreamIo) {
       }
 
       {
-        std::stringstream stream;
+        stringstream stream;
 
         {
           OstreamOutputStream output(&stream, kBlockSizes[i]);

@@ -47,23 +47,16 @@ from google.protobuf.internal import encoder
 from google.protobuf.internal import message_set_extensions_pb2
 from google.protobuf.internal import missing_enum_values_pb2
 from google.protobuf.internal import test_util
-from google.protobuf.internal import testing_refleaks
 from google.protobuf.internal import type_checkers
 
 
-BaseTestCase = testing_refleaks.BaseTestCase
-
-
-# CheckUnknownField() cannot be used by the C++ implementation because
-# some protect members are called. It is not a behavior difference
-# for python and C++ implementation.
-def SkipCheckUnknownFieldIfCppImplementation(func):
+def SkipIfCppImplementation(func):
   return unittest.skipIf(
       api_implementation.Type() == 'cpp' and api_implementation.Version() == 2,
-      'Addtional test for pure python involved protect members')(func)
+      'C++ implementation does not expose unknown fields to Python')(func)
 
 
-class UnknownFieldsTest(BaseTestCase):
+class UnknownFieldsTest(unittest.TestCase):
 
   def setUp(self):
     self.descriptor = unittest_pb2.TestAllTypes.DESCRIPTOR
@@ -80,23 +73,11 @@ class UnknownFieldsTest(BaseTestCase):
     # stdout.
     self.assertTrue(data == self.all_fields_data)
 
-  def expectSerializeProto3(self, preserve):
+  def testSerializeProto3(self):
+    # Verify that proto3 doesn't preserve unknown fields.
     message = unittest_proto3_arena_pb2.TestEmptyMessage()
     message.ParseFromString(self.all_fields_data)
-    if preserve:
-      self.assertEqual(self.all_fields_data, message.SerializeToString())
-    else:
-      self.assertEqual(0, len(message.SerializeToString()))
-
-  def testSerializeProto3(self):
-    # Verify that proto3 unknown fields behavior.
-    default_preserve = (api_implementation
-                        .GetPythonProto3PreserveUnknownsDefault())
-    self.expectSerializeProto3(default_preserve)
-    api_implementation.SetPythonProto3PreserveUnknownsDefault(
-        not default_preserve)
-    self.expectSerializeProto3(not default_preserve)
-    api_implementation.SetPythonProto3PreserveUnknownsDefault(default_preserve)
+    self.assertEqual(0, len(message.SerializeToString()))
 
   def testByteSize(self):
     self.assertEqual(self.all_fields.ByteSize(), self.empty_message.ByteSize())
@@ -159,7 +140,7 @@ class UnknownFieldsTest(BaseTestCase):
         b'', message.repeated_nested_message[0].SerializeToString())
 
 
-class UnknownFieldsAccessorsTest(BaseTestCase):
+class UnknownFieldsAccessorsTest(unittest.TestCase):
 
   def setUp(self):
     self.descriptor = unittest_pb2.TestAllTypes.DESCRIPTOR
@@ -168,51 +149,60 @@ class UnknownFieldsAccessorsTest(BaseTestCase):
     self.all_fields_data = self.all_fields.SerializeToString()
     self.empty_message = unittest_pb2.TestEmptyMessage()
     self.empty_message.ParseFromString(self.all_fields_data)
+    if api_implementation.Type() != 'cpp':
+      # _unknown_fields is an implementation detail.
+      self.unknown_fields = self.empty_message._unknown_fields
 
-  # CheckUnknownField() is an additional Pure Python check which checks
-  # a detail of unknown fields. It cannot be used by the C++
-  # implementation because some protect members are called.
-  # The test is added for historical reasons. It is not necessary as
-  # serialized string is checked.
+  # All the tests that use GetField() check an implementation detail of the
+  # Python implementation, which stores unknown fields as serialized strings.
+  # These tests are skipped by the C++ implementation: it's enough to check that
+  # the message is correctly serialized.
 
-  def CheckUnknownField(self, name, expected_value):
+  def GetField(self, name):
     field_descriptor = self.descriptor.fields_by_name[name]
     wire_type = type_checkers.FIELD_TYPE_TO_WIRE_TYPE[field_descriptor.type]
     field_tag = encoder.TagBytes(field_descriptor.number, wire_type)
     result_dict = {}
-    for tag_bytes, value in self.empty_message._unknown_fields:
+    for tag_bytes, value in self.unknown_fields:
       if tag_bytes == field_tag:
         decoder = unittest_pb2.TestAllTypes._decoders_by_tag[tag_bytes][0]
         decoder(value, 0, len(value), self.all_fields, result_dict)
-    self.assertEqual(expected_value, result_dict[field_descriptor])
+    return result_dict[field_descriptor]
 
-  @SkipCheckUnknownFieldIfCppImplementation
-  def testCheckUnknownFieldValue(self):
-    # Test enum.
-    self.CheckUnknownField('optional_nested_enum',
-                           self.all_fields.optional_nested_enum)
-    # Test repeated enum.
-    self.CheckUnknownField('repeated_nested_enum',
-                           self.all_fields.repeated_nested_enum)
+  @SkipIfCppImplementation
+  def testEnum(self):
+    value = self.GetField('optional_nested_enum')
+    self.assertEqual(self.all_fields.optional_nested_enum, value)
 
-    # Test varint.
-    self.CheckUnknownField('optional_int32',
-                           self.all_fields.optional_int32)
-    # Test fixed32.
-    self.CheckUnknownField('optional_fixed32',
-                           self.all_fields.optional_fixed32)
+  @SkipIfCppImplementation
+  def testRepeatedEnum(self):
+    value = self.GetField('repeated_nested_enum')
+    self.assertEqual(self.all_fields.repeated_nested_enum, value)
 
-    # Test fixed64.
-    self.CheckUnknownField('optional_fixed64',
-                           self.all_fields.optional_fixed64)
+  @SkipIfCppImplementation
+  def testVarint(self):
+    value = self.GetField('optional_int32')
+    self.assertEqual(self.all_fields.optional_int32, value)
 
-    # Test lengthd elimited.
-    self.CheckUnknownField('optional_string',
-                           self.all_fields.optional_string)
+  @SkipIfCppImplementation
+  def testFixed32(self):
+    value = self.GetField('optional_fixed32')
+    self.assertEqual(self.all_fields.optional_fixed32, value)
 
-    # Test group.
-    self.CheckUnknownField('optionalgroup',
-                           self.all_fields.optionalgroup)
+  @SkipIfCppImplementation
+  def testFixed64(self):
+    value = self.GetField('optional_fixed64')
+    self.assertEqual(self.all_fields.optional_fixed64, value)
+
+  @SkipIfCppImplementation
+  def testLengthDelimited(self):
+    value = self.GetField('optional_string')
+    self.assertEqual(self.all_fields.optional_string, value)
+
+  @SkipIfCppImplementation
+  def testGroup(self):
+    value = self.GetField('optionalgroup')
+    self.assertEqual(self.all_fields.optionalgroup, value)
 
   def testCopyFrom(self):
     message = unittest_pb2.TestEmptyMessage()
@@ -251,44 +241,45 @@ class UnknownFieldsAccessorsTest(BaseTestCase):
     self.assertEqual(message.SerializeToString(), self.all_fields_data)
 
 
-class UnknownEnumValuesTest(BaseTestCase):
+class UnknownEnumValuesTest(unittest.TestCase):
 
   def setUp(self):
     self.descriptor = missing_enum_values_pb2.TestEnumValues.DESCRIPTOR
 
     self.message = missing_enum_values_pb2.TestEnumValues()
-    # TestEnumValues.ZERO = 0, but does not exist in the other NestedEnum.
     self.message.optional_nested_enum = (
-        missing_enum_values_pb2.TestEnumValues.ZERO)
+      missing_enum_values_pb2.TestEnumValues.ZERO)
     self.message.repeated_nested_enum.extend([
-        missing_enum_values_pb2.TestEnumValues.ZERO,
-        missing_enum_values_pb2.TestEnumValues.ONE,
-        ])
+      missing_enum_values_pb2.TestEnumValues.ZERO,
+      missing_enum_values_pb2.TestEnumValues.ONE,
+      ])
     self.message.packed_nested_enum.extend([
-        missing_enum_values_pb2.TestEnumValues.ZERO,
-        missing_enum_values_pb2.TestEnumValues.ONE,
-        ])
+      missing_enum_values_pb2.TestEnumValues.ZERO,
+      missing_enum_values_pb2.TestEnumValues.ONE,
+      ])
     self.message_data = self.message.SerializeToString()
     self.missing_message = missing_enum_values_pb2.TestMissingEnumValues()
     self.missing_message.ParseFromString(self.message_data)
+    if api_implementation.Type() != 'cpp':
+      # _unknown_fields is an implementation detail.
+      self.unknown_fields = self.missing_message._unknown_fields
 
-  # CheckUnknownField() is an additional Pure Python check which checks
-  # a detail of unknown fields. It cannot be used by the C++
-  # implementation because some protect members are called.
-  # The test is added for historical reasons. It is not necessary as
-  # serialized string is checked.
+  # All the tests that use GetField() check an implementation detail of the
+  # Python implementation, which stores unknown fields as serialized strings.
+  # These tests are skipped by the C++ implementation: it's enough to check that
+  # the message is correctly serialized.
 
-  def CheckUnknownField(self, name, expected_value):
+  def GetField(self, name):
     field_descriptor = self.descriptor.fields_by_name[name]
     wire_type = type_checkers.FIELD_TYPE_TO_WIRE_TYPE[field_descriptor.type]
     field_tag = encoder.TagBytes(field_descriptor.number, wire_type)
     result_dict = {}
-    for tag_bytes, value in self.missing_message._unknown_fields:
+    for tag_bytes, value in self.unknown_fields:
       if tag_bytes == field_tag:
         decoder = missing_enum_values_pb2.TestEnumValues._decoders_by_tag[
-            tag_bytes][0]
+          tag_bytes][0]
         decoder(value, 0, len(value), self.message, result_dict)
-    self.assertEqual(expected_value, result_dict[field_descriptor])
+    return result_dict[field_descriptor]
 
   def testUnknownParseMismatchEnumValue(self):
     just_string = missing_enum_values_pb2.JustString()
@@ -303,28 +294,21 @@ class UnknownEnumValuesTest(BaseTestCase):
     # default value.
     self.assertEqual(missing.optional_nested_enum, 0)
 
+  @SkipIfCppImplementation
   def testUnknownEnumValue(self):
     self.assertFalse(self.missing_message.HasField('optional_nested_enum'))
-    self.assertEqual(self.missing_message.optional_nested_enum, 2)
-    # Clear does not do anything.
-    serialized = self.missing_message.SerializeToString()
-    self.missing_message.ClearField('optional_nested_enum')
-    self.assertEqual(self.missing_message.SerializeToString(), serialized)
+    value = self.GetField('optional_nested_enum')
+    self.assertEqual(self.message.optional_nested_enum, value)
 
+  @SkipIfCppImplementation
   def testUnknownRepeatedEnumValue(self):
-    self.assertEqual([], self.missing_message.repeated_nested_enum)
+    value = self.GetField('repeated_nested_enum')
+    self.assertEqual(self.message.repeated_nested_enum, value)
 
+  @SkipIfCppImplementation
   def testUnknownPackedEnumValue(self):
-    self.assertEqual([], self.missing_message.packed_nested_enum)
-
-  @SkipCheckUnknownFieldIfCppImplementation
-  def testCheckUnknownFieldValueForEnum(self):
-    self.CheckUnknownField('optional_nested_enum',
-                           self.message.optional_nested_enum)
-    self.CheckUnknownField('repeated_nested_enum',
-                           self.message.repeated_nested_enum)
-    self.CheckUnknownField('packed_nested_enum',
-                           self.message.packed_nested_enum)
+    value = self.GetField('packed_nested_enum')
+    self.assertEqual(self.message.packed_nested_enum, value)
 
   def testRoundTrip(self):
     new_message = missing_enum_values_pb2.TestEnumValues()

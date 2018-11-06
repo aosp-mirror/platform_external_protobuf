@@ -76,7 +76,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
                              const string& parameter,
                              OutputDirectory* output_directory,
                              string* error) const {
-  std::vector<std::pair<string, string> > options;
+  vector<pair<string, string> > options;
 
 //  GOOGLE_LOG(INFO) << "wink: JavaMicroGenerator::Generate INFO";
 //  GOOGLE_LOG(WARNING) << "wink: JavaMicroGenerator::Generate WARNING";
@@ -113,7 +113,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
         return false;
       }
     } else if (options[i].first == "java_package") {
-        std::vector<string> parts;
+        vector<string> parts;
         SplitStringUsing(options[i].second, "|", &parts);
         if (parts.size() != 2) {
           *error = "Bad java_package, expecting filename|PackageName found '"
@@ -122,7 +122,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
         }
         params.set_java_package(parts[0], parts[1]);
     } else if (options[i].first == "java_outer_classname") {
-        std::vector<string> parts;
+        vector<string> parts;
         SplitStringUsing(options[i].second, "|", &parts);
         if (parts.size() != 2) {
           *error = "Bad java_outer_classname, "
@@ -171,7 +171,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
     StringReplace(file_generator.java_package(), ".", "/", true);
   if (!package_dir.empty()) package_dir += "/";
 
-  std::vector<string> all_files;
+  vector<string> all_files;
 
   if (IsOuterClassNeeded(params, file)) {
     string java_filename = package_dir;
