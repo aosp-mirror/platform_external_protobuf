@@ -438,8 +438,8 @@ class enable_shared_from_this {
 
  protected:
   enable_shared_from_this() { }
-  enable_shared_from_this(const enable_shared_from_this& other) { }
-  enable_shared_from_this& operator=(const enable_shared_from_this& other) {
+  enable_shared_from_this(const enable_shared_from_this&) { }
+  enable_shared_from_this& operator=(const enable_shared_from_this&) {
     return *this;
   }
   ~enable_shared_from_this() { }
@@ -456,8 +456,7 @@ class enable_shared_from_this {
 template<typename T>
 void shared_ptr<T>::MaybeSetupWeakThis(enable_shared_from_this<T>* ptr) {
   if (ptr) {
-    GOOGLE_CHECK(ptr->weak_this_.expired())
-        << "Object already owned by a shared_ptr";
+    GOOGLE_CHECK(ptr->weak_this_.expired()) << "Object already owned by a shared_ptr";
     ptr->weak_this_ = *this;
   }
 }

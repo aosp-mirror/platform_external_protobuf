@@ -56,9 +56,8 @@
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/wire_format.h>
-#include <google/protobuf/stubs/substitute.h>
 #include <google/protobuf/stubs/strutil.h>
-
+#include <google/protobuf/stubs/substitute.h>
 
 namespace google {
 namespace protobuf {
@@ -69,14 +68,6 @@ using internal::WireFormat;
 using internal::WireFormatLite;
 
 namespace {
-bool EnableExperimentalRuntimeForLite() {
-#ifdef PROTOBUF_EXPERIMENT
-  return PROTOBUF_EXPERIMENT;
-#else   // PROTOBUF_EXPERIMENT
-  return false;
-#endif  // !PROTOBUF_EXPERIMENT
-}
-
 bool GenerateHasBits(const Descriptor* descriptor) {
   return SupportFieldPresence(descriptor->file()) ||
       HasRepeatedFields(descriptor);
@@ -129,32 +120,23 @@ int ImmutableMessageLiteGenerator::GenerateStaticVariableInitializers(
 // ===================================================================
 
 void ImmutableMessageLiteGenerator::GenerateInterface(io::Printer* printer) {
-  MaybePrintGeneratedAnnotation(context_, printer, descriptor_,
-                                /* immutable = */ true, "OrBuilder");
   if (descriptor_->extension_range_count() > 0) {
     printer->Print(
-        "$deprecation$public interface ${$$classname$OrBuilder$}$ extends \n"
-        "    $extra_interfaces$\n"
-        "     com.google.protobuf.GeneratedMessageLite.\n"
-        "          ExtendableMessageOrBuilder<\n"
-        "              $classname$, $classname$.Builder> {\n",
-        "deprecation", descriptor_->options().deprecated() ?
-            "@java.lang.Deprecated " : "",
-        "extra_interfaces", ExtraMessageOrBuilderInterfaces(descriptor_),
-        "classname", descriptor_->name(),
-        "{", "", "}", "");
+      "public interface $classname$OrBuilder extends \n"
+      "    $extra_interfaces$\n"
+      "     com.google.protobuf.GeneratedMessageLite.\n"
+      "          ExtendableMessageOrBuilder<\n"
+      "              $classname$, $classname$.Builder> {\n",
+      "extra_interfaces", ExtraMessageOrBuilderInterfaces(descriptor_),
+      "classname", descriptor_->name());
   } else {
     printer->Print(
-        "$deprecation$public interface ${$$classname$OrBuilder$}$ extends\n"
-        "    $extra_interfaces$\n"
-        "    com.google.protobuf.MessageLiteOrBuilder {\n",
-        "deprecation", descriptor_->options().deprecated() ?
-            "@java.lang.Deprecated " : "",
-        "extra_interfaces", ExtraMessageOrBuilderInterfaces(descriptor_),
-        "classname", descriptor_->name(),
-        "{", "", "}", "");
+      "public interface $classname$OrBuilder extends\n"
+      "    $extra_interfaces$\n"
+      "    com.google.protobuf.MessageLiteOrBuilder {\n",
+      "extra_interfaces", ExtraMessageOrBuilderInterfaces(descriptor_),
+      "classname", descriptor_->name());
   }
-  printer->Annotate("{", "}", descriptor_);
 
   printer->Indent();
     for (int i = 0; i < descriptor_->field_count(); i++) {
@@ -181,25 +163,22 @@ void ImmutableMessageLiteGenerator::GenerateInterface(io::Printer* printer) {
 // ===================================================================
 
 void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
-  bool is_own_file = IsOwnFile(descriptor_, /* immutable = */ true);
+  bool is_own_file =
+    descriptor_->containing_type() == NULL &&
+    MultipleJavaFiles(descriptor_->file(), /* immutable = */ true);
 
-  std::map<string, string> variables;
+  map<string, string> variables;
   variables["static"] = is_own_file ? " " : " static ";
   variables["classname"] = descriptor_->name();
   variables["extra_interfaces"] = ExtraMessageInterfaces(descriptor_);
-  variables["deprecation"] = descriptor_->options().deprecated()
-      ? "@java.lang.Deprecated " : "";
 
   WriteMessageDocComment(printer, descriptor_);
-  MaybePrintGeneratedAnnotation(context_, printer, descriptor_,
-                                /* immutable = */ true);
-
 
   // The builder_type stores the super type name of the nested Builder class.
   string builder_type;
   if (descriptor_->extension_range_count() > 0) {
     printer->Print(variables,
-      "$deprecation$public $static$final class $classname$ extends\n"
+      "public $static$final class $classname$ extends\n"
       "    com.google.protobuf.GeneratedMessageLite.ExtendableMessage<\n"
       "      $classname$, $classname$.Builder> implements\n"
       "    $extra_interfaces$\n"
@@ -209,7 +188,7 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
         name_resolver_->GetImmutableClassName(descriptor_));
   } else {
     printer->Print(variables,
-        "$deprecation$public $static$final class $classname$ extends\n"
+        "public $static$final class $classname$ extends\n"
         "    com.google.protobuf.GeneratedMessageLite<\n"
         "        $classname$, $classname$.Builder> implements\n"
         "    $extra_interfaces$\n"
@@ -218,6 +197,7 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
     builder_type = "com.google.protobuf.GeneratedMessageLite.Builder";
   }
   printer->Indent();
+
 
   GenerateConstructor(printer);
 
@@ -251,13 +231,13 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
   }
 
   // oneof
-  std::map<string, string> vars;
+  map<string, string> vars;
   for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
-    const OneofDescriptor* oneof = descriptor_->oneof_decl(i);
-    vars["oneof_name"] = context_->GetOneofGeneratorInfo(oneof)->name;
+    vars["oneof_name"] = context_->GetOneofGeneratorInfo(
+        descriptor_->oneof_decl(i))->name;
     vars["oneof_capitalized_name"] = context_->GetOneofGeneratorInfo(
-        oneof)->capitalized_name;
-    vars["oneof_index"] = SimpleItoa(oneof->index());
+        descriptor_->oneof_decl(i))->capitalized_name;
+    vars["oneof_index"] = SimpleItoa(descriptor_->oneof_decl(i)->index());
     // oneofCase_ and oneof_
     printer->Print(vars,
       "private int $oneof_name$Case_ = 0;\n"
@@ -267,8 +247,8 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
       "public enum $oneof_capitalized_name$Case\n"
       "    implements com.google.protobuf.Internal.EnumLite {\n");
     printer->Indent();
-    for (int j = 0; j < oneof->field_count(); j++) {
-      const FieldDescriptor* field = oneof->field(j);
+    for (int j = 0; j < descriptor_->oneof_decl(i)->field_count(); j++) {
+      const FieldDescriptor* field = descriptor_->oneof_decl(i)->field(j);
       printer->Print(
         "$field_name$($field_number$),\n",
         "field_name",
@@ -296,8 +276,8 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
       "\n"
       "public static $oneof_capitalized_name$Case forNumber(int value) {\n"
       "  switch (value) {\n");
-    for (int j = 0; j < oneof->field_count(); j++) {
-      const FieldDescriptor* field = oneof->field(j);
+    for (int j = 0; j < descriptor_->oneof_decl(i)->field_count(); j++) {
+      const FieldDescriptor* field = descriptor_->oneof_decl(i)->field(j);
       printer->Print(
         "    case $field_number$: return $field_name$;\n",
         "field_number",
@@ -340,43 +320,40 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
     printer->Print("\n");
   }
 
-  if (!EnableExperimentalRuntime(context_)) {
-    GenerateMessageSerializationMethods(printer);
-  }
+  GenerateMessageSerializationMethods(printer);
 
   GenerateParseFromMethods(printer);
   GenerateBuilder(printer);
 
   if (HasRequiredFields(descriptor_)) {
     // Memoizes whether the protocol buffer is fully initialized (has all
-    // required fields). 0 means false, 1 means true, and all other values
-    // mean not yet computed.
+    // required fields). -1 means not yet computed. 0 means false and 1 means
+    // true.
     printer->Print(
-      "private byte memoizedIsInitialized = 2;\n");
+      "private byte memoizedIsInitialized = -1;\n");
   }
 
   printer->Print(
-      "@java.lang.SuppressWarnings({\"unchecked\", \"fallthrough\"})\n"
-      "protected final java.lang.Object dynamicMethod(\n"
-      "    com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,\n"
-      "    java.lang.Object arg0, java.lang.Object arg1) {\n"
-      "  switch (method) {\n"
-      "    case NEW_MUTABLE_INSTANCE: {\n"
-      "      return new $classname$();\n"
-      "    }\n",
-      "classname", name_resolver_->GetImmutableClassName(descriptor_));
+    "protected final Object dynamicMethod(\n"
+    "    com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,\n"
+    "    Object arg0, Object arg1) {\n"
+    "  switch (method) {\n"
+    "    case NEW_MUTABLE_INSTANCE: {\n"
+    "      return new $classname$();\n"
+    "    }\n",
+    "classname", name_resolver_->GetImmutableClassName(descriptor_));
 
   printer->Indent();
   printer->Indent();
 
-  printer->Print("case IS_INITIALIZED: {\n");
+  printer->Print(
+    "case IS_INITIALIZED: {\n");
   printer->Indent();
   GenerateDynamicMethodIsInitialized(printer);
   printer->Outdent();
 
-  printer->Print("}\n");
-
   printer->Print(
+    "}\n"
     "case MAKE_IMMUTABLE: {\n");
 
   printer->Indent();
@@ -391,15 +368,13 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
   GenerateDynamicMethodNewBuilder(printer);
   printer->Outdent();
 
-  if (!EnableExperimentalRuntimeForLite()) {
-    printer->Print(
-        "}\n"
-        "case VISIT: {\n");
+  printer->Print(
+    "}\n"
+    "case VISIT: {\n");
 
-    printer->Indent();
-    GenerateDynamicMethodVisit(printer);
-    printer->Outdent();
-  }
+  printer->Indent();
+  GenerateDynamicMethodVisit(printer);
+  printer->Outdent();
 
   printer->Print(
     "}\n"
@@ -411,7 +386,6 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
 
   printer->Print(
     "}\n"
-    "// fall through\n"
     "case GET_DEFAULT_INSTANCE: {\n"
     "  return DEFAULT_INSTANCE;\n"
     "}\n"
@@ -427,33 +401,13 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
     "      }\n"
     "    }\n"
     "  }\n"
-    "  return PARSER;\n",
+    "  return PARSER;\n"
+    "}\n",
     "classname", name_resolver_->GetImmutableClassName(descriptor_));
 
   printer->Outdent();
-
-  if (HasRequiredFields(descriptor_)) {
-    printer->Print(
-        "}\n"
-        "case GET_MEMOIZED_IS_INITIALIZED: {\n"
-        "  return memoizedIsInitialized;\n"
-        "}\n"
-        "case SET_MEMOIZED_IS_INITIALIZED: {\n"
-        "  memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);\n"
-        "  return null;\n"
-        "}\n");
-  } else {
-    printer->Print(
-        "}\n"
-        "case GET_MEMOIZED_IS_INITIALIZED: {\n"
-        "  return (byte) 1;\n"
-        "}\n"
-        "case SET_MEMOIZED_IS_INITIALIZED: {\n"
-        "  return null;\n"
-        "}\n");
-  }
-
   printer->Outdent();
+
   printer->Print(
     "  }\n"
     "  throw new UnsupportedOperationException();\n"
@@ -480,34 +434,12 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
     "}\n"
     "\n",
     "classname", descriptor_->name());
-  if (EnableExperimentalRuntimeForLite()) {
-    // Register the default instance in a map. This map will be used by
-    // experimental runtime to lookup default instance given a class instance
-    // without using Java reflection.
-    printer->Print(
-        "static {\n"
-        "  com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(\n"
-        "    $classname$.class, DEFAULT_INSTANCE);\n"
-        "}\n",
-        "classname", descriptor_->name());
-  }
   printer->Print(
       "public static $classname$ getDefaultInstance() {\n"
       "  return DEFAULT_INSTANCE;\n"
       "}\n"
       "\n",
       "classname", name_resolver_->GetImmutableClassName(descriptor_));
-
-  // 'of' method for Wrappers
-  if (IsWrappersProtoFile(descriptor_->file())) {
-    printer->Print(
-        "public static $classname$ of($field_type$ value) {\n"
-        "  return newBuilder().setValue(value).build();\n"
-        "}\n"
-        "\n",
-        "classname", name_resolver_->GetImmutableClassName(descriptor_),
-        "field_type", PrimitiveTypeName(GetJavaType(descriptor_->field(0))));
-  }
 
   GenerateParser(printer);
 
@@ -523,7 +455,6 @@ void ImmutableMessageLiteGenerator::Generate(io::Printer* printer) {
   printer->Print("}\n\n");
 }
 
-
 // ===================================================================
 
 void ImmutableMessageLiteGenerator::
@@ -531,7 +462,7 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
   google::protobuf::scoped_array<const FieldDescriptor * > sorted_fields(
       SortFieldsByNumber(descriptor_));
 
-  std::vector<const Descriptor::ExtensionRange*> sorted_extensions;
+  vector<const Descriptor::ExtensionRange*> sorted_extensions;
   for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
     sorted_extensions.push_back(descriptor_->extension_range(i));
   }
@@ -545,34 +476,36 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
   if (HasPackedFields(descriptor_)) {
     // writeTo(CodedOutputStream output) might be invoked without
     // getSerializedSize() ever being called, but we need the memoized
-    // sizes in case this message has packed fields. Rather than emit checks
-    // for each packed field, just call getSerializedSize() up front. In most
-    // cases, getSerializedSize() will have already been called anyway by one
-    // of the wrapper writeTo() methods, making this call cheap.
-    printer->Print("getSerializedSize();\n");
+    // sizes in case this message has packed fields. Rather than emit checks for
+    // each packed field, just call getSerializedSize() up front.
+    // In most cases, getSerializedSize() will have already been called anyway
+    // by one of the wrapper writeTo() methods, making this call cheap.
+    printer->Print(
+      "getSerializedSize();\n");
   }
 
   if (descriptor_->extension_range_count() > 0) {
     if (descriptor_->options().message_set_wire_format()) {
       printer->Print(
-          "com.google.protobuf.GeneratedMessageLite\n"
-          "  .ExtendableMessage<$classname$, $classname$.Builder>\n"
-          "    .ExtensionWriter extensionWriter =\n"
-          "      newMessageSetExtensionWriter();\n",
-          "classname", name_resolver_->GetImmutableClassName(descriptor_));
+        "com.google.protobuf.GeneratedMessageLite\n"
+        "  .ExtendableMessage<$classname$, $classname$.Builder>\n"
+        "    .ExtensionWriter extensionWriter =\n"
+        "      newMessageSetExtensionWriter();\n",
+        "classname", name_resolver_->GetImmutableClassName(descriptor_));
     } else {
       printer->Print(
-          "com.google.protobuf.GeneratedMessageLite\n"
-          "  .ExtendableMessage<$classname$, $classname$.Builder>\n"
-          "    .ExtensionWriter extensionWriter =\n"
-          "      newExtensionWriter();\n",
-          "classname", name_resolver_->GetImmutableClassName(descriptor_));
+        "com.google.protobuf.GeneratedMessageLite\n"
+        "  .ExtendableMessage<$classname$, $classname$.Builder>\n"
+        "    .ExtensionWriter extensionWriter =\n"
+        "      newExtensionWriter();\n",
+        "classname", name_resolver_->GetImmutableClassName(descriptor_));
     }
   }
 
   // Merge the fields and the extension ranges, both sorted by field number.
   for (int i = 0, j = 0;
-       i < descriptor_->field_count() || j < sorted_extensions.size();) {
+       i < descriptor_->field_count() || j < sorted_extensions.size();
+       ) {
     if (i == descriptor_->field_count()) {
       GenerateSerializeOneExtensionRange(printer, sorted_extensions[j++]);
     } else if (j == sorted_extensions.size()) {
@@ -584,23 +517,21 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
     }
   }
 
-  if (descriptor_->options().message_set_wire_format()) {
-    printer->Print("unknownFields.writeAsMessageSetTo(output);\n");
-  } else {
-    printer->Print("unknownFields.writeTo(output);\n");
+  if (PreserveUnknownFields(descriptor_)) {
+    printer->Print(
+      "unknownFields.writeTo(output);\n");
   }
 
   printer->Outdent();
   printer->Print(
-      "}\n"
-      "\n"
-      "public int getSerializedSize() {\n"
-      "  int size = memoizedSerializedSize;\n"
-      "  if (size != -1) return size;\n"
-      "\n");
+    "}\n"
+    "\n"
+    "public int getSerializedSize() {\n"
+    "  int size = memoizedSerializedSize;\n"
+    "  if (size != -1) return size;\n"
+    "\n"
+    "  size = 0;\n");
   printer->Indent();
-  printer->Print(
-      "size = 0;\n");
 
   for (int i = 0; i < descriptor_->field_count(); i++) {
     field_generators_.get(sorted_fields[i]).GenerateSerializedSizeCode(printer);
@@ -608,24 +539,23 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
 
   if (descriptor_->extension_range_count() > 0) {
     if (descriptor_->options().message_set_wire_format()) {
-      printer->Print("size += extensionsSerializedSizeAsMessageSet();\n");
+      printer->Print(
+        "size += extensionsSerializedSizeAsMessageSet();\n");
     } else {
-      printer->Print("size += extensionsSerializedSize();\n");
+      printer->Print(
+        "size += extensionsSerializedSize();\n");
     }
   }
 
-  if (descriptor_->options().message_set_wire_format()) {
-    printer->Print("size += unknownFields.getSerializedSizeAsMessageSet();\n");
-  } else {
-    printer->Print("size += unknownFields.getSerializedSize();\n");
+  if (PreserveUnknownFields(descriptor_)) {
+    printer->Print(
+      "size += unknownFields.getSerializedSize();\n");
   }
-
-  printer->Print(
-      "memoizedSerializedSize = size;\n"
-      "return size;\n");
 
   printer->Outdent();
   printer->Print(
+    "  memoizedSerializedSize = size;\n"
+    "  return size;\n"
     "}\n"
     "\n");
 }
@@ -636,19 +566,6 @@ GenerateParseFromMethods(io::Printer* printer) {
   //   because they need to be generated even for messages that are optimized
   //   for code size.
   printer->Print(
-    "public static $classname$ parseFrom(\n"
-    "    java.nio.ByteBuffer data)\n"
-    "    throws com.google.protobuf.InvalidProtocolBufferException {\n"
-    "  return com.google.protobuf.GeneratedMessageLite.parseFrom(\n"
-    "      DEFAULT_INSTANCE, data);\n"
-    "}\n"
-    "public static $classname$ parseFrom(\n"
-    "    java.nio.ByteBuffer data,\n"
-    "    com.google.protobuf.ExtensionRegistryLite extensionRegistry)\n"
-    "    throws com.google.protobuf.InvalidProtocolBufferException {\n"
-    "  return com.google.protobuf.GeneratedMessageLite.parseFrom(\n"
-    "      DEFAULT_INSTANCE, data, extensionRegistry);\n"
-    "}\n"
     "public static $classname$ parseFrom(\n"
     "    com.google.protobuf.ByteString data)\n"
     "    throws com.google.protobuf.InvalidProtocolBufferException {\n"
@@ -730,10 +647,10 @@ void ImmutableMessageLiteGenerator::GenerateSerializeOneExtensionRange(
 void ImmutableMessageLiteGenerator::GenerateBuilder(io::Printer* printer) {
   printer->Print(
     "public static Builder newBuilder() {\n"
-    "  return (Builder) DEFAULT_INSTANCE.createBuilder();\n"
+    "  return DEFAULT_INSTANCE.toBuilder();\n"
     "}\n"
     "public static Builder newBuilder($classname$ prototype) {\n"
-    "  return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);\n"
+    "  return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);\n"
     "}\n"
     "\n",
     "classname", name_resolver_->GetImmutableClassName(descriptor_));
@@ -752,10 +669,7 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodIsInitialized(
     return;
   }
 
-  // TODO(xiaofeng): Remove this when b/64445758 is fixed. We don't need to
-  // check memoizedIsInitialized here because the caller does that already,
-  // but right now proguard proto shrinker asserts on the bytecode layout of
-  // this code so it can't be removed until proguard is updated.
+  // Don't directly compare to -1 to avoid an Android x86 JIT bug.
   printer->Print(
     "byte isInitialized = memoizedIsInitialized;\n"
     "if (isInitialized == 1) return DEFAULT_INSTANCE;\n"
@@ -773,6 +687,9 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodIsInitialized(
     if (field->is_required()) {
       printer->Print(
         "if (!has$name$()) {\n"
+        "  if (shouldMemoize) {\n"
+        "    memoizedIsInitialized = 0;\n"
+        "  }\n"
         "  return null;\n"
         "}\n",
         "name", info->capitalized_name);
@@ -789,6 +706,9 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodIsInitialized(
         case FieldDescriptor::LABEL_REQUIRED:
           printer->Print(
             "if (!get$name$().isInitialized()) {\n"
+            "  if (shouldMemoize) {\n"
+            "    memoizedIsInitialized = 0;\n"
+            "  }\n"
             "  return null;\n"
             "}\n",
             "type", name_resolver_->GetImmutableClassName(
@@ -812,6 +732,9 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodIsInitialized(
           }
           printer->Print(
             "  if (!get$name$().isInitialized()) {\n"
+            "    if (shouldMemoize) {\n"
+            "      memoizedIsInitialized = 0;\n"
+            "    }\n"
             "    return null;\n"
             "  }\n"
             "}\n",
@@ -820,8 +743,11 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodIsInitialized(
         case FieldDescriptor::LABEL_REPEATED:
           if (IsMapEntry(field->message_type())) {
             printer->Print(
-              "for ($type$ item : get$name$Map().values()) {\n"
+              "for ($type$ item : get$name$().values()) {\n"
               "  if (!item.isInitialized()) {\n"
+              "    if (shouldMemoize) {\n"
+              "      memoizedIsInitialized = 0;\n"
+              "    }\n"
               "    return null;\n"
               "  }\n"
               "}\n",
@@ -832,6 +758,9 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodIsInitialized(
             printer->Print(
               "for (int i = 0; i < get$name$Count(); i++) {\n"
               "  if (!get$name$(i).isInitialized()) {\n"
+              "    if (shouldMemoize) {\n"
+              "      memoizedIsInitialized = 0;\n"
+              "    }\n"
               "    return null;\n"
               "  }\n"
               "}\n",
@@ -847,9 +776,15 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodIsInitialized(
   if (descriptor_->extension_range_count() > 0) {
     printer->Print(
       "if (!extensionsAreInitialized()) {\n"
+      "  if (shouldMemoize) {\n"
+      "    memoizedIsInitialized = 0;\n"
+      "  }\n"
       "  return null;\n"
       "}\n");
   }
+
+  printer->Print(
+    "if (shouldMemoize) memoizedIsInitialized = 1;\n");
 
   printer->Print(
     "return DEFAULT_INSTANCE;\n"
@@ -979,106 +914,96 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodMergeFromStream(
       "    (com.google.protobuf.CodedInputStream) arg0;\n"
       "com.google.protobuf.ExtensionRegistryLite extensionRegistry =\n"
       "    (com.google.protobuf.ExtensionRegistryLite) arg1;\n"
-      "if (extensionRegistry == null) {\n"
-      "  throw new java.lang.NullPointerException();\n"
-      "}\n");
-  printer->Print(
       "try {\n");
   printer->Indent();
-  if (EnableExperimentalRuntime(context_)) {
-    printer->Print(
-        "mergeFromInternal(input, extensionRegistry);\n"
-        "return DEFAULT_INSTANCE;\n");
-  } else {
-    printer->Print(
-        "boolean done = false;\n"
-        "while (!done) {\n");
-    printer->Indent();
 
-    printer->Print(
-        "int tag = input.readTag();\n"
-        "switch (tag) {\n");
-    printer->Indent();
+  printer->Print(
+    "boolean done = false;\n"
+    "while (!done) {\n");
+  printer->Indent();
 
-    printer->Print(
-        "case 0:\n"  // zero signals EOF / limit reached
-        "  done = true;\n"
-        "  break;\n");
+  printer->Print(
+    "int tag = input.readTag();\n"
+    "switch (tag) {\n");
+  printer->Indent();
 
+  printer->Print(
+    "case 0:\n"          // zero signals EOF / limit reached
+    "  done = true;\n"
+    "  break;\n");
+
+  if (PreserveUnknownFields(descriptor_)) {
     if (descriptor_->extension_range_count() > 0) {
-      if (descriptor_->options().message_set_wire_format()) {
-        printer->Print(
-            "default: {\n"
-            "  if (!parseUnknownFieldAsMessageSet(\n"
-            "      getDefaultInstanceForType(), input, extensionRegistry,\n"
-            "      tag)) {\n"
-            "    done = true;\n"  // it's an endgroup tag
-            "  }\n"
-            "  break;\n"
-            "}\n");
-      } else {
-        printer->Print(
-            "default: {\n"
-            "  if (!parseUnknownField(getDefaultInstanceForType(),\n"
-            "      input, extensionRegistry, tag)) {\n"
-            "    done = true;\n"  // it's an endgroup tag
-            "  }\n"
-            "  break;\n"
-            "}\n");
-      }
+      printer->Print(
+        "default: {\n"
+        "  if (!parseUnknownField(getDefaultInstanceForType(),\n"
+        "                         input, extensionRegistry, tag)) {\n"
+        "    done = true;\n"  // it's an endgroup tag
+        "  }\n"
+        "  break;\n"
+        "}\n");
     } else {
       printer->Print(
-          "default: {\n"
-          "  if (!parseUnknownField(tag, input)) {\n"
-          "    done = true;\n"  // it's an endgroup tag
-          "  }\n"
-          "  break;\n"
-          "}\n");
+        "default: {\n"
+        "  if (!parseUnknownField(tag, input)) {\n"
+        "    done = true;\n"  // it's an endgroup tag
+        "  }\n"
+        "  break;\n"
+        "}\n");
     }
+  } else {
+    printer->Print(
+      "default: {\n"
+      "  if (!input.skipField(tag)) {\n"
+      "    done = true;\n"  // it's an endgroup tag
+      "  }\n"
+      "  break;\n"
+      "}\n");
+  }
 
-    google::protobuf::scoped_array<const FieldDescriptor* > sorted_fields(
-        SortFieldsByNumber(descriptor_));
-    for (int i = 0; i < descriptor_->field_count(); i++) {
-      const FieldDescriptor* field = sorted_fields[i];
-      uint32 tag = WireFormatLite::MakeTag(
-          field->number(), WireFormat::WireTypeForFieldType(field->type()));
+  google::protobuf::scoped_array<const FieldDescriptor * > sorted_fields(
+      SortFieldsByNumber(descriptor_));
+  for (int i = 0; i < descriptor_->field_count(); i++) {
+    const FieldDescriptor* field = sorted_fields[i];
+    uint32 tag = WireFormatLite::MakeTag(field->number(),
+      WireFormat::WireTypeForFieldType(field->type()));
 
-      printer->Print("case $tag$: {\n", "tag",
-                     SimpleItoa(static_cast<int32>(tag)));
+    printer->Print(
+      "case $tag$: {\n",
+      "tag", SimpleItoa(tag));
+    printer->Indent();
+
+    field_generators_.get(field).GenerateParsingCode(printer);
+
+    printer->Outdent();
+    printer->Print(
+      "  break;\n"
+      "}\n");
+
+    if (field->is_packable()) {
+      // To make packed = true wire compatible, we generate parsing code from a
+      // packed version of this field regardless of field->options().packed().
+      uint32 packed_tag = WireFormatLite::MakeTag(field->number(),
+        WireFormatLite::WIRETYPE_LENGTH_DELIMITED);
+      printer->Print(
+        "case $tag$: {\n",
+        "tag", SimpleItoa(packed_tag));
       printer->Indent();
 
-      field_generators_.get(field).GenerateParsingCode(printer);
+      field_generators_.get(field).GenerateParsingCodeFromPacked(printer);
 
       printer->Outdent();
       printer->Print(
         "  break;\n"
         "}\n");
-
-      if (field->is_packable()) {
-        // To make packed = true wire compatible, we generate parsing code from
-        // a packed version of this field regardless of
-        // field->options().packed().
-        uint32 packed_tag = WireFormatLite::MakeTag(
-            field->number(), WireFormatLite::WIRETYPE_LENGTH_DELIMITED);
-        printer->Print("case $tag$: {\n", "tag",
-                       SimpleItoa(static_cast<int32>(packed_tag)));
-        printer->Indent();
-
-        field_generators_.get(field).GenerateParsingCodeFromPacked(printer);
-
-        printer->Outdent();
-        printer->Print(
-            "  break;\n"
-            "}\n");
-      }
     }
-
-    printer->Outdent();
-    printer->Outdent();
-    printer->Print(
-        "  }\n"  // switch (tag)
-        "}\n");  // while (!done)
   }
+
+  printer->Outdent();
+  printer->Outdent();
+  printer->Print(
+      "  }\n"     // switch (tag)
+      "}\n");     // while (!done)
 
   printer->Outdent();
   printer->Print(
@@ -1095,6 +1020,21 @@ void ImmutableMessageLiteGenerator::GenerateDynamicMethodMergeFromStream(
   printer->Print(
       "}\n");     // finally
 }
+
+// ===================================================================
+
+namespace {
+bool CheckHasBitsForEqualsAndHashCode(const FieldDescriptor* field) {
+  if (field->is_repeated()) {
+    return false;
+  }
+  if (SupportFieldPresence(field->file())) {
+    return true;
+  }
+  return GetJavaType(field) == JAVATYPE_MESSAGE &&
+      field->containing_oneof() == NULL;
+}
+}  // namespace
 
 // ===================================================================
 

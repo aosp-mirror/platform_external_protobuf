@@ -41,8 +41,6 @@ fail() {
 
 TEST_TMPDIR=.
 PROTOC=./protoc
-JAR=jar
-UNZIP=unzip
 
 echo '
   syntax = "proto2";
@@ -59,9 +57,8 @@ $PROTOC \
     || fail 'protoc failed.'
 
 echo "Testing output to zip..."
-if $UNZIP -h > /dev/null; then
-  $UNZIP -t $TEST_TMPDIR/testzip.zip > $TEST_TMPDIR/testzip.list \
-    || fail 'unzip failed.'
+if unzip -h > /dev/null; then
+  unzip -t $TEST_TMPDIR/testzip.zip > $TEST_TMPDIR/testzip.list || fail 'unzip failed.'
 
   grep 'testing: testzip\.pb\.cc *OK$' $TEST_TMPDIR/testzip.list > /dev/null \
     || fail 'testzip.pb.cc not found in output zip.'
@@ -76,14 +73,8 @@ else
 fi
 
 echo "Testing output to jar..."
-if $JAR c $TEST_TMPDIR/testzip.proto > /dev/null; then
-  $JAR tf $TEST_TMPDIR/testzip.jar > $TEST_TMPDIR/testzip.list \
-    || fail 'jar failed.'
-
-  # Check that -interface.jar timestamps are normalized:
-  if [[ "$(TZ=UTC $JAR tvf $TEST_TMPDIR/testzip.jar)" != *'Tue Jan 01 00:00:00 UTC 1980'* ]]; then
-    fail 'Zip did not contain normalized timestamps'
-  fi
+if jar c $TEST_TMPDIR/testzip.proto > /dev/null; then
+  jar tf $TEST_TMPDIR/testzip.jar > $TEST_TMPDIR/testzip.list || fail 'jar failed.'
 
   grep '^test/jar/Foo\.java$' $TEST_TMPDIR/testzip.list > /dev/null \
     || fail 'Foo.java not found in output jar.'
