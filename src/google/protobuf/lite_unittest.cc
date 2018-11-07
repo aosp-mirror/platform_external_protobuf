@@ -36,26 +36,24 @@
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/arena_test_util.h>
-#include <google/protobuf/map_lite_test_util.h>
 #include <google/protobuf/map_lite_unittest.pb.h>
+#include <google/protobuf/map_lite_test_util.h>
 #include <google/protobuf/test_util_lite.h>
 #include <google/protobuf/unittest_lite.pb.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 #include <google/protobuf/wire_format_lite.h>
 #include <google/protobuf/wire_format_lite_inl.h>
-#include <gtest/gtest.h>
-
 #include <google/protobuf/stubs/strutil.h>
 
-using std::string;
+using namespace std;
 
 namespace {
 // Helper methods to test parsing merge behavior.
 void ExpectMessageMerged(const google::protobuf::unittest::TestAllTypesLite& message) {
-  EXPECT_EQ(message.optional_int32(), 3);
-  EXPECT_EQ(message.optional_int64(), 2);
-  EXPECT_EQ(message.optional_string(), "hello");
+  GOOGLE_CHECK(message.optional_int32() == 3);
+  GOOGLE_CHECK(message.optional_int64() == 2);
+  GOOGLE_CHECK(message.optional_string() == "hello");
 }
 
 void AssignParsingMergeMessages(
@@ -91,8 +89,14 @@ void SetSomeTypesInEmptyMessageUnknownFields(
 
 }  // namespace
 
-TEST(Lite, AllLite1) {
-  string data;
+#define EXPECT_TRUE GOOGLE_CHECK
+#define ASSERT_TRUE GOOGLE_CHECK
+#define EXPECT_FALSE(COND) GOOGLE_CHECK(!(COND))
+#define EXPECT_EQ GOOGLE_CHECK_EQ
+#define ASSERT_EQ GOOGLE_CHECK_EQ
+
+int main(int argc, char* argv[]) {
+  string data, data2, packed_data;
 
   {
     protobuf_unittest::TestAllTypesLite message, message2, message3;
@@ -109,10 +113,7 @@ TEST(Lite, AllLite1) {
     message.Clear();
     google::protobuf::TestUtilLite::ExpectClear(message);
   }
-}
 
-TEST(Lite, AllLite2) {
-  string data;
   {
     protobuf_unittest::TestAllExtensionsLite message, message2, message3;
     google::protobuf::TestUtilLite::ExpectExtensionsClear(message);
@@ -128,10 +129,6 @@ TEST(Lite, AllLite2) {
     message.Clear();
     google::protobuf::TestUtilLite::ExpectExtensionsClear(message);
   }
-}
-
-TEST(Lite, AllLite3) {
-  string data, packed_data;
 
   {
     protobuf_unittest::TestPackedTypesLite message, message2, message3;
@@ -155,7 +152,7 @@ TEST(Lite, AllLite3) {
     google::protobuf::TestUtilLite::SetPackedExtensions(&message);
     message2.CopyFrom(message);
     string packed_extensions_data = message.SerializeAsString();
-    EXPECT_EQ(packed_extensions_data, packed_data);
+    GOOGLE_CHECK(packed_extensions_data == packed_data);
     message3.ParseFromString(packed_extensions_data);
     google::protobuf::TestUtilLite::ExpectPackedExtensionsSet(message);
     google::protobuf::TestUtilLite::ExpectPackedExtensionsSet(message2);
@@ -165,10 +162,6 @@ TEST(Lite, AllLite3) {
     message.Clear();
     google::protobuf::TestUtilLite::ExpectPackedExtensionsClear(message);
   }
-}
-
-TEST(Lite, AllLite5) {
-  string data;
 
   {
     // Test that if an optional or required message/group field appears multiple
@@ -216,16 +209,11 @@ TEST(Lite, AllLite5) {
         google::protobuf::unittest::TestParsingMergeLite::optional_ext));
 
     // Repeated fields should not be merged.
-    EXPECT_EQ(parsing_merge.repeated_all_types_size(), 3);
-    EXPECT_EQ(parsing_merge.repeatedgroup_size(), 3);
-    EXPECT_EQ(parsing_merge.ExtensionSize(
-                  google::protobuf::unittest::TestParsingMergeLite::repeated_ext),
-              3);
+    GOOGLE_CHECK(parsing_merge.repeated_all_types_size() == 3);
+    GOOGLE_CHECK(parsing_merge.repeatedgroup_size() == 3);
+    GOOGLE_CHECK(parsing_merge.ExtensionSize(
+        google::protobuf::unittest::TestParsingMergeLite::repeated_ext) == 3);
   }
-}
-
-TEST(Lite, AllLite6) {
-  string data;
 
   // Test unknown fields support for lite messages.
   {
@@ -243,10 +231,6 @@ TEST(Lite, AllLite6) {
     message.Clear();
     google::protobuf::TestUtilLite::ExpectClear(message);
   }
-}
-
-TEST(Lite, AllLite7) {
-  string data;
 
   {
     protobuf_unittest::TestAllExtensionsLite message, message2;
@@ -263,10 +247,6 @@ TEST(Lite, AllLite7) {
     message.Clear();
     google::protobuf::TestUtilLite::ExpectExtensionsClear(message);
   }
-}
-
-TEST(Lite, AllLite8) {
-  string data;
 
   {
     protobuf_unittest::TestPackedTypesLite message, message2;
@@ -283,10 +263,6 @@ TEST(Lite, AllLite8) {
     message.Clear();
     google::protobuf::TestUtilLite::ExpectPackedClear(message);
   }
-}
-
-TEST(Lite, AllLite9) {
-  string data;
 
   {
     protobuf_unittest::TestPackedExtensionsLite message, message2;
@@ -303,10 +279,6 @@ TEST(Lite, AllLite9) {
     message.Clear();
     google::protobuf::TestUtilLite::ExpectPackedExtensionsClear(message);
   }
-}
-
-TEST(Lite, AllLite10) {
-  string data;
 
   {
     // Test Unknown fields swap
@@ -314,15 +286,11 @@ TEST(Lite, AllLite10) {
     SetAllTypesInEmptyMessageUnknownFields(&empty_message);
     SetSomeTypesInEmptyMessageUnknownFields(&empty_message2);
     data = empty_message.SerializeAsString();
-    string data2 = empty_message2.SerializeAsString();
+    data2 = empty_message2.SerializeAsString();
     empty_message.Swap(&empty_message2);
-    EXPECT_EQ(data, empty_message2.SerializeAsString());
-    EXPECT_EQ(data2, empty_message.SerializeAsString());
+    GOOGLE_CHECK_EQ(data, empty_message2.SerializeAsString());
+    GOOGLE_CHECK_EQ(data2, empty_message.SerializeAsString());
   }
-}
-
-TEST(Lite, AllLite11) {
-  string data;
 
   {
     // Test unknown fields swap with self
@@ -330,12 +298,8 @@ TEST(Lite, AllLite11) {
     SetAllTypesInEmptyMessageUnknownFields(&empty_message);
     data = empty_message.SerializeAsString();
     empty_message.Swap(&empty_message);
-    EXPECT_EQ(data, empty_message.SerializeAsString());
+    GOOGLE_CHECK_EQ(data, empty_message.SerializeAsString());
   }
-}
-
-TEST(Lite, AllLite12) {
-  string data;
 
   {
     // Test MergeFrom with unknown fields
@@ -360,12 +324,8 @@ TEST(Lite, AllLite12) {
     // We do not compare the serialized output of a normal message and a lite
     // message because the order of fields do not match. We convert lite message
     // back into normal message, then compare.
-    EXPECT_EQ(message.SerializeAsString(), message2.SerializeAsString());
+    GOOGLE_CHECK_EQ(message.SerializeAsString(), message2.SerializeAsString());
   }
-}
-
-TEST(Lite, AllLite13) {
-  string data;
 
   {
     // Test unknown enum value
@@ -385,26 +345,18 @@ TEST(Lite, AllLite13) {
     }
     message.ParseFromString(buffer);
     data = message.SerializeAsString();
-    EXPECT_EQ(data, buffer);
+    GOOGLE_CHECK_EQ(data, buffer);
   }
-}
-
-TEST(Lite, AllLite14) {
-  string data;
 
   {
     // Test Clear with unknown fields
     protobuf_unittest::TestEmptyMessageLite empty_message;
     SetAllTypesInEmptyMessageUnknownFields(&empty_message);
     empty_message.Clear();
-    EXPECT_EQ(0, empty_message.unknown_fields().size());
+    GOOGLE_CHECK_EQ(0, empty_message.unknown_fields().size());
   }
-}
 
-// Tests for map lite =============================================
-
-TEST(Lite, AllLite15) {
-  string data;
+  // Tests for map lite =============================================
 
   {
     // Accessors
@@ -416,10 +368,6 @@ TEST(Lite, AllLite15) {
     google::protobuf::MapLiteTestUtil::ModifyMapFields(&message);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsModified(message);
   }
-}
-
-TEST(Lite, AllLite16) {
-  string data;
 
   {
     // SetMapFieldsInitialized
@@ -428,10 +376,6 @@ TEST(Lite, AllLite16) {
     google::protobuf::MapLiteTestUtil::SetMapFieldsInitialized(&message);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSetInitialized(message);
   }
-}
-
-TEST(Lite, AllLite17) {
-  string data;
 
   {
     // Clear
@@ -441,10 +385,6 @@ TEST(Lite, AllLite17) {
     message.Clear();
     google::protobuf::MapLiteTestUtil::ExpectClear(message);
   }
-}
-
-TEST(Lite, AllLite18) {
-  string data;
 
   {
     // ClearMessageMap
@@ -454,10 +394,6 @@ TEST(Lite, AllLite18) {
     google::protobuf::TestUtilLite::ExpectClear(
         (*message.mutable_map_int32_message())[0]);
   }
-}
-
-TEST(Lite, AllLite19) {
-  string data;
 
   {
     // CopyFrom
@@ -471,10 +407,6 @@ TEST(Lite, AllLite19) {
     message2.CopyFrom(message2);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message2);
   }
-}
-
-TEST(Lite, AllLite20) {
-  string data;
 
   {
     // CopyFromMessageMap
@@ -489,10 +421,6 @@ TEST(Lite, AllLite20) {
     EXPECT_EQ(1, message1.map_int32_message().at(0).repeated_int32_size());
     EXPECT_EQ(101, message1.map_int32_message().at(0).repeated_int32(0));
   }
-}
-
-TEST(Lite, AllLite21) {
-  string data;
 
   {
     // SwapWithEmpty
@@ -506,10 +434,6 @@ TEST(Lite, AllLite21) {
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message2);
     google::protobuf::MapLiteTestUtil::ExpectClear(message1);
   }
-}
-
-TEST(Lite, AllLite22) {
-  string data;
 
   {
     // SwapWithSelf
@@ -521,10 +445,6 @@ TEST(Lite, AllLite22) {
     message.Swap(&message);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message);
   }
-}
-
-TEST(Lite, AllLite23) {
-  string data;
 
   {
     // SwapWithOther
@@ -538,10 +458,6 @@ TEST(Lite, AllLite23) {
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsModified(message1);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message2);
   }
-}
-
-TEST(Lite, AllLite24) {
-  string data;
 
   {
     // CopyConstructor
@@ -551,10 +467,6 @@ TEST(Lite, AllLite24) {
     protobuf_unittest::TestMapLite message2(message1);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message2);
   }
-}
-
-TEST(Lite, AllLite25) {
-  string data;
 
   {
     // CopyAssignmentOperator
@@ -569,10 +481,6 @@ TEST(Lite, AllLite25) {
     message2.operator=(message2);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message2);
   }
-}
-
-TEST(Lite, AllLite26) {
-  string data;
 
   {
     // NonEmptyMergeFrom
@@ -591,10 +499,6 @@ TEST(Lite, AllLite26) {
     message1.MergeFrom(message2);
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message1);
   }
-}
-
-TEST(Lite, AllLite27) {
-  string data;
 
   {
     // MergeFromMessageMap
@@ -609,10 +513,6 @@ TEST(Lite, AllLite27) {
     EXPECT_EQ(1, message1.map_int32_message().at(0).repeated_int32_size());
     EXPECT_EQ(101, message1.map_int32_message().at(0).repeated_int32(0));
   }
-}
-
-TEST(Lite, AllLite28) {
-  string data;
 
   {
     // Test the generated SerializeWithCachedSizesToArray()
@@ -627,10 +527,6 @@ TEST(Lite, AllLite28) {
     EXPECT_TRUE(message2.ParseFromString(data));
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message2);
   }
-}
-
-TEST(Lite, AllLite29) {
-  string data;
 
   {
     // Test the generated SerializeWithCachedSizes()
@@ -651,11 +547,7 @@ TEST(Lite, AllLite29) {
     EXPECT_TRUE(message2.ParseFromString(data));
     google::protobuf::MapLiteTestUtil::ExpectMapFieldsSet(message2);
   }
-}
 
-
-TEST(Lite, AllLite32) {
-  string data;
 
   {
     // Proto2UnknownEnum
@@ -686,10 +578,6 @@ TEST(Lite, AllLite32) {
     EXPECT_EQ(protobuf_unittest::E_PROTO2_MAP_ENUM_EXTRA_LITE,
               from.unknown_map_field().at(0));
   }
-}
-
-TEST(Lite, AllLite33) {
-  string data;
 
   {
     // StandardWireFormat
@@ -700,10 +588,6 @@ TEST(Lite, AllLite33) {
     EXPECT_EQ(1, message.map_int32_int32().size());
     EXPECT_EQ(1, message.map_int32_int32().at(1));
   }
-}
-
-TEST(Lite, AllLite34) {
-  string data;
 
   {
     // UnorderedWireFormat
@@ -716,10 +600,6 @@ TEST(Lite, AllLite34) {
     EXPECT_EQ(1, message.map_int32_int32().size());
     EXPECT_EQ(1, message.map_int32_int32().at(2));
   }
-}
-
-TEST(Lite, AllLite35) {
-  string data;
 
   {
     // DuplicatedKeyWireFormat
@@ -732,10 +612,6 @@ TEST(Lite, AllLite35) {
     EXPECT_EQ(1, message.map_int32_int32().size());
     EXPECT_EQ(1, message.map_int32_int32().at(2));
   }
-}
-
-TEST(Lite, AllLite36) {
-  string data;
 
   {
     // DuplicatedValueWireFormat
@@ -748,10 +624,6 @@ TEST(Lite, AllLite36) {
     EXPECT_EQ(1, message.map_int32_int32().size());
     EXPECT_EQ(2, message.map_int32_int32().at(1));
   }
-}
-
-TEST(Lite, AllLite37) {
-  string data;
 
   {
     // MissedKeyWireFormat
@@ -764,10 +636,6 @@ TEST(Lite, AllLite37) {
     EXPECT_EQ(1, message.map_int32_int32().size());
     EXPECT_EQ(1, message.map_int32_int32().at(0));
   }
-}
-
-TEST(Lite, AllLite38) {
-  string data;
 
   {
     // MissedValueWireFormat
@@ -780,10 +648,6 @@ TEST(Lite, AllLite38) {
     EXPECT_EQ(1, message.map_int32_int32().size());
     EXPECT_EQ(0, message.map_int32_int32().at(1));
   }
-}
-
-TEST(Lite, AllLite39) {
-  string data;
 
   {
     // UnknownFieldWireFormat
@@ -796,10 +660,6 @@ TEST(Lite, AllLite39) {
     EXPECT_EQ(1, message.map_int32_int32().size());
     EXPECT_EQ(3, message.map_int32_int32().at(2));
   }
-}
-
-TEST(Lite, AllLite40) {
-  string data;
 
   {
     // CorruptedWireFormat
@@ -810,10 +670,6 @@ TEST(Lite, AllLite40) {
 
     EXPECT_FALSE(message.ParseFromString(data));
   }
-}
-
-TEST(Lite, AllLite41) {
-  string data;
 
   {
     // IsInitialized
@@ -829,10 +685,6 @@ TEST(Lite, AllLite41) {
     (*map_message.mutable_map_field())[0].set_c(0);
     EXPECT_TRUE(map_message.IsInitialized());
   }
-}
-
-TEST(Lite, AllLite42) {
-  string data;
 
   {
       // Check that adding more values to enum does not corrupt message
@@ -860,146 +712,7 @@ TEST(Lite, AllLite42) {
       EXPECT_EQ(v2_message.int_field(), same_v2_message.int_field());
       EXPECT_EQ(v2_message.enum_field(), same_v2_message.enum_field());
   }
-}
-
-// Test that when parsing a oneof, we can successfully clear whatever already
-// happened to be stored in the oneof.
-TEST(Lite, AllLite43) {
-  protobuf_unittest::TestOneofParsingLite message1;
-
-  message1.set_oneof_int32(17);
-  string serialized;
-  EXPECT_TRUE(message1.SerializeToString(&serialized));
-
-  // Submessage
-  {
-    protobuf_unittest::TestOneofParsingLite message2;
-    message2.mutable_oneof_submessage();
-    google::protobuf::io::CodedInputStream input_stream(
-        reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()), serialized.size());
-    EXPECT_TRUE(message2.MergeFromCodedStream(&input_stream));
-    EXPECT_EQ(17, message2.oneof_int32());
-  }
-
-  // String
-  {
-    protobuf_unittest::TestOneofParsingLite message2;
-    message2.set_oneof_string("string");
-    google::protobuf::io::CodedInputStream input_stream(
-        reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()), serialized.size());
-    EXPECT_TRUE(message2.MergeFromCodedStream(&input_stream));
-    EXPECT_EQ(17, message2.oneof_int32());
-  }
-
-  // Bytes
-  {
-    protobuf_unittest::TestOneofParsingLite message2;
-    message2.set_oneof_bytes("bytes");
-    google::protobuf::io::CodedInputStream input_stream(
-        reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()), serialized.size());
-    EXPECT_TRUE(message2.MergeFromCodedStream(&input_stream));
-    EXPECT_EQ(17, message2.oneof_int32());
-  }
-}
-
-// Verify that we can successfully parse fields of various types within oneof
-// fields. We also verify that we can parse the same data twice into the same
-// message.
-TEST(Lite, AllLite44) {
-  // Int32
-  {
-    protobuf_unittest::TestOneofParsingLite original;
-    original.set_oneof_int32(17);
-    string serialized;
-    EXPECT_TRUE(original.SerializeToString(&serialized));
-    protobuf_unittest::TestOneofParsingLite parsed;
-    for (int i = 0; i < 2; ++i) {
-      google::protobuf::io::CodedInputStream input_stream(
-          reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()),
-          serialized.size());
-      EXPECT_TRUE(parsed.MergeFromCodedStream(&input_stream));
-      EXPECT_EQ(17, parsed.oneof_int32());
-    }
-  }
-
-  // Submessage
-  {
-    protobuf_unittest::TestOneofParsingLite original;
-    original.mutable_oneof_submessage()->set_optional_int32(5);
-    string serialized;
-    EXPECT_TRUE(original.SerializeToString(&serialized));
-    protobuf_unittest::TestOneofParsingLite parsed;
-    for (int i = 0; i < 2; ++i) {
-      google::protobuf::io::CodedInputStream input_stream(
-          reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()),
-          serialized.size());
-      EXPECT_TRUE(parsed.MergeFromCodedStream(&input_stream));
-      EXPECT_EQ(5, parsed.oneof_submessage().optional_int32());
-    }
-  }
-
-  // String
-  {
-    protobuf_unittest::TestOneofParsingLite original;
-    original.set_oneof_string("string");
-    string serialized;
-    EXPECT_TRUE(original.SerializeToString(&serialized));
-    protobuf_unittest::TestOneofParsingLite parsed;
-    for (int i = 0; i < 2; ++i) {
-      google::protobuf::io::CodedInputStream input_stream(
-          reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()),
-          serialized.size());
-      EXPECT_TRUE(parsed.MergeFromCodedStream(&input_stream));
-      EXPECT_EQ("string", parsed.oneof_string());
-    }
-  }
-
-  // Bytes
-  {
-    protobuf_unittest::TestOneofParsingLite original;
-    original.set_oneof_bytes("bytes");
-    string serialized;
-    EXPECT_TRUE(original.SerializeToString(&serialized));
-    protobuf_unittest::TestOneofParsingLite parsed;
-    for (int i = 0; i < 2; ++i) {
-      google::protobuf::io::CodedInputStream input_stream(
-          reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()),
-          serialized.size());
-      EXPECT_TRUE(parsed.MergeFromCodedStream(&input_stream));
-      EXPECT_EQ("bytes", parsed.oneof_bytes());
-    }
-  }
-
-  // Enum
-  {
-    protobuf_unittest::TestOneofParsingLite original;
-    original.set_oneof_enum(protobuf_unittest::V2_SECOND);
-    string serialized;
-    EXPECT_TRUE(original.SerializeToString(&serialized));
-    protobuf_unittest::TestOneofParsingLite parsed;
-    for (int i = 0; i < 2; ++i) {
-      google::protobuf::io::CodedInputStream input_stream(
-          reinterpret_cast<const ::google::protobuf::uint8*>(serialized.data()),
-          serialized.size());
-      EXPECT_TRUE(parsed.MergeFromCodedStream(&input_stream));
-      EXPECT_EQ(protobuf_unittest::V2_SECOND, parsed.oneof_enum());
-    }
-  }
 
   std::cout << "PASS" << std::endl;
-}
-
-TEST(Lite, AllLite45) {
-  // Test unknown fields are not discarded upon parsing.
-  string data = "\20\1";  // varint 1 with field number 2
-
-  protobuf_unittest::ForeignMessageLite a;
-  EXPECT_TRUE(a.ParseFromString(data));
-  google::protobuf::io::CodedInputStream input_stream(
-      reinterpret_cast<const ::google::protobuf::uint8*>(data.data()), data.size());
-  EXPECT_TRUE(a.MergePartialFromCodedStream(&input_stream));
-
-  string serialized = a.SerializeAsString();
-  EXPECT_EQ(serialized.substr(0, 2), data);
-  EXPECT_EQ(serialized.substr(2), data);
+  return 0;
 }

@@ -417,16 +417,5 @@ namespace Google.Protobuf.WellKnownTypes
             TestWellKnownTypes.Descriptor.Fields[TestWellKnownTypes.StringFieldFieldNumber].Accessor.Clear(message);
             Assert.IsNull(message.StringField);
         }
-
-        [Test]
-        public void NaNComparisons()
-        {
-            var message1 = new TestWellKnownTypes { DoubleField = SampleNaNs.Regular };
-            var message2 = new TestWellKnownTypes { DoubleField = SampleNaNs.PayloadFlipped };
-            var message3 = new TestWellKnownTypes { DoubleField = SampleNaNs.Regular };
-
-            EqualityTester.AssertInequality(message1, message2);
-            EqualityTester.AssertEquality(message1, message3);
-        }
     }
 }

@@ -30,7 +30,6 @@
 
 // Author: kenton@google.com (Kenton Varda)
 
-#include <google/protobuf/message_lite.h>  // TODO(gerbens) ideally remove this.
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/once.h>
 #include <google/protobuf/stubs/status.h>
@@ -54,7 +53,9 @@
 #error "No suitable threading library available."
 #endif
 #if defined(__ANDROID__)
+#ifdef GOOGLE_PROTOBUF_MIN_LOG_LEVEL
 #include <android/log.h>
+#endif
 #endif
 
 namespace google {
@@ -111,17 +112,11 @@ string VersionString(int version) {
 // ===================================================================
 // emulates google3/base/logging.cc
 
-// If the minimum logging level is not set, we default to logging messages for
-// all levels.
-#ifndef GOOGLE_PROTOBUF_MIN_LOG_LEVEL
-#define GOOGLE_PROTOBUF_MIN_LOG_LEVEL LOGLEVEL_INFO
-#endif
-
 namespace internal {
-
 #if defined(__ANDROID__)
 inline void DefaultLogHandler(LogLevel level, const char* filename, int line,
                               const string& message) {
+#ifdef GOOGLE_PROTOBUF_MIN_LOG_LEVEL
   if (level < GOOGLE_PROTOBUF_MIN_LOG_LEVEL) {
     return;
   }
@@ -152,14 +147,11 @@ inline void DefaultLogHandler(LogLevel level, const char* filename, int line,
     __android_log_write(ANDROID_LOG_FATAL, "libprotobuf-native",
                         "terminating.\n");
   }
+#endif
 }
-
 #else
 void DefaultLogHandler(LogLevel level, const char* filename, int line,
                        const string& message) {
-  if (level < GOOGLE_PROTOBUF_MIN_LOG_LEVEL) {
-    return;
-  }
   static const char* level_names[] = { "INFO", "WARNING", "ERROR", "FATAL" };
 
   // We use fprintf() instead of cerr because we want this to work at static
@@ -419,30 +411,13 @@ uint32 ghtonl(uint32 x) {
 namespace internal {
 
 typedef void OnShutdownFunc();
-struct ShutdownData {
-  ~ShutdownData() {
-    for (int i = 0; i < functions.size(); i++) {
-      functions[i]();
-    }
-    for (int i = 0; i < strings.size(); i++) {
-      strings[i]->~string();
-    }
-    for (int i = 0; i < messages.size(); i++) {
-      messages[i]->~MessageLite();
-    }
-  }
-
-  vector<void (*)()> functions;
-  vector<const std::string*> strings;
-  vector<const MessageLite*> messages;
-  Mutex mutex;
-};
-
-ShutdownData* shutdown_data = NULL;
+vector<void (*)()>* shutdown_functions = NULL;
+Mutex* shutdown_functions_mutex = NULL;
 GOOGLE_PROTOBUF_DECLARE_ONCE(shutdown_functions_init);
 
 void InitShutdownFunctions() {
-  shutdown_data = new ShutdownData;
+  shutdown_functions = new vector<void (*)()>;
+  shutdown_functions_mutex = new Mutex;
 }
 
 inline void InitShutdownFunctionsOnce() {
@@ -451,20 +426,8 @@ inline void InitShutdownFunctionsOnce() {
 
 void OnShutdown(void (*func)()) {
   InitShutdownFunctionsOnce();
-  MutexLock lock(&shutdown_data->mutex);
-  shutdown_data->functions.push_back(func);
-}
-
-void OnShutdownDestroyString(const std::string* ptr) {
-  InitShutdownFunctionsOnce();
-  MutexLock lock(&shutdown_data->mutex);
-  shutdown_data->strings.push_back(ptr);
-}
-
-void OnShutdownDestroyMessage(const void* ptr) {
-  InitShutdownFunctionsOnce();
-  MutexLock lock(&shutdown_data->mutex);
-  shutdown_data->messages.push_back(static_cast<const MessageLite*>(ptr));
+  MutexLock lock(shutdown_functions_mutex);
+  shutdown_functions->push_back(func);
 }
 
 }  // namespace internal
@@ -477,10 +440,15 @@ void ShutdownProtobufLibrary() {
   // called.
 
   // Make it safe to call this multiple times.
-  if (internal::shutdown_data == NULL) return;
+  if (internal::shutdown_functions == NULL) return;
 
-  delete internal::shutdown_data;
-  internal::shutdown_data = NULL;
+  for (int i = 0; i < internal::shutdown_functions->size(); i++) {
+    internal::shutdown_functions->at(i)();
+  }
+  delete internal::shutdown_functions;
+  internal::shutdown_functions = NULL;
+  delete internal::shutdown_functions_mutex;
+  internal::shutdown_functions_mutex = NULL;
 }
 
 #if PROTOBUF_USE_EXCEPTIONS

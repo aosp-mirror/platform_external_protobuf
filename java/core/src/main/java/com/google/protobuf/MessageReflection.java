@@ -31,6 +31,7 @@
 package com.google.protobuf;
 
 import com.google.protobuf.Descriptors.FieldDescriptor;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -363,6 +364,7 @@ class MessageReflection {
      * Finishes the merge and returns the underlying object.
      */
     Object finish();
+    
   }
 
   static class BuilderAdapter implements MergeTarget {
@@ -547,6 +549,7 @@ class MessageReflection {
     public Object finish() {
       return builder.buildPartial();
     }
+    
   }
 
 
@@ -710,17 +713,16 @@ class MessageReflection {
       throw new UnsupportedOperationException(
           "finish() called on FieldSet object");
     }
+    
   }
 
   /**
-   * Parses a single field into MergeTarget. The target can be Message.Builder, FieldSet or
-   * MutableMessage.
+   * Parses a single field into MergeTarget. The target can be Message.Builder,
+   * FieldSet or MutableMessage.
    *
-   * <p>Package-private because it is used by GeneratedMessage.ExtendableMessage.
+   * Package-private because it is used by GeneratedMessage.ExtendableMessage.
    *
    * @param tag The tag, which should have already been read.
-   * @param unknownFields If not null, unknown fields will be merged to this {@link
-   *     UnknownFieldSet}, otherwise unknown fields will be discarded.
    * @return {@code true} unless the tag is an end-group tag.
    */
   static boolean mergeFieldFrom(
@@ -729,8 +731,7 @@ class MessageReflection {
       ExtensionRegistryLite extensionRegistry,
       Descriptors.Descriptor type,
       MergeTarget target,
-      int tag)
-      throws IOException {
+      int tag) throws IOException {
     if (type.getOptions().getMessageSetWireFormat() &&
         tag == WireFormat.MESSAGE_SET_ITEM_TAG) {
       mergeMessageSetExtensionFromCodedStream(
@@ -794,11 +795,7 @@ class MessageReflection {
     }
 
     if (unknown) {  // Unknown field or wrong wire type.  Skip.
-      if (unknownFields != null) {
-        return unknownFields.mergeFieldFrom(tag, input);
-      } else {
-        return input.skipField(tag);
-      }
+      return unknownFields.mergeFieldFrom(tag, input);
     }
 
     if (packed) {
@@ -850,9 +847,7 @@ class MessageReflection {
             // If the number isn't recognized as a valid value for this enum,
             // drop it.
             if (value == null) {
-              if (unknownFields != null) {
-                unknownFields.mergeVarintField(fieldNumber, rawValue);
-              }
+              unknownFields.mergeVarintField(fieldNumber, rawValue);
               return true;
             }
           }
@@ -955,7 +950,7 @@ class MessageReflection {
         mergeMessageSetExtensionFromBytes(
             rawBytes, extension, extensionRegistry, target);
       } else { // We don't know how to parse this. Ignore it.
-        if (rawBytes != null && unknownFields != null) {
+        if (rawBytes != null) {
           unknownFields.mergeField(typeId, UnknownFieldSet.Field.newBuilder()
               .addLengthDelimited(rawBytes).build());
         }

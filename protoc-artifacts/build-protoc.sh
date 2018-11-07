@@ -1,35 +1,16 @@
 #!/bin/bash
 
-# Builds protoc executable into target/protoc.exe; optionally build protoc
-# plugins into target/protoc-gen-*.exe
+# Builds protoc executable into target/protoc.exe
 # To be run from Maven.
-# Usage: build-protoc.sh <OS> <ARCH> <TARGET>
+# Usage: build-protoc.sh <OS> <ARCH>
 # <OS> and <ARCH> are ${os.detected.name} and ${os.detected.arch} from os-maven-plugin
-# <TARGET> can be "protoc" or "protoc-gen-javalite"
-#
-# The script now supports cross-compiling windows and linux-arm64 in linux-x86
-# environment. Required packages:
-# - Windows: i686-w64-mingw32-gcc (32bit) and x86_64-w64-mingw32-gcc (64bit)
-# - Arm64: g++-aarch64-linux-gnu
-
 OS=$1
 ARCH=$2
-MAKE_TARGET=$3
 
-if [[ $# < 3 ]]; then
+if [[ $# < 2 ]]; then
   echo "No arguments provided. This script is intended to be run from Maven."
   exit 1
 fi
-
-case $MAKE_TARGET in
-  protoc-gen-javalite)
-    ;;
-  protoc)
-    ;;
-  *)
-    echo "Target ""$TARGET"" invalid."
-    exit 1
-esac
 
 # Under Cygwin, bash doesn't have these in PATH when called from Maven which
 # runs in Windows version of Java.
@@ -79,8 +60,6 @@ checkArch ()
         assertEq $format "elf32-i386" $LINENO
       elif [[ "$ARCH" == x86_64 ]]; then
         assertEq $format "elf64-x86-64" $LINENO
-      elif [[ "$ARCH" == aarch_64 ]]; then
-        assertEq $format "elf64-little" $LINENO
       else
         fail "Unsupported arch: $ARCH"
       fi
@@ -124,9 +103,6 @@ checkDependencies ()
       white_list="linux-gate\.so\.1\|libpthread\.so\.0\|libm\.so\.6\|libc\.so\.6\|ld-linux\.so\.2"
     elif [[ "$ARCH" == x86_64 ]]; then
       white_list="linux-vdso\.so\.1\|libpthread\.so\.0\|libm\.so\.6\|libc\.so\.6\|ld-linux-x86-64\.so\.2"
-    elif [[ "$ARCH" == aarch_64 ]]; then
-      dump_cmd='objdump -p '"$1"' | grep NEEDED'
-      white_list="libpthread\.so\.0\|libc\.so\.6\|ld-linux-aarch64\.so\.1"
     fi
   elif [[ "$OS" == osx ]]; then
     dump_cmd='otool -L '"$1"' | fgrep dylib'
@@ -150,7 +126,7 @@ checkDependencies ()
 }
 ############################################################################
 
-echo "Building protoc, OS=$OS ARCH=$ARCH TARGET=$TARGET"
+echo "Building protoc, OS=$OS ARCH=$ARCH"
 
 # Nested double quotes are unintuitive, but it works.
 cd "$(dirname "$0")"
@@ -158,7 +134,7 @@ cd "$(dirname "$0")"
 WORKING_DIR=$(pwd)
 CONFIGURE_ARGS="--disable-shared"
 
-TARGET_FILE=target/$MAKE_TARGET.exe
+MAKE_TARGET="protoc"
 if [[ "$OS" == windows ]]; then
   MAKE_TARGET="${MAKE_TARGET}.exe"
 fi
@@ -191,13 +167,13 @@ elif [[ "$(uname)" == Linux* ]]; then
       CXXFLAGS="$CXXFLAGS -m64"
     elif [[ "$ARCH" == x86_32 ]]; then
       CXXFLAGS="$CXXFLAGS -m32"
-    elif [[ "$ARCH" == aarch_64 ]]; then
-      CONFIGURE_ARGS="$CONFIGURE_ARGS --host=aarch64-linux-gnu"
     else
       fail "Unsupported arch: $ARCH"
     fi
   elif [[ "$OS" == windows ]]; then
     # Cross-compilation for Windows
+    # TODO(zhangkun83) MinGW 64 always adds dependency on libwinpthread-1.dll,
+    # which is undesirable for repository deployment.
     CONFIGURE_ARGS="$CONFIGURE_ARGS"
     if [[ "$ARCH" == x86_64 ]]; then
       CONFIGURE_ARGS="$CONFIGURE_ARGS --host=x86_64-w64-mingw32"
@@ -226,20 +202,19 @@ fi
 
 # Statically link libgcc and libstdc++.
 # -s to produce stripped binary.
-if [[ "$OS" == windows ]]; then
-  # Also static link libpthread required by mingw64
-  LDFLAGS="$LDFLAGS -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread -s"
-elif [[ "$OS" != osx ]]; then
-  # And they don't work under Mac.
+# And they don't work under Mac.
+if [[ "$OS" != osx ]]; then
   LDFLAGS="$LDFLAGS -static-libgcc -static-libstdc++ -s"
 fi
 
 export CXXFLAGS LDFLAGS
 
+TARGET_FILE=target/protoc.exe
+
 cd "$WORKING_DIR"/.. && ./configure $CONFIGURE_ARGS &&
   cd src && make clean && make $MAKE_TARGET &&
   cd "$WORKING_DIR" && mkdir -p target &&
-  cp ../src/$MAKE_TARGET $TARGET_FILE ||
+  (cp ../src/protoc $TARGET_FILE || cp ../src/protoc.exe $TARGET_FILE) ||
   exit 1
 
 if [[ "$OS" == osx ]]; then
