@@ -665,3 +665,79 @@ filegroup {
     ],
     path: "src",
 }
+
+// To test java proto params build rules.
+// =======================================================
+java_test {
+    name: "aprotoc-test-nano-params",
+    sdk_version: "current",
+    proto: {
+        type: "nano",
+        local_include_dirs: ["src"],
+        output_params: [
+            "java_package=javanano/src/test/java/com/google/protobuf/nano/unittest_import_nano.proto\\|com.google.protobuf.nano",
+            "java_outer_classname=javanano/src/test/java/com/google/protobuf/nano/unittest_import_nano.proto\\|UnittestImportNano",
+        ],
+    },
+    srcs: [
+        "javanano/src/test/java/com/google/protobuf/nano/unittest_import_nano.proto",
+        "javanano/src/test/java/com/google/protobuf/nano/unittest_simple_nano.proto",
+        "javanano/src/test/java/com/google/protobuf/nano/unittest_stringutf8_nano.proto",
+        "javanano/src/test/java/com/google/protobuf/nano/unittest_recursive_nano.proto",
+    ],
+    java_version: "1.7",
+}
+
+// To test Android-specific nanoproto features.
+// =======================================================
+java_test {
+    // Parcelable messages
+    name: "android-nano-test-parcelable",
+    sdk_version: "current",
+    // Only needed at compile-time.
+    libs: ["android-support-annotations"],
+    proto: {
+        type: "nano",
+        local_include_dirs: ["src"],
+        output_params: [
+            "parcelable_messages=true",
+            "generate_intdefs=true",
+        ],
+    },
+    srcs: ["javanano/src/test/java/com/google/protobuf/nano/unittest_simple_nano.proto"],
+}
+
+java_test {
+    // Parcelable and extendable messages
+    name: "android-nano-test-parcelable-extendable",
+    sdk_version: "current",
+    // Only needed at compile-time.
+    libs: ["android-support-annotations"],
+    proto: {
+        type: "nano",
+        local_include_dirs: ["src"],
+        output_params: [
+            "parcelable_messages=true",
+            "generate_intdefs=true",
+            "store_unknown_fields=true",
+        ],
+    },
+    srcs: ["javanano/src/test/java/com/google/protobuf/nano/unittest_extension_nano.proto"],
+    java_version: "1.7",
+}
+
+android_test {
+    // Test APK
+    name: "NanoAndroidTest",
+    sdk_version: "8",
+    srcs: ["javanano/src/device/test/java/com/google/protobuf/nano/**/*.java"],
+    manifest: "javanano/src/device/test/AndroidManifest.xml",
+    static_libs: [
+        "libprotobuf-java-nano",
+        "android-nano-test-parcelable",
+        "android-nano-test-parcelable-extendable",
+    ],
+    dex_preopt: {
+        enabled: false,
+    },
+}
