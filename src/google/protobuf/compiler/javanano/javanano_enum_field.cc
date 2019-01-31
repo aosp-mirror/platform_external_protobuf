@@ -76,6 +76,10 @@ void SetEnumVariables(const Params& params,
       internal::WireFormatLite::MakeTag(descriptor->number(),
           internal::WireFormat::WireTypeForFieldType(descriptor->type())));
   (*variables)["message_name"] = descriptor->containing_type()->name();
+  const EnumDescriptor* enum_type = descriptor->enum_type();
+  (*variables)["message_type_intdef"] = "@"
+      + ToJavaName(params, enum_type->name(), true,
+          enum_type->containing_type(), enum_type->file());
 }
 
 void LoadEnumValues(const Params& params,
@@ -116,8 +120,10 @@ EnumFieldGenerator::~EnumFieldGenerator() {}
 
 void EnumFieldGenerator::
 GenerateMembers(io::Printer* printer, bool /* unused lazy_init */) const {
-  printer->Print(variables_,
-    "public $type$ $name$;\n");
+  if (params_.generate_intdefs()) {
+    printer->Print(variables_, "$message_type_intdef$\n");
+  }
+  printer->Print(variables_, "public $type$ $name$;\n");
 
   if (params_.generate_has()) {
     printer->Print(variables_,
@@ -138,6 +144,9 @@ GenerateClearCode(io::Printer* printer) const {
 
 void EnumFieldGenerator::
 GenerateMergingCode(io::Printer* printer) const {
+  if (params_.store_unknown_fields()) {
+    printer->Print("int initialPos = input.getPosition();\n");
+  }
   printer->Print(variables_,
     "int value = input.readInt32();\n"
     "switch (value) {\n");
@@ -149,11 +158,20 @@ GenerateMergingCode(io::Printer* printer) const {
       "    has$capitalized_name$ = true;\n");
   }
   printer->Print(
-    "    break;\n"
-    "}\n");
-  // No default case: in case of invalid value from the wire, preserve old
-  // field value. Also we are not storing the invalid value into the unknown
-  // fields, because there is no way to get the value out.
+    "    break;\n");
+  if (params_.store_unknown_fields()) {
+    // If storing unknown fields, store invalid values there.
+    // This is consistent with full protobuf, but note that if a client writes
+    // a new value to this field, both will be serialized on the wire, and
+    // other clients which are aware of unknown fields will see the previous
+    // value, not the new one.
+    printer->Print(
+      "  default:\n"
+      "    input.rewindToPosition(initialPos);\n"
+      "    storeUnknownField(input, tag);\n"
+      "    break;\n");
+  }
+  printer->Print("}\n");
 }
 
 void EnumFieldGenerator::
@@ -256,12 +274,22 @@ AccessorEnumFieldGenerator::~AccessorEnumFieldGenerator() {}
 
 void AccessorEnumFieldGenerator::
 GenerateMembers(io::Printer* printer, bool /* unused lazy_init */) const {
+  printer->Print(variables_, "private int $name$_;\n");
+  if (params_.generate_intdefs()) {
+    printer->Print(variables_, "$message_type_intdef$\n");
+  }
   printer->Print(variables_,
-    "private int $name$_;\n"
     "public int get$capitalized_name$() {\n"
     "  return $name$_;\n"
     "}\n"
-    "public $message_name$ set$capitalized_name$(int value) {\n"
+    "public $message_name$ set$capitalized_name$(");
+  if (params_.generate_intdefs()) {
+    printer->Print(variables_,
+      "\n"
+      "    $message_type_intdef$ ");
+  }
+  printer->Print(variables_,
+    "int value) {\n"
     "  $name$_ = value;\n"
     "  $set_has$;\n"
     "  return this;\n"
@@ -284,6 +312,9 @@ GenerateClearCode(io::Printer* printer) const {
 
 void AccessorEnumFieldGenerator::
 GenerateMergingCode(io::Printer* printer) const {
+  if (params_.store_unknown_fields()) {
+    printer->Print("int initialPos = input.getPosition();\n");
+  }
   printer->Print(variables_,
     "int value = input.readInt32();\n"
     "switch (value) {\n");
@@ -291,11 +322,20 @@ GenerateMergingCode(io::Printer* printer) const {
   printer->Print(variables_,
     "    $name$_ = value;\n"
     "    $set_has$;\n"
-    "    break;\n"
-    "}\n");
-  // No default case: in case of invalid value from the wire, preserve old
-  // field value. Also we are not storing the invalid value into the unknown
-  // fields, because there is no way to get the value out.
+    "    break;\n");
+  if (params_.store_unknown_fields()) {
+    // If storing unknown fields, store invalid values there.
+    // This is consistent with full protobuf, but note that if a client writes
+    // a new value to this field, both will be serialized on the wire, and
+    // other clients which are aware of unknown fields will see the previous
+    // value, not the new one.
+    printer->Print(
+      "  default:\n"
+      "    input.rewindToPosition(initialPos);\n"
+      "    storeUnknownField(input, tag);\n"
+      "    break;\n");
+  }
+  printer->Print("}\n");
 }
 
 void AccessorEnumFieldGenerator::
@@ -365,7 +405,11 @@ GenerateMergingCode(io::Printer* printer) const {
     "for (int i = 0; i < length; i++) {\n"
     "  if (i != 0) { // tag for first value already consumed.\n"
     "    input.readTag();\n"
-    "  }\n"
+    "  }\n");
+  if (params_.store_unknown_fields()) {
+    printer->Print("  int initialPos = input.getPosition();\n");
+  }
+  printer->Print(
     "  int value = input.readInt32();\n"
     "  switch (value) {\n");
   printer->Indent();
@@ -373,7 +417,19 @@ GenerateMergingCode(io::Printer* printer) const {
   printer->Outdent();
   printer->Print(variables_,
     "      validValues[validCount++] = value;\n"
-    "      break;\n"
+    "      break;\n");
+  if (params_.store_unknown_fields()) {
+    // If storing unknown fields, store invalid values there.
+    // This is consistent with full protobuf. Note that this can lead to very
+    // strange behaviors if a value is serialized and reread, e.g. changes in
+    // value ordering.
+    printer->Print(
+      "    default:\n"
+      "      input.rewindToPosition(initialPos);\n"
+      "      storeUnknownField(input, tag);\n"
+      "      break;\n");
+  }
+  printer->Print(variables_,
     "  }\n"
     "}\n"
     "if (validCount != 0) {\n"
@@ -416,7 +472,11 @@ GenerateMergingCodeFromPacked(io::Printer* printer) const {
     "  if (i != 0) {\n"
     "    java.lang.System.arraycopy(this.$name$, 0, newArray, 0, i);\n"
     "  }\n"
-    "  while (input.getBytesUntilLimit() > 0) {\n"
+    "  while (input.getBytesUntilLimit() > 0) {\n");
+  if (params_.store_unknown_fields()) {
+    printer->Print("    int initialPos = input.getPosition();\n");
+  }
+  printer->Print(variables_,
     "    int value = input.readInt32();\n"
     "    switch (value) {\n");
   printer->Indent();
@@ -426,7 +486,19 @@ GenerateMergingCodeFromPacked(io::Printer* printer) const {
   printer->Outdent();
   printer->Print(variables_,
     "        newArray[i++] = value;\n"
-    "        break;\n"
+    "        break;\n");
+  if (params_.store_unknown_fields()) {
+    // If storing unknown fields, store invalid values there.
+    // This is consistent with full protobuf. Note that this can lead to very
+    // strange behaviors if a value is serialized and reread, e.g. changes in
+    // value ordering.
+    printer->Print(variables_,
+      "      default:\n"
+      "        input.rewindToPosition(initialPos);\n"
+      "        storeUnknownField(input, $non_packed_tag$);\n"
+      "        break;\n");
+  }
+  printer->Print(variables_,
     "    }\n"
     "  }\n"
     "  this.$name$ = newArray;\n"
@@ -495,6 +567,14 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
   printer->Outdent();
 
   printer->Print(
+    "}\n");
+}
+
+void RepeatedEnumFieldGenerator::
+GenerateFixClonedCode(io::Printer* printer) const {
+  printer->Print(variables_,
+    "if (this.$name$ != null && this.$name$.length > 0) {\n"
+    "  cloned.$name$ = this.$name$.clone();\n"
     "}\n");
 }
 

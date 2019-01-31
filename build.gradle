@@ -19,21 +19,68 @@ apply plugin: 'java'
 configurations {
     micro
     nano
+    lite
 }
 
 sourceSets {
+
     micro {
         java {
-            srcDirs = ['java/src/main/java/']
+            srcDirs = ['javamicro/src/main/java/']
             include("com/google/protobuf/micro/*")
+        }
+    }
+
+    lite {
+        java {
+            srcDirs = ['java/core/src/main/java/']
+            include 'com/google/protobuf/AbstractMessageLite.java'
+            include 'com/google/protobuf/AbstractParser.java'
+            include 'com/google/protobuf/AbstractProtobufList.java'
+            include 'com/google/protobuf/ByteOutput.java'
+            include 'com/google/protobuf/ByteString.java'
+            include 'com/google/protobuf/BooleanArrayList.java'
+            include 'com/google/protobuf/CodedInputStream.java'
+            include 'com/google/protobuf/CodedOutputStream.java'
+            include 'com/google/protobuf/DoubleArrayList.java'
+            include 'com/google/protobuf/ExperimentalApi.java'
+            include 'com/google/protobuf/ExtensionLite.java'
+            include 'com/google/protobuf/ExtensionRegistryLite.java'
+            include 'com/google/protobuf/FieldSet.java'
+            include 'com/google/protobuf/FloatArrayList.java'
+            include 'com/google/protobuf/GeneratedMessageLite.java'
+            include 'com/google/protobuf/IntArrayList.java'
+            include 'com/google/protobuf/Internal.java'
+            include 'com/google/protobuf/InvalidProtocolBufferException.java'
+            include 'com/google/protobuf/LazyField.java'
+            include 'com/google/protobuf/LazyFieldLite.java'
+            include 'com/google/protobuf/LazyStringArrayList.java'
+            include 'com/google/protobuf/LazyStringList.java'
+            include 'com/google/protobuf/LongArrayList.java'
+            include 'com/google/protobuf/MapFieldLite.java'
+            include 'com/google/protobuf/MessageLite.java'
+            include 'com/google/protobuf/MessageLiteToString.java'
+            include 'com/google/protobuf/MessageLiteOrBuilder.java'
+            include 'com/google/protobuf/MutabilityOracle.java'
+            include 'com/google/protobuf/Parser.java'
+            include 'com/google/protobuf/ProtobufArrayList.java'
+            include 'com/google/protobuf/ProtocolStringList.java'
+            include 'com/google/protobuf/RopeByteString.java'
+            include 'com/google/protobuf/SmallSortedMap.java'
+            include 'com/google/protobuf/TextFormatEscaper.java'
+            include 'com/google/protobuf/UninitializedMessageException.java'
+            include 'com/google/protobuf/UnknownFieldSetLite.java'
+            include 'com/google/protobuf/UnmodifiableLazyStringList.java'
+            include 'com/google/protobuf/Utf8.java'
+            include 'com/google/protobuf/WireFormat.java'
         }
     }
 
     nano {
         java {
             srcDirs = [
-                    'java/src/main/java/',
-                    'java/src/device/main/java/'
+                    'javanano/src/main/java/',
+                    'javanano/src/device/main/java/'
             ]
             include("com/google/protobuf/nano/**")
         }
@@ -42,7 +89,7 @@ sourceSets {
 
 if (project == rootProject) {
     ext.getAndroidPrebuilt = { apiLevel ->
-        files("$rootDir/../../prebuilts/sdk/$apiLevel/android.jar")
+        files("$rootDir/../../prebuilts/sdk/$apiLevel/public/android.jar")
     }
 }
 
@@ -55,7 +102,7 @@ jar {
     from sourceSets.nano.output, sourceSets.micro.output
     baseName "libprotobuf"
     appendix "java"
-    version "2.3"
+    version "3.0"
     classifier "micronano"
 }
 
@@ -64,7 +111,7 @@ task nanoJar(type: Jar) {
     dependsOn nanoClasses
     baseName "libprotobuf"
     appendix "java"
-    version "2.3"
+    version "3.0"
     classifier "nano"
 }
 
@@ -73,12 +120,22 @@ task microJar(type: Jar) {
     dependsOn microClasses
     baseName "libprotobuf"
     appendix "java"
-    version "2.3"
+    version "3.0"
     classifier "micro"
+}
+
+task liteJar(type: Jar) {
+    from sourceSets.lite.output
+    dependsOn liteClasses
+    baseName "libprotobuf"
+    appendix "java"
+    version "3.0"
+    classifier "lite"
 }
 
 artifacts {
     micro microJar
     nano nanoJar
+    lite liteJar
 }
 

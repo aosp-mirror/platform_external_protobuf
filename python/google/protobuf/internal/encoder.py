@@ -1,6 +1,6 @@
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# http://code.google.com/p/protobuf/
+# https://developers.google.com/protocol-buffers/
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -41,7 +41,7 @@ FieldDescriptor) we construct two functions:  a "sizer" and an "encoder".  The
 sizer takes a value of this field's type and computes its byte size.  The
 encoder takes a writer function and a value.  It encodes the value into byte
 strings and invokes the writer function to write those strings.  Typically the
-writer function is the write() method of a cStringIO.
+writer function is the write() method of a BytesIO.
 
 We try to do as much work as possible when constructing the writer and the
 sizer rather than when calling them.  In particular:
@@ -67,7 +67,16 @@ sizer rather than when calling them.  In particular:
 __author__ = 'kenton@google.com (Kenton Varda)'
 
 import struct
+
+import six
+
 from google.protobuf.internal import wire_format
+
+
+# This will overflow and thus become IEEE-754 "infinity".  We would use
+# "float('inf')" but it doesn't work on Windows pre-Python-2.6.
+_POS_INF = 1e10000
+_NEG_INF = -_POS_INF
 
 
 def _VarintSize(value):
@@ -302,7 +311,7 @@ def MessageSizer(field_number, is_repeated, is_packed):
 
 
 # --------------------------------------------------------------------
-# MessageSet is special.
+# MessageSet is special: it needs custom logic to compute its size properly.
 
 
 def MessageSetItemSizer(field_number):
@@ -327,6 +336,32 @@ def MessageSetItemSizer(field_number):
   return FieldSize
 
 
+# --------------------------------------------------------------------
+# Map is special: it needs custom logic to compute its size properly.
+
+
+def MapSizer(field_descriptor):
+  """Returns a sizer for a map field."""
+
+  # Can't look at field_descriptor.message_type._concrete_class because it may
+  # not have been initialized yet.
+  message_type = field_descriptor.message_type
+  message_sizer = MessageSizer(field_descriptor.number, False, False)
+
+  def FieldSize(map_value):
+    total = 0
+    for key in map_value:
+      value = map_value[key]
+      # It's wasteful to create the messages and throw them away one second
+      # later since we'll do the same for the actual encode.  But there's not an
+      # obvious way to avoid this within the current design without tons of code
+      # duplication.
+      entry_msg = message_type._concrete_class(key=key, value=value)
+      total += message_sizer(entry_msg)
+    return total
+
+  return FieldSize
+
 # ====================================================================
 # Encoders!
 
@@ -334,15 +369,14 @@ def MessageSetItemSizer(field_number):
 def _VarintEncoder():
   """Return an encoder for a basic varint value (does not include tag)."""
 
-  local_chr = chr
   def EncodeVarint(write, value):
     bits = value & 0x7f
     value >>= 7
     while value:
-      write(local_chr(0x80|bits))
+      write(six.int2byte(0x80|bits))
       bits = value & 0x7f
       value >>= 7
-    return write(local_chr(bits))
+    return write(six.int2byte(bits))
 
   return EncodeVarint
 
@@ -351,17 +385,16 @@ def _SignedVarintEncoder():
   """Return an encoder for a basic signed varint value (does not include
   tag)."""
 
-  local_chr = chr
   def EncodeSignedVarint(write, value):
     if value < 0:
       value += (1 << 64)
     bits = value & 0x7f
     value >>= 7
     while value:
-      write(local_chr(0x80|bits))
+      write(six.int2byte(0x80|bits))
       bits = value & 0x7f
       value >>= 7
-    return write(local_chr(bits))
+    return write(six.int2byte(bits))
 
   return EncodeSignedVarint
 
@@ -376,7 +409,7 @@ def _VarintBytes(value):
 
   pieces = []
   _EncodeVarint(pieces.append, value)
-  return "".join(pieces)
+  return b"".join(pieces)
 
 
 def TagBytes(field_number, wire_type):
@@ -502,6 +535,83 @@ def _StructPackEncoder(wire_type, format):
   return SpecificEncoder
 
 
+def _FloatingPointEncoder(wire_type, format):
+  """Return a constructor for an encoder for float fields.
+
+  This is like StructPackEncoder, but catches errors that may be due to
+  passing non-finite floating-point values to struct.pack, and makes a
+  second attempt to encode those values.
+
+  Args:
+      wire_type:  The field's wire type, for encoding tags.
+      format:  The format string to pass to struct.pack().
+  """
+
+  value_size = struct.calcsize(format)
+  if value_size == 4:
+    def EncodeNonFiniteOrRaise(write, value):
+      # Remember that the serialized form uses little-endian byte order.
+      if value == _POS_INF:
+        write(b'\x00\x00\x80\x7F')
+      elif value == _NEG_INF:
+        write(b'\x00\x00\x80\xFF')
+      elif value != value:           # NaN
+        write(b'\x00\x00\xC0\x7F')
+      else:
+        raise
+  elif value_size == 8:
+    def EncodeNonFiniteOrRaise(write, value):
+      if value == _POS_INF:
+        write(b'\x00\x00\x00\x00\x00\x00\xF0\x7F')
+      elif value == _NEG_INF:
+        write(b'\x00\x00\x00\x00\x00\x00\xF0\xFF')
+      elif value != value:                         # NaN
+        write(b'\x00\x00\x00\x00\x00\x00\xF8\x7F')
+      else:
+        raise
+  else:
+    raise ValueError('Can\'t encode floating-point values that are '
+                     '%d bytes long (only 4 or 8)' % value_size)
+
+  def SpecificEncoder(field_number, is_repeated, is_packed):
+    local_struct_pack = struct.pack
+    if is_packed:
+      tag_bytes = TagBytes(field_number, wire_format.WIRETYPE_LENGTH_DELIMITED)
+      local_EncodeVarint = _EncodeVarint
+      def EncodePackedField(write, value):
+        write(tag_bytes)
+        local_EncodeVarint(write, len(value) * value_size)
+        for element in value:
+          # This try/except block is going to be faster than any code that
+          # we could write to check whether element is finite.
+          try:
+            write(local_struct_pack(format, element))
+          except SystemError:
+            EncodeNonFiniteOrRaise(write, element)
+      return EncodePackedField
+    elif is_repeated:
+      tag_bytes = TagBytes(field_number, wire_type)
+      def EncodeRepeatedField(write, value):
+        for element in value:
+          write(tag_bytes)
+          try:
+            write(local_struct_pack(format, element))
+          except SystemError:
+            EncodeNonFiniteOrRaise(write, element)
+      return EncodeRepeatedField
+    else:
+      tag_bytes = TagBytes(field_number, wire_type)
+      def EncodeField(write, value):
+        write(tag_bytes)
+        try:
+          write(local_struct_pack(format, value))
+        except SystemError:
+          EncodeNonFiniteOrRaise(write, value)
+      return EncodeField
+
+  return SpecificEncoder
+
+
 # ====================================================================
 # Here we declare an encoder constructor for each field type.  These work
 # very similarly to sizer constructors, described earlier.
@@ -525,15 +635,15 @@ Fixed32Encoder  = _StructPackEncoder(wire_format.WIRETYPE_FIXED32, '<I')
 Fixed64Encoder  = _StructPackEncoder(wire_format.WIRETYPE_FIXED64, '<Q')
 SFixed32Encoder = _StructPackEncoder(wire_format.WIRETYPE_FIXED32, '<i')
 SFixed64Encoder = _StructPackEncoder(wire_format.WIRETYPE_FIXED64, '<q')
-FloatEncoder    = _StructPackEncoder(wire_format.WIRETYPE_FIXED32, '<f')
-DoubleEncoder   = _StructPackEncoder(wire_format.WIRETYPE_FIXED64, '<d')
+FloatEncoder    = _FloatingPointEncoder(wire_format.WIRETYPE_FIXED32, '<f')
+DoubleEncoder   = _FloatingPointEncoder(wire_format.WIRETYPE_FIXED64, '<d')
 
 
 def BoolEncoder(field_number, is_repeated, is_packed):
   """Returns an encoder for a boolean field."""
 
-  false_byte = chr(0)
-  true_byte = chr(1)
+  false_byte = b'\x00'
+  true_byte = b'\x01'
   if is_packed:
     tag_bytes = TagBytes(field_number, wire_format.WIRETYPE_LENGTH_DELIMITED)
     local_EncodeVarint = _EncodeVarint
@@ -669,7 +779,7 @@ def MessageSetItemEncoder(field_number):
       }
     }
   """
-  start_bytes = "".join([
+  start_bytes = b"".join([
       TagBytes(1, wire_format.WIRETYPE_START_GROUP),
       TagBytes(2, wire_format.WIRETYPE_VARINT),
       _VarintBytes(field_number),
@@ -682,5 +792,32 @@ def MessageSetItemEncoder(field_number):
     local_EncodeVarint(write, value.ByteSize())
     value._InternalSerialize(write)
     return write(end_bytes)
+
+  return EncodeField
+
+
+# --------------------------------------------------------------------
+# As before, Map is special.
+
+
+def MapEncoder(field_descriptor):
+  """Encoder for extensions of MessageSet.
+
+  Maps always have a wire format like this:
+    message MapEntry {
+      key_type key = 1;
+      value_type value = 2;
+    }
+    repeated MapEntry map = N;
+  """
+  # Can't look at field_descriptor.message_type._concrete_class because it may
+  # not have been initialized yet.
+  message_type = field_descriptor.message_type
+  encode_message = MessageEncoder(field_descriptor.number, False, False)
+
+  def EncodeField(write, value):
+    for key in value:
+      entry_msg = message_type._concrete_class(key=key, value=value[key])
+      encode_message(write, entry_msg)
 
   return EncodeField

@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -32,18 +32,40 @@
 
 #include <google/protobuf/compiler/mock_code_generator.h>
 
+#include <stdlib.h>
+#include <iostream>
+#include <memory>
+#ifndef _SHARED_PTR_H
+#include <google/protobuf/stubs/shared_ptr.h>
+#endif
+#include <vector>
+
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/testing/file.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/testing/file.h>
+#include <google/protobuf/testing/file.h>
 #include <google/protobuf/io/printer.h>
+#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/descriptor.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
 #include <gtest/gtest.h>
-#include <google/protobuf/stubs/stl_util-inl.h>
 
 namespace google {
 namespace protobuf {
 namespace compiler {
+
+// Returns the list of the names of files in all_files in the form of a
+// comma-separated string.
+string CommaSeparatedList(const vector<const FileDescriptor*> all_files) {
+  vector<string> names;
+  for (int i = 0; i < all_files.size(); i++) {
+    names.push_back(all_files[i]->name());
+  }
+  return Join(names, ",");
+}
 
 static const char* kFirstInsertionPointName = "first_mock_insertion_point";
 static const char* kSecondInsertionPointName = "second_mock_insertion_point";
@@ -63,13 +85,14 @@ void MockCodeGenerator::ExpectGenerated(
     const string& insertions,
     const string& file,
     const string& first_message_name,
+    const string& first_parsed_file_name,
     const string& output_directory) {
   string content;
-  ASSERT_TRUE(File::ReadFileToString(
-      output_directory + "/" + GetOutputFileName(name, file), &content));
+  GOOGLE_CHECK_OK(
+      File::GetContents(output_directory + "/" + GetOutputFileName(name, file),
+                        &content, true));
 
-  vector<string> lines;
-  SplitStringUsing(content, "\n", &lines);
+  vector<string> lines = Split(content, "\n", true);
 
   while (!lines.empty() && lines.back().empty()) {
     lines.pop_back();
@@ -83,8 +106,9 @@ void MockCodeGenerator::ExpectGenerated(
     SplitStringUsing(insertions, ",", &insertion_list);
   }
 
-  ASSERT_EQ(lines.size(), 3 + insertion_list.size() * 2);
-  EXPECT_EQ(GetOutputFileContent(name, parameter, file, first_message_name),
+  EXPECT_EQ(lines.size(), 3 + insertion_list.size() * 2);
+  EXPECT_EQ(GetOutputFileContent(name, parameter, file,
+                                 first_parsed_file_name, first_message_name),
             lines[0]);
 
   EXPECT_EQ(kFirstInsertionPoint, lines[1 + insertion_list.size()]);
@@ -92,12 +116,12 @@ void MockCodeGenerator::ExpectGenerated(
 
   for (int i = 0; i < insertion_list.size(); i++) {
     EXPECT_EQ(GetOutputFileContent(insertion_list[i], "first_insert",
-                                   file, first_message_name),
+                                   file, file, first_message_name),
               lines[1 + i]);
     // Second insertion point is indented, so the inserted text should
     // automatically be indented too.
     EXPECT_EQ("  " + GetOutputFileContent(insertion_list[i], "second_insert",
-                                          file, first_message_name),
+                                          file, file, first_message_name),
               lines[2 + insertion_list.size() + i]);
   }
 }
@@ -105,7 +129,7 @@ void MockCodeGenerator::ExpectGenerated(
 bool MockCodeGenerator::Generate(
     const FileDescriptor* file,
     const string& parameter,
-    OutputDirectory* output_directory,
+    GeneratorContext* context,
     string* error) const {
   for (int i = 0; i < file->message_type_count(); i++) {
     if (HasPrefixString(file->message_type(i)->name(), "MockCodeGenerator_")) {
@@ -115,10 +139,25 @@ bool MockCodeGenerator::Generate(
         *error = "Saw message type MockCodeGenerator_Error.";
         return false;
       } else if (command == "Exit") {
-        cerr << "Saw message type MockCodeGenerator_Exit." << endl;
+        std::cerr << "Saw message type MockCodeGenerator_Exit." << std::endl;
         exit(123);
       } else if (command == "Abort") {
-        cerr << "Saw message type MockCodeGenerator_Abort." << endl;
+        std::cerr << "Saw message type MockCodeGenerator_Abort." << std::endl;
+        abort();
+      } else if (command == "HasSourceCodeInfo") {
+        FileDescriptorProto file_descriptor_proto;
+        file->CopySourceCodeInfoTo(&file_descriptor_proto);
+        bool has_source_code_info =
+            file_descriptor_proto.has_source_code_info() &&
+            file_descriptor_proto.source_code_info().location_size() > 0;
+        std::cerr << "Saw message type MockCodeGenerator_HasSourceCodeInfo: "
+                  << has_source_code_info << "." << std::endl;
+        abort();
+      } else if (command == "HasJsonName") {
+        FieldDescriptorProto field_descriptor_proto;
+        file->message_type(i)->field(0)->CopyTo(&field_descriptor_proto);
+        std::cerr << "Saw json_name: "
+                  << field_descriptor_proto.has_json_name() << std::endl;
         abort();
       } else {
         GOOGLE_LOG(FATAL) << "Unknown MockCodeGenerator command: " << command;
@@ -133,12 +172,11 @@ bool MockCodeGenerator::Generate(
 
     for (int i = 0; i < insert_into.size(); i++) {
       {
-        scoped_ptr<io::ZeroCopyOutputStream> output(
-            output_directory->OpenForInsert(
-              GetOutputFileName(insert_into[i], file),
-              kFirstInsertionPointName));
+        google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(context->OpenForInsert(
+            GetOutputFileName(insert_into[i], file), kFirstInsertionPointName));
         io::Printer printer(output.get(), '$');
-        printer.PrintRaw(GetOutputFileContent(name_, "first_insert", file));
+        printer.PrintRaw(GetOutputFileContent(name_, "first_insert",
+                                              file, context));
         if (printer.failed()) {
           *error = "MockCodeGenerator detected write error.";
           return false;
@@ -146,12 +184,12 @@ bool MockCodeGenerator::Generate(
       }
 
       {
-        scoped_ptr<io::ZeroCopyOutputStream> output(
-            output_directory->OpenForInsert(
-              GetOutputFileName(insert_into[i], file),
-              kSecondInsertionPointName));
+        google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(
+            context->OpenForInsert(GetOutputFileName(insert_into[i], file),
+                                   kSecondInsertionPointName));
         io::Printer printer(output.get(), '$');
-        printer.PrintRaw(GetOutputFileContent(name_, "second_insert", file));
+        printer.PrintRaw(GetOutputFileContent(name_, "second_insert",
+                                              file, context));
         if (printer.failed()) {
           *error = "MockCodeGenerator detected write error.";
           return false;
@@ -159,11 +197,12 @@ bool MockCodeGenerator::Generate(
       }
     }
   } else {
-    scoped_ptr<io::ZeroCopyOutputStream> output(
-        output_directory->Open(GetOutputFileName(name_, file)));
+    google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(
+        context->Open(GetOutputFileName(name_, file)));
 
     io::Printer printer(output.get(), '$');
-    printer.PrintRaw(GetOutputFileContent(name_, parameter, file));
+    printer.PrintRaw(GetOutputFileContent(name_, parameter,
+                                          file, context));
     printer.PrintRaw(kFirstInsertionPoint);
     printer.PrintRaw(kSecondInsertionPoint);
 
@@ -186,11 +225,16 @@ string MockCodeGenerator::GetOutputFileName(const string& generator_name,
   return file + ".MockCodeGenerator." + generator_name;
 }
 
-string MockCodeGenerator::GetOutputFileContent(const string& generator_name,
-                                               const string& parameter,
-                                               const FileDescriptor* file) {
+string MockCodeGenerator::GetOutputFileContent(
+    const string& generator_name,
+    const string& parameter,
+    const FileDescriptor* file,
+    GeneratorContext *context) {
+  vector<const FileDescriptor*> all_files;
+  context->ListParsedFiles(&all_files);
   return GetOutputFileContent(
       generator_name, parameter, file->name(),
+      CommaSeparatedList(all_files),
       file->message_type_count() > 0 ?
           file->message_type(0)->name() : "(none)");
 }
@@ -199,9 +243,11 @@ string MockCodeGenerator::GetOutputFileContent(
     const string& generator_name,
     const string& parameter,
     const string& file,
+    const string& parsed_file_list,
     const string& first_message_name) {
-  return strings::Substitute("$0: $1, $2, $3\n",
-      generator_name, parameter, file, first_message_name);
+  return strings::Substitute("$0: $1, $2, $3, $4\n",
+      generator_name, parameter, file,
+      first_message_name, parsed_file_list);
 }
 
 }  // namespace compiler

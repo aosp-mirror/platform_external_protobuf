@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -48,6 +48,7 @@
 #include <unistd.h>
 #endif
 
+#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/compiler/plugin.pb.h>
 #include <google/protobuf/compiler/code_generator.h>
@@ -59,13 +60,15 @@ namespace google {
 namespace protobuf {
 namespace compiler {
 
-class GeneratorResponseOutputDirectory : public OutputDirectory {
+class GeneratorResponseContext : public GeneratorContext {
  public:
-  GeneratorResponseOutputDirectory(CodeGeneratorResponse* response)
-      : response_(response) {}
-  virtual ~GeneratorResponseOutputDirectory() {}
+  GeneratorResponseContext(CodeGeneratorResponse* response,
+                           const vector<const FileDescriptor*>& parsed_files)
+      : response_(response),
+        parsed_files_(parsed_files) {}
+  virtual ~GeneratorResponseContext() {}
 
-  // implements OutputDirectory --------------------------------------
+  // implements GeneratorContext --------------------------------------
 
   virtual io::ZeroCopyOutputStream* Open(const string& filename) {
     CodeGeneratorResponse::File* file = response_->add_file();
@@ -81,14 +84,78 @@ class GeneratorResponseOutputDirectory : public OutputDirectory {
     return new io::StringOutputStream(file->mutable_content());
   }
 
+  void ListParsedFiles(vector<const FileDescriptor*>* output) {
+    *output = parsed_files_;
+  }
+
  private:
   CodeGeneratorResponse* response_;
+  const vector<const FileDescriptor*>& parsed_files_;
 };
+
+bool GenerateCode(const CodeGeneratorRequest& request,
+    const CodeGenerator& generator, CodeGeneratorResponse* response,
+    string* error_msg) {
+  DescriptorPool pool;
+  for (int i = 0; i < request.proto_file_size(); i++) {
+    const FileDescriptor* file = pool.BuildFile(request.proto_file(i));
+    if (file == NULL) {
+      // BuildFile() already wrote an error message.
+      return false;
+    }
+  }
+
+  vector<const FileDescriptor*> parsed_files;
+  for (int i = 0; i < request.file_to_generate_size(); i++) {
+    parsed_files.push_back(pool.FindFileByName(request.file_to_generate(i)));
+    if (parsed_files.back() == NULL) {
+      *error_msg = "protoc asked plugin to generate a file but "
+                   "did not provide a descriptor for the file: " +
+                   request.file_to_generate(i);
+      return false;
+    }
+  }
+
+  GeneratorResponseContext context(response, parsed_files);
+
+  if (generator.HasGenerateAll()) {
+    string error;
+    bool succeeded = generator.GenerateAll(
+        parsed_files, request.parameter(), &context, &error);
+
+    if (!succeeded && error.empty()) {
+      error = "Code generator returned false but provided no error "
+              "description.";
+    }
+    if (!error.empty()) {
+      response->set_error(error);
+    }
+  } else {
+    for (int i = 0; i < parsed_files.size(); i++) {
+      const FileDescriptor* file = parsed_files[i];
+
+      string error;
+      bool succeeded = generator.Generate(
+          file, request.parameter(), &context, &error);
+
+      if (!succeeded && error.empty()) {
+        error = "Code generator returned false but provided no error "
+                "description.";
+      }
+      if (!error.empty()) {
+        response->set_error(file->name() + ": " + error);
+        break;
+      }
+    }
+  }
+
+  return true;
+}
 
 int PluginMain(int argc, char* argv[], const CodeGenerator* generator) {
 
   if (argc > 1) {
-    cerr << argv[0] << ": Unknown option: " << argv[1] << endl;
+    std::cerr << argv[0] << ": Unknown option: " << argv[1] << std::endl;
     return 1;
   }
 
@@ -99,48 +166,23 @@ int PluginMain(int argc, char* argv[], const CodeGenerator* generator) {
 
   CodeGeneratorRequest request;
   if (!request.ParseFromFileDescriptor(STDIN_FILENO)) {
-    cerr << argv[0] << ": protoc sent unparseable request to plugin." << endl;
+    std::cerr << argv[0] << ": protoc sent unparseable request to plugin."
+              << std::endl;
     return 1;
   }
 
-  DescriptorPool pool;
-  for (int i = 0; i < request.proto_file_size(); i++) {
-    const FileDescriptor* file = pool.BuildFile(request.proto_file(i));
-    if (file == NULL) {
-      // BuildFile() already wrote an error message.
-      return 1;
-    }
-  }
-
+  string error_msg;
   CodeGeneratorResponse response;
-  GeneratorResponseOutputDirectory output_directory(&response);
 
-  for (int i = 0; i < request.file_to_generate_size(); i++) {
-    const FileDescriptor* file =
-        pool.FindFileByName(request.file_to_generate(i));
-    if (file == NULL) {
-      cerr << argv[0] << ": protoc asked plugin to generate a file but "
-              "did not provide a descriptor for the file: "
-           << request.file_to_generate(i) << endl;
+  if (GenerateCode(request, *generator, &response, &error_msg)) {
+    if (!response.SerializeToFileDescriptor(STDOUT_FILENO)) {
+      std::cerr << argv[0] << ": Error writing to stdout." << std::endl;
       return 1;
     }
-
-    string error;
-    bool succeeded = generator->Generate(
-        file, request.parameter(), &output_directory, &error);
-
-    if (!succeeded && error.empty()) {
-      error = "Code generator returned false but provided no error "
-              "description.";
+  } else {
+    if (!error_msg.empty()) {
+      std::cerr << argv[0] << ": " << error_msg << std::endl;
     }
-    if (!error.empty()) {
-      response.set_error(file->name() + ": " + error);
-      break;
-    }
-  }
-
-  if (!response.SerializeToFileDescriptor(STDOUT_FILENO)) {
-    cerr << argv[0] << ": Error writing to stdout." << endl;
     return 1;
   }
 

@@ -50,7 +50,7 @@ class AddPerson {
         stdout.println("Unknown phone type.  Using default.");
       }
 
-      person.addPhone(phoneNumber);
+      person.addPhones(phoneNumber);
     }
 
     return person.build();
@@ -70,20 +70,26 @@ class AddPerson {
     // Read the existing address book.
     try {
       FileInputStream input = new FileInputStream(args[0]);
-      addressBook.mergeFrom(input);
-      input.close();
+      try {
+        addressBook.mergeFrom(input);
+      } finally {
+        try { input.close(); } catch (Throwable ignore) {}
+      }
     } catch (FileNotFoundException e) {
       System.out.println(args[0] + ": File not found.  Creating a new file.");
     }
 
     // Add an address.
-    addressBook.addPerson(
+    addressBook.addPeople(
       PromptForAddress(new BufferedReader(new InputStreamReader(System.in)),
                        System.out));
 
     // Write the new address book back to disk.
     FileOutputStream output = new FileOutputStream(args[0]);
-    addressBook.build().writeTo(output);
-    output.close();
+    try {
+      addressBook.build().writeTo(output);
+    } finally {
+      output.close();
+    }
   }
 }
