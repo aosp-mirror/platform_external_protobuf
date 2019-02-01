@@ -31,14 +31,12 @@
 #include <map>
 #include <string>
 
-#include <google/protobuf/compiler/objectivec/objectivec_primitive_field.h>
-#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/compiler/objectivec/objectivec_helpers.h>
+#include <google/protobuf/compiler/objectivec/objectivec_primitive_field.h>
 #include <google/protobuf/io/printer.h>
+#include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/wire_format.h>
 #include <google/protobuf/wire_format_lite_inl.h>
-#include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/stubs/substitute.h>
 
 namespace google {
 namespace protobuf {
@@ -118,7 +116,7 @@ const char* PrimitiveArrayTypeName(const FieldDescriptor* descriptor) {
 }
 
 void SetPrimitiveVariables(const FieldDescriptor* descriptor,
-                           map<string, string>* variables) {
+                           std::map<string, string>* variables) {
   std::string primitive_name = PrimitiveTypeName(descriptor);
   (*variables)["type"] = primitive_name;
   (*variables)["storage_type"] = primitive_name;

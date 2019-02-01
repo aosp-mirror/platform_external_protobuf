@@ -34,6 +34,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+#if NET35
+// Needed for ReadOnlyDictionary, which does not exist in .NET 3.5
+using Google.Protobuf.Collections;
+#endif
 
 namespace Google.Protobuf.Reflection
 {
@@ -68,23 +72,21 @@ namespace Google.Protobuf.Reflection
             ClrType = generatedCodeInfo?.ClrType;
             ContainingType = parent;
 
-            // Note use of generatedCodeInfo. rather than generatedCodeInfo?. here... we don't expect
-            // to see any nested oneofs, types or enums in "not actually generated" code... we do
-            // expect fields though (for map entry messages).
+            // If generatedCodeInfo is null, we just won't generate an accessor for any fields.
             Oneofs = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.OneofDecl,
                 (oneof, index) =>
-                new OneofDescriptor(oneof, file, this, index, generatedCodeInfo.OneofNames[index]));
+                new OneofDescriptor(oneof, file, this, index, generatedCodeInfo?.OneofNames[index]));
 
             NestedTypes = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.NestedType,
                 (type, index) =>
-                new MessageDescriptor(type, file, this, index, generatedCodeInfo.NestedTypes[index]));
+                new MessageDescriptor(type, file, this, index, generatedCodeInfo?.NestedTypes[index]));
 
             EnumTypes = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.EnumType,
                 (type, index) =>
-                new EnumDescriptor(type, file, this, index, generatedCodeInfo.NestedEnums[index]));
+                new EnumDescriptor(type, file, this, index, generatedCodeInfo?.NestedEnums[index]));
 
             fieldsInDeclarationOrder = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.Field,
@@ -112,6 +114,21 @@ namespace Google.Protobuf.Reflection
         /// The brief name of the descriptor's target.
         /// </summary>
         public override string Name => Proto.Name;
+
+        internal override IReadOnlyList<DescriptorBase> GetNestedDescriptorListForField(int fieldNumber)
+        {
+            switch (fieldNumber)
+            {
+                case DescriptorProto.FieldFieldNumber:
+                    return (IReadOnlyList<DescriptorBase>) fieldsInDeclarationOrder;
+                case DescriptorProto.NestedTypeFieldNumber:
+                    return (IReadOnlyList<DescriptorBase>) NestedTypes;
+                case DescriptorProto.EnumTypeFieldNumber:
+                    return (IReadOnlyList<DescriptorBase>) EnumTypes;
+                default:
+                    return null;
+            }
+        }
 
         internal DescriptorProto Proto { get; }
 
@@ -215,6 +232,11 @@ namespace Google.Protobuf.Reflection
         /// <returns>The descriptor, or null if not found.</returns>
         public T FindDescriptor<T>(string name)  where T : class, IDescriptor =>
             File.DescriptorPool.FindSymbol<T>(FullName + "." + name);
+
+        /// <summary>
+        /// The (possibly empty) set of custom options for this message.
+        /// </summary>
+        public CustomOptions CustomOptions => Proto.Options?.CustomOptions ?? CustomOptions.Empty;
 
         /// <summary>
         /// Looks up and cross-links all fields and nested types.

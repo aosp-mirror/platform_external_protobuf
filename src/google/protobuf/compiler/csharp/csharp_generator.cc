@@ -44,8 +44,6 @@
 #include <google/protobuf/compiler/csharp/csharp_options.h>
 #include <google/protobuf/compiler/csharp/csharp_reflection_class.h>
 
-using google::protobuf::internal::scoped_ptr;
-
 namespace google {
 namespace protobuf {
 namespace compiler {
@@ -64,14 +62,14 @@ bool Generator::Generate(
     GeneratorContext* generator_context,
     string* error) const {
 
-  vector<pair<string, string> > options;
+  std::vector<std::pair<string, string> > options;
   ParseGeneratorParameter(parameter, &options);
 
-  // We only support proto3 - but we make an exception for descriptor.proto.
+  // We only support proto3 - but we make an exception for descriptor.proto. 
   if (file->syntax() != FileDescriptor::SYNTAX_PROTO3 && !IsDescriptorProto(file)) {
-    *error = "C# code generation only supports proto3 syntax";
+    *error = "C# code generation only supports proto3 syntax"; 
     return false;
-  }
+  } 
 
   struct Options cli_options;
 
@@ -83,9 +81,8 @@ bool Generator::Generate(
       cli_options.base_namespace_specified = true;
     } else if (options[i].first == "internal_access") {
       cli_options.internal_access = true;
-    } else if (options[i].first == "legacy_enum_values") {
-      // TODO: Remove this before final release
-      cli_options.legacy_enum_values = true;
+    } else if (options[i].first == "serializable") {
+      cli_options.serializable = true;
     } else {
       *error = "Unknown generator option: " + options[i].first;
       return false;
@@ -103,7 +100,7 @@ bool Generator::Generate(
     *error = filename_error;
     return false;
   }
-  scoped_ptr<io::ZeroCopyOutputStream> output(
+  std::unique_ptr<io::ZeroCopyOutputStream> output(
       generator_context->Open(filename));
   io::Printer printer(output.get(), '$');
 

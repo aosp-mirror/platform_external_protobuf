@@ -41,6 +41,8 @@
 #include <google/protobuf/compiler/code_generator.h>
 #include <google/protobuf/compiler/javamicro/javamicro_params.h>
 
+#include <google/protobuf/port_def.inc>
+
 namespace google {
 namespace protobuf {
   class FileDescriptor;        // descriptor.h
@@ -53,6 +55,7 @@ namespace protobuf {
 namespace compiler {
 namespace javamicro {
 
+<<<<<<< HEAD:src/google/protobuf/compiler/javamicro/javamicro_file.h
 class FileGenerator {
  public:
   explicit FileGenerator(const FileDescriptor* file, const Params& params);
@@ -71,6 +74,31 @@ class FileGenerator {
   void GenerateSiblings(const string& package_dir,
                         OutputDirectory* output_directory,
                         vector<string>* file_list);
+=======
+class PROTOC_EXPORT Generator
+    : public google::protobuf::compiler::CodeGenerator {
+  virtual bool Generate(
+      const FileDescriptor* file,
+      const string& parameter,
+      GeneratorContext* generator_context,
+      string* error) const;
+};
+
+// To skip reserved keywords in php, some generated classname are prefixed.
+// Other code generators may need following API to figure out the actual
+// classname.
+PROTOC_EXPORT std::string GeneratedClassName(
+    const google::protobuf::Descriptor* desc);
+PROTOC_EXPORT std::string GeneratedClassName(
+    const google::protobuf::EnumDescriptor* desc);
+PROTOC_EXPORT std::string GeneratedClassName(
+    const google::protobuf::ServiceDescriptor* desc);
+
+inline bool IsWrapperType(const FieldDescriptor* descriptor) {
+  return descriptor->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE &&
+      descriptor->message_type()->file()->name() == "google/protobuf/wrappers.proto";
+}
+>>>>>>> github/3.7.x:src/google/protobuf/compiler/php/php_generator.h
 
   const string& java_package() { return java_package_; }
   const string& classname()    { return classname_;    }
@@ -88,5 +116,11 @@ class FileGenerator {
 }  // namespace compiler
 }  // namespace protobuf
 
+<<<<<<< HEAD:src/google/protobuf/compiler/javamicro/javamicro_file.h
 }  // namespace google
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_FILE_H__
+=======
+#include <google/protobuf/port_undef.inc>
+
+#endif  // GOOGLE_PROTOBUF_COMPILER_PHP_GENERATOR_H__
+>>>>>>> github/3.7.x:src/google/protobuf/compiler/php/php_generator.h

@@ -35,12 +35,8 @@
 #include <google/protobuf/compiler/java/java_message_builder.h>
 
 #include <algorithm>
-#include <google/protobuf/stubs/hash.h>
 #include <map>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <vector>
 
 #include <google/protobuf/compiler/java/java_context.h>
@@ -50,12 +46,14 @@
 #include <google/protobuf/compiler/java/java_generator_factory.h>
 #include <google/protobuf/compiler/java/java_helpers.h>
 #include <google/protobuf/compiler/java/java_name_resolver.h>
+#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/printer.h>
-#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/wire_format.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
+
+
 
 namespace google {
 namespace protobuf {
@@ -94,20 +92,22 @@ Generate(io::Printer* printer) {
   if (descriptor_->extension_range_count() > 0) {
     printer->Print(
       "public static final class Builder extends\n"
-      "    com.google.protobuf.GeneratedMessage.ExtendableBuilder<\n"
+      "    com.google.protobuf.GeneratedMessage$ver$.ExtendableBuilder<\n"
       "      $classname$, Builder> implements\n"
       "    $extra_interfaces$\n"
       "    $classname$OrBuilder {\n",
       "classname", name_resolver_->GetImmutableClassName(descriptor_),
-      "extra_interfaces", ExtraBuilderInterfaces(descriptor_));
+      "extra_interfaces", ExtraBuilderInterfaces(descriptor_),
+      "ver", GeneratedCodeVersionSuffix());
   } else {
     printer->Print(
       "public static final class Builder extends\n"
-      "    com.google.protobuf.GeneratedMessage.Builder<Builder> implements\n"
+      "    com.google.protobuf.GeneratedMessage$ver$.Builder<Builder> implements\n"
       "    $extra_interfaces$\n"
       "    $classname$OrBuilder {\n",
       "classname", name_resolver_->GetImmutableClassName(descriptor_),
-      "extra_interfaces", ExtraBuilderInterfaces(descriptor_));
+      "extra_interfaces", ExtraBuilderInterfaces(descriptor_),
+      "ver", GeneratedCodeVersionSuffix());
   }
   printer->Indent();
 
@@ -120,13 +120,13 @@ Generate(io::Printer* printer) {
   }
 
   // oneof
-  map<string, string> vars;
+  std::map<string, string> vars;
   for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
     vars["oneof_name"] = context_->GetOneofGeneratorInfo(
         descriptor_->oneof_decl(i))->name;
     vars["oneof_capitalized_name"] = context_->GetOneofGeneratorInfo(
         descriptor_->oneof_decl(i))->capitalized_name;
-    vars["oneof_index"] = SimpleItoa(descriptor_->oneof_decl(i)->index());
+    vars["oneof_index"] = StrCat(descriptor_->oneof_decl(i)->index());
     // oneofCase_ and oneof_
     printer->Print(vars,
       "private int $oneof_name$Case_ = 0;\n"
@@ -169,19 +169,24 @@ Generate(io::Printer* printer) {
                      .GenerateBuilderMembers(printer);
   }
 
-  if (!PreserveUnknownFields(descriptor_)) {
-    printer->Print(
-      "public final Builder setUnknownFields(\n"
-      "    final com.google.protobuf.UnknownFieldSet unknownFields) {\n"
-      "  return this;\n"
-      "}\n"
-      "\n"
-      "public final Builder mergeUnknownFields(\n"
-      "    final com.google.protobuf.UnknownFieldSet unknownFields) {\n"
-      "  return this;\n"
-      "}\n"
-      "\n");
-  }
+    // Override methods declared in GeneratedMessage to return the concrete
+    // generated type so callsites won't depend on GeneratedMessage. This
+    // is needed to keep binary compatibility when we change generated code
+    // to subclass a different GeneratedMessage class (e.g., in v3.0.0 release
+    // we changed all generated code to subclass GeneratedMessageV3).
+  printer->Print(
+    "@java.lang.Override\n"
+    "public final Builder setUnknownFields(\n"
+    "    final com.google.protobuf.UnknownFieldSet unknownFields) {\n"
+    "  return super.setUnknownFields(unknownFields);\n"
+    "}\n"
+    "\n"
+    "@java.lang.Override\n"
+    "public final Builder mergeUnknownFields(\n"
+    "    final com.google.protobuf.UnknownFieldSet unknownFields) {\n"
+    "  return super.mergeUnknownFields(unknownFields);\n"
+    "}\n"
+    "\n");
 
   printer->Print(
     "\n"
@@ -206,7 +211,7 @@ GenerateDescriptorMethods(io::Printer* printer) {
       "fileclass", name_resolver_->GetImmutableClassName(descriptor_->file()),
       "identifier", UniqueFileScopeIdentifier(descriptor_));
   }
-  vector<const FieldDescriptor*> map_fields;
+  std::vector<const FieldDescriptor*> map_fields;
   for (int i = 0; i < descriptor_->field_count(); i++) {
     const FieldDescriptor* field = descriptor_->field(i);
     if (GetJavaType(field) == JAVATYPE_MESSAGE &&
@@ -226,10 +231,10 @@ GenerateDescriptorMethods(io::Printer* printer) {
       const FieldDescriptor* field = map_fields[i];
       const FieldGeneratorInfo* info = context_->GetFieldGeneratorInfo(field);
       printer->Print(
-        "case $number$:\n"
-        "  return internalGet$capitalized_name$();\n",
-        "number", SimpleItoa(field->number()),
-        "capitalized_name", info->capitalized_name);
+          "case $number$:\n"
+          "  return internalGet$capitalized_name$();\n",
+          "number", StrCat(field->number()), "capitalized_name",
+          info->capitalized_name);
     }
     printer->Print(
         "default:\n"
@@ -252,10 +257,10 @@ GenerateDescriptorMethods(io::Printer* printer) {
       const FieldGeneratorInfo* info =
           context_->GetFieldGeneratorInfo(field);
       printer->Print(
-        "case $number$:\n"
-        "  return internalGetMutable$capitalized_name$();\n",
-        "number", SimpleItoa(field->number()),
-        "capitalized_name", info->capitalized_name);
+          "case $number$:\n"
+          "  return internalGetMutable$capitalized_name$();\n",
+          "number", StrCat(field->number()), "capitalized_name",
+          info->capitalized_name);
     }
     printer->Print(
         "default:\n"
@@ -268,7 +273,8 @@ GenerateDescriptorMethods(io::Printer* printer) {
         "}\n");
   }
   printer->Print(
-    "protected com.google.protobuf.GeneratedMessage.FieldAccessorTable\n"
+    "@java.lang.Override\n"
+    "protected com.google.protobuf.GeneratedMessage$ver$.FieldAccessorTable\n"
     "    internalGetFieldAccessorTable() {\n"
     "  return $fileclass$.internal_$identifier$_fieldAccessorTable\n"
     "      .ensureFieldAccessorsInitialized(\n"
@@ -277,7 +283,8 @@ GenerateDescriptorMethods(io::Printer* printer) {
     "\n",
     "classname", name_resolver_->GetImmutableClassName(descriptor_),
     "fileclass", name_resolver_->GetImmutableClassName(descriptor_->file()),
-    "identifier", UniqueFileScopeIdentifier(descriptor_));
+    "identifier", UniqueFileScopeIdentifier(descriptor_),
+    "ver", GeneratedCodeVersionSuffix());
 }
 
 // ===================================================================
@@ -294,15 +301,18 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
 
   printer->Print(
     "private Builder(\n"
-    "    com.google.protobuf.GeneratedMessage.BuilderParent parent) {\n"
+    "    com.google.protobuf.GeneratedMessage$ver$.BuilderParent parent) {\n"
     "  super(parent);\n"
     "  maybeForceBuilderInitialization();\n"
     "}\n",
-    "classname", name_resolver_->GetImmutableClassName(descriptor_));
+    "classname", name_resolver_->GetImmutableClassName(descriptor_),
+    "ver", GeneratedCodeVersionSuffix());
 
   printer->Print(
     "private void maybeForceBuilderInitialization() {\n"
-    "  if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {\n");
+    "  if (com.google.protobuf.GeneratedMessage$ver$\n"
+    "          .alwaysUseFieldBuilders) {\n",
+    "ver", GeneratedCodeVersionSuffix());
 
   printer->Indent();
   printer->Indent();
@@ -320,6 +330,7 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
     "}\n");
 
   printer->Print(
+    "@java.lang.Override\n"
     "public Builder clear() {\n"
     "  super.clear();\n");
 
@@ -348,6 +359,7 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
     "\n");
 
   printer->Print(
+    "@java.lang.Override\n"
     "public com.google.protobuf.Descriptors.Descriptor\n"
     "    getDescriptorForType() {\n"
     "  return $fileclass$.internal_$identifier$_descriptor;\n"
@@ -358,6 +370,7 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
 
   // LITE runtime implements this in GeneratedMessageLite.
   printer->Print(
+    "@java.lang.Override\n"
     "public $classname$ getDefaultInstanceForType() {\n"
     "  return $classname$.getDefaultInstance();\n"
     "}\n"
@@ -365,6 +378,7 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
     "classname", name_resolver_->GetImmutableClassName(descriptor_));
 
   printer->Print(
+    "@java.lang.Override\n"
     "public $classname$ build() {\n"
     "  $classname$ result = buildPartial();\n"
     "  if (!result.isInitialized()) {\n"
@@ -376,6 +390,7 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
     "classname", name_resolver_->GetImmutableClassName(descriptor_));
 
   printer->Print(
+    "@java.lang.Override\n"
     "public $classname$ buildPartial() {\n"
     "  $classname$ result = new $classname$(this);\n",
     "classname", name_resolver_->GetImmutableClassName(descriptor_));
@@ -438,10 +453,82 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
     "\n",
     "classname", name_resolver_->GetImmutableClassName(descriptor_));
 
+  // Override methods declared in GeneratedMessage to return the concrete
+  // generated type so callsites won't depend on GeneratedMessage. This
+  // is needed to keep binary compatibility when we change generated code
+  // to subclass a different GeneratedMessage class (e.g., in v3.0.0 release
+  // we changed all generated code to subclass GeneratedMessageV3).
+  printer->Print(
+    "@java.lang.Override\n"
+    "public Builder clone() {\n"
+    "  return super.clone();\n"
+    "}\n"
+    "@java.lang.Override\n"
+    "public Builder setField(\n"
+    "    com.google.protobuf.Descriptors.FieldDescriptor field,\n"
+    "    java.lang.Object value) {\n"
+    "  return super.setField(field, value);\n"
+    "}\n"
+    "@java.lang.Override\n"
+    "public Builder clearField(\n"
+    "    com.google.protobuf.Descriptors.FieldDescriptor field) {\n"
+    "  return super.clearField(field);\n"
+    "}\n"
+    "@java.lang.Override\n"
+    "public Builder clearOneof(\n"
+    "    com.google.protobuf.Descriptors.OneofDescriptor oneof) {\n"
+    "  return super.clearOneof(oneof);\n"
+    "}\n"
+    "@java.lang.Override\n"
+    "public Builder setRepeatedField(\n"
+    "    com.google.protobuf.Descriptors.FieldDescriptor field,\n"
+    "    int index, java.lang.Object value) {\n"
+    "  return super.setRepeatedField(field, index, value);\n"
+    "}\n"
+    "@java.lang.Override\n"
+    "public Builder addRepeatedField(\n"
+    "    com.google.protobuf.Descriptors.FieldDescriptor field,\n"
+    "    java.lang.Object value) {\n"
+    "  return super.addRepeatedField(field, value);\n"
+    "}\n");
+
+  if (descriptor_->extension_range_count() > 0) {
+    printer->Print(
+      "@java.lang.Override\n"
+      "public <Type> Builder setExtension(\n"
+      "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
+      "        $classname$, Type> extension,\n"
+      "    Type value) {\n"
+      "  return super.setExtension(extension, value);\n"
+      "}\n"
+      "@java.lang.Override\n"
+      "public <Type> Builder setExtension(\n"
+      "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
+      "        $classname$, java.util.List<Type>> extension,\n"
+      "    int index, Type value) {\n"
+      "  return super.setExtension(extension, index, value);\n"
+      "}\n"
+      "@java.lang.Override\n"
+      "public <Type> Builder addExtension(\n"
+      "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
+      "        $classname$, java.util.List<Type>> extension,\n"
+      "    Type value) {\n"
+      "  return super.addExtension(extension, value);\n"
+      "}\n"
+      "@java.lang.Override\n"
+      "public <Type> Builder clearExtension(\n"
+      "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
+      "        $classname$, ?> extension) {\n"
+      "  return super.clearExtension(extension);\n"
+      "}\n",
+      "classname", name_resolver_->GetImmutableClassName(descriptor_));
+  }
+
   // -----------------------------------------------------------------
 
   if (context_->HasGeneratedMethods(descriptor_)) {
     printer->Print(
+      "@java.lang.Override\n"
       "public Builder mergeFrom(com.google.protobuf.Message other) {\n"
       "  if (other instanceof $classname$) {\n"
       "    return mergeFrom(($classname$)other);\n"
@@ -510,10 +597,8 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
         "  this.mergeExtensionFields(other);\n");
     }
 
-    if (PreserveUnknownFields(descriptor_)) {
-      printer->Print(
-        "  this.mergeUnknownFields(other.unknownFields);\n");
-    }
+    printer->Print(
+      "  this.mergeUnknownFields(other.unknownFields);\n");
 
     printer->Print(
       "  onChanged();\n");
@@ -530,6 +615,7 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
 void MessageBuilderGenerator::
 GenerateBuilderParsingMethods(io::Printer* printer) {
   printer->Print(
+    "@java.lang.Override\n"
     "public Builder mergeFrom(\n"
     "    com.google.protobuf.CodedInputStream input,\n"
     "    com.google.protobuf.ExtensionRegistryLite extensionRegistry)\n"
@@ -555,6 +641,7 @@ GenerateBuilderParsingMethods(io::Printer* printer) {
 void MessageBuilderGenerator::GenerateIsInitialized(
     io::Printer* printer) {
   printer->Print(
+    "@java.lang.Override\n"
     "public final boolean isInitialized() {\n");
   printer->Indent();
 
@@ -596,10 +683,9 @@ void MessageBuilderGenerator::GenerateIsInitialized(
             const OneofDescriptor* oneof = field->containing_oneof();
             const OneofGeneratorInfo* oneof_info =
                 context_->GetOneofGeneratorInfo(oneof);
-            printer->Print(
-              "if ($oneof_name$Case_ == $field_number$) {\n",
-              "oneof_name", oneof_info->name,
-              "field_number", SimpleItoa(field->number()));
+            printer->Print("if ($oneof_name$Case_ == $field_number$) {\n",
+                           "oneof_name", oneof_info->name, "field_number",
+                           StrCat(field->number()));
           } else {
             printer->Print(
               "if (has$name$()) {\n",
@@ -615,7 +701,7 @@ void MessageBuilderGenerator::GenerateIsInitialized(
         case FieldDescriptor::LABEL_REPEATED:
           if (IsMapEntry(field->message_type())) {
             printer->Print(
-              "for ($type$ item : get$name$().values()) {\n"
+              "for ($type$ item : get$name$Map().values()) {\n"
               "  if (!item.isInitialized()) {\n"
               "    return false;\n"
               "  }\n"

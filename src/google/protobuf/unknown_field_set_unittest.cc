@@ -35,6 +35,7 @@
 // This test is testing a lot more than just the UnknownFieldSet class.  It
 // tests handling of unknown fields throughout the system.
 
+#include <google/protobuf/stubs/mutex.h>
 #include <google/protobuf/unknown_field_set.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/io/coded_stream.h>
@@ -46,9 +47,10 @@
 #include <google/protobuf/stubs/callback.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/mutex.h>
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
+
+
 #include <google/protobuf/stubs/stl_util.h>
 
 namespace google {
@@ -194,13 +196,14 @@ TEST_F(UnknownFieldSetTest, SerializeFastAndSlowAreEquivalent) {
   slow_buffer.resize(size);
   fast_buffer.resize(size);
 
-  uint8* target = reinterpret_cast<uint8*>(string_as_array(&fast_buffer));
+  uint8* target = reinterpret_cast<uint8*>(::google::protobuf::string_as_array(&fast_buffer));
   uint8* result = WireFormat::SerializeUnknownFieldsToArray(
           empty_message_.unknown_fields(), target);
   EXPECT_EQ(size, result - target);
 
   {
-    io::ArrayOutputStream raw_stream(string_as_array(&slow_buffer), size, 1);
+    io::ArrayOutputStream raw_stream(::google::protobuf::string_as_array(&slow_buffer), size,
+                                     1);
     io::CodedOutputStream output_stream(&raw_stream);
     WireFormat::SerializeUnknownFields(empty_message_.unknown_fields(),
                                        &output_stream);
@@ -488,7 +491,7 @@ TEST_F(UnknownFieldSetTest, UnknownEnumValue) {
 TEST_F(UnknownFieldSetTest, SpaceUsedExcludingSelf) {
   UnknownFieldSet empty;
   empty.AddVarint(1, 0);
-  EXPECT_EQ(sizeof(vector<UnknownField>) + sizeof(UnknownField),
+  EXPECT_EQ(sizeof(std::vector<UnknownField>) + sizeof(UnknownField),
             empty.SpaceUsedExcludingSelf());
 }
 
@@ -559,8 +562,9 @@ TEST_F(UnknownFieldSetTest, DeleteSubrange) {
   }
 }
 
-void CheckDeleteByNumber(const vector<int>& field_numbers, int deleted_number,
-                        const vector<int>& expected_field_nubmers) {
+void CheckDeleteByNumber(const std::vector<int>& field_numbers,
+                         int deleted_number,
+                         const std::vector<int>& expected_field_nubmers) {
   UnknownFieldSet unknown_fields;
   for (int i = 0; i < field_numbers.size(); ++i) {
     unknown_fields.AddFixed32(field_numbers[i], i);
@@ -573,9 +577,9 @@ void CheckDeleteByNumber(const vector<int>& field_numbers, int deleted_number,
   }
 }
 
-#define MAKE_VECTOR(x) vector<int>(x, x + GOOGLE_ARRAYSIZE(x))
+#define MAKE_VECTOR(x) std::vector<int>(x, x + GOOGLE_ARRAYSIZE(x))
 TEST_F(UnknownFieldSetTest, DeleteByNumber) {
-  CheckDeleteByNumber(vector<int>(), 1, vector<int>());
+  CheckDeleteByNumber(std::vector<int>(), 1, std::vector<int>());
   static const int kTestFieldNumbers1[] = {1, 2, 3};
   static const int kFieldNumberToDelete1 = 1;
   static const int kExpectedFieldNumbers1[] = {2, 3};

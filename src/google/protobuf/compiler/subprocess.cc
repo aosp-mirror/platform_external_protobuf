@@ -33,6 +33,7 @@
 #include <google/protobuf/compiler/subprocess.h>
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 
 #ifndef _WIN32
@@ -47,10 +48,19 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/stubs/substitute.h>
 
-
 namespace google {
 namespace protobuf {
 namespace compiler {
+
+namespace {
+char* portable_strdup(const char* s) {
+  char* ns = (char*) malloc(strlen(s) + 1);
+  if (ns != NULL) {
+    strcpy(ns, s);
+  }
+  return ns;
+}
+}  // namespace
 
 #ifdef _WIN32
 
@@ -114,14 +124,17 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
                       << Win32ErrorMessage(GetLastError());
   }
 
-  // CreateProcess() mutates its second parameter.  WTF?
-  char* name_copy = strdup(program.c_str());
+  // Invoking cmd.exe allows for '.bat' files from the path as well as '.exe'.
+  // Using a malloc'ed string because CreateProcess() can mutate its second
+  // parameter.
+  char *command_line =
+      portable_strdup(("cmd.exe /c \"" + program + "\"").c_str());
 
   // Create the process.
   PROCESS_INFORMATION process_info;
 
   if (CreateProcessA((search_mode == SEARCH_PATH) ? NULL : program.c_str(),
-                     (search_mode == SEARCH_PATH) ? name_copy : NULL,
+                     (search_mode == SEARCH_PATH) ? command_line : NULL,
                      NULL,  // process security attributes
                      NULL,  // thread security attributes
                      TRUE,  // inherit handles?
@@ -142,7 +155,7 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
 
   CloseHandleOrDie(stdin_pipe_read);
   CloseHandleOrDie(stdout_pipe_write);
-  free(name_copy);
+  free(command_line);
 }
 
 bool Subprocess::Communicate(const Message& input, Message* output,
@@ -261,12 +274,11 @@ string Subprocess::Win32ErrorMessage(DWORD error_code) {
   char* message;
 
   // WTF?
-  FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                FORMAT_MESSAGE_FROM_SYSTEM |
-                FORMAT_MESSAGE_IGNORE_INSERTS,
-                NULL, error_code, 0,
-                (LPTSTR)&message,  // NOT A BUG!
-                0, NULL);
+  FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                     FORMAT_MESSAGE_IGNORE_INSERTS,
+                 NULL, error_code, 0,
+                 (LPSTR)&message,  // NOT A BUG!
+                 0, NULL);
 
   string result = message;
   LocalFree(message);
@@ -300,7 +312,7 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
   GOOGLE_CHECK(pipe(stdin_pipe) != -1);
   GOOGLE_CHECK(pipe(stdout_pipe) != -1);
 
-  char* argv[2] = { strdup(program.c_str()), NULL };
+  char* argv[2] = { portable_strdup(program.c_str()), NULL };
 
   child_pid_ = fork();
   if (child_pid_ == -1) {
@@ -348,7 +360,6 @@ void Subprocess::Start(const string& program, SearchMode search_mode) {
 
 bool Subprocess::Communicate(const Message& input, Message* output,
                              string* error) {
-
   GOOGLE_CHECK_NE(child_stdin_, -1) << "Must call Start() first.";
 
   // The "sighandler_t" typedef is GNU-specific, so define our own.

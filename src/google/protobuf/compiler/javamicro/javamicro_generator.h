@@ -67,6 +67,10 @@ class LIBPROTOC_EXPORT JavaMicroGenerator : public CodeGenerator {
 }  // namespace javamicro
 }  // namespace compiler
 }  // namespace protobuf
-
 }  // namespace google
+<<<<<<< HEAD:src/google/protobuf/compiler/javamicro/javamicro_generator.h
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_MICRO_GENERATOR_H__
+=======
+
+#endif  // GOOGLE_PROTOBUF_COMPILER_CPP_MESSAGE_LAYOUT_HELPER_H__
+>>>>>>> github/3.7.x:src/google/protobuf/compiler/cpp/cpp_message_layout_helper.h

@@ -30,9 +30,6 @@
 
 #include <string>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <vector>
 
 #include <google/protobuf/test_util.h>
@@ -42,9 +39,9 @@
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
 
-namespace google {
 using proto3_arena_unittest::TestAllTypes;
 
+namespace google {
 namespace protobuf {
 namespace {
 // We selectively set/check a few representative fields rather than all fields
@@ -144,9 +141,9 @@ TEST(Proto3ArenaTest, UnknownFields) {
       arena_message->GetReflection()->MutableUnknownFields(arena_message);
   // We can modify this UnknownFieldSet.
   unknown_fields->AddVarint(1, 2);
-  // But the change will never will serialized back.
-  ASSERT_EQ(original.ByteSize(), arena_message->ByteSize());
-  ASSERT_TRUE(
+  // And the unknown fields should be changed.
+  ASSERT_NE(original.ByteSize(), arena_message->ByteSize());
+  ASSERT_FALSE(
       arena_message->GetReflection()->GetUnknownFields(*arena_message).empty());
 }
 
@@ -175,13 +172,13 @@ TEST(Proto3ArenaTest, ReleaseMessage) {
   Arena arena;
   TestAllTypes* arena_message = Arena::CreateMessage<TestAllTypes>(&arena);
   arena_message->mutable_optional_nested_message()->set_bb(118);
-  google::protobuf::scoped_ptr<TestAllTypes::NestedMessage> nested(
+  std::unique_ptr<TestAllTypes::NestedMessage> nested(
       arena_message->release_optional_nested_message());
   EXPECT_EQ(118, nested->bb());
 }
 
 TEST(Proto3ArenaTest, MessageFieldClear) {
-  // GitHub issue #310: https://github.com/google/protobuf/issues/310
+  // GitHub issue #310: https://github.com/protocolbuffers/protobuf/issues/310
   Arena arena;
   TestAllTypes* arena_message = Arena::CreateMessage<TestAllTypes>(&arena);
   arena_message->mutable_optional_nested_message()->set_bb(118);

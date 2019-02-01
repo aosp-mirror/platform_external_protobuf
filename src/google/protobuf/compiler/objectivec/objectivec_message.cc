@@ -32,7 +32,6 @@
 #include <iostream>
 #include <sstream>
 
-#include <google/protobuf/stubs/hash.h>
 #include <google/protobuf/compiler/objectivec/objectivec_message.h>
 #include <google/protobuf/compiler/objectivec/objectivec_enum.h>
 #include <google/protobuf/compiler/objectivec/objectivec_extension.h>
@@ -156,7 +155,7 @@ const FieldDescriptor** SortFieldsByNumber(const Descriptor* descriptor) {
   for (int i = 0; i < descriptor->field_count(); i++) {
     fields[i] = descriptor->field(i);
   }
-  sort(fields, fields + descriptor->field_count(), FieldOrderingByNumber());
+  std::sort(fields, fields + descriptor->field_count(), FieldOrderingByNumber());
   return fields;
 }
 
@@ -168,7 +167,7 @@ const FieldDescriptor** SortFieldsByStorageSize(const Descriptor* descriptor) {
   for (int i = 0; i < descriptor->field_count(); i++) {
     fields[i] = descriptor->field(i);
   }
-  sort(fields, fields + descriptor->field_count(),
+  std::sort(fields, fields + descriptor->field_count(),
        FieldOrderingByStorageSize());
   return fields;
 }
@@ -180,7 +179,10 @@ MessageGenerator::MessageGenerator(const string& root_classname,
     : root_classname_(root_classname),
       descriptor_(descriptor),
       field_generators_(descriptor, options),
-      class_name_(ClassName(descriptor_)) {
+      class_name_(ClassName(descriptor_)),
+      deprecated_attribute_(
+          GetOptionalDeprecatedAttribute(descriptor, descriptor->file(), false, true)) {
+
   for (int i = 0; i < descriptor_->extension_count(); i++) {
     extension_generators_.push_back(
         new ExtensionGenerator(class_name_, descriptor_->extension(i)));
@@ -217,20 +219,20 @@ MessageGenerator::~MessageGenerator() {
 
 void MessageGenerator::GenerateStaticVariablesInitialization(
     io::Printer* printer) {
-  for (vector<ExtensionGenerator*>::iterator iter =
+  for (std::vector<ExtensionGenerator*>::iterator iter =
            extension_generators_.begin();
        iter != extension_generators_.end(); ++iter) {
     (*iter)->GenerateStaticVariablesInitialization(printer);
   }
 
-  for (vector<MessageGenerator*>::iterator iter =
+  for (std::vector<MessageGenerator*>::iterator iter =
            nested_message_generators_.begin();
        iter != nested_message_generators_.end(); ++iter) {
     (*iter)->GenerateStaticVariablesInitialization(printer);
   }
 }
 
-void MessageGenerator::DetermineForwardDeclarations(set<string>* fwd_decls) {
+void MessageGenerator::DetermineForwardDeclarations(std::set<string>* fwd_decls) {
   if (!IsMapEntryMessage(descriptor_)) {
     for (int i = 0; i < descriptor_->field_count(); i++) {
       const FieldDescriptor* fieldDescriptor = descriptor_->field(i);
@@ -239,20 +241,36 @@ void MessageGenerator::DetermineForwardDeclarations(set<string>* fwd_decls) {
     }
   }
 
-  for (vector<MessageGenerator*>::iterator iter =
+  for (std::vector<MessageGenerator*>::iterator iter =
            nested_message_generators_.begin();
        iter != nested_message_generators_.end(); ++iter) {
     (*iter)->DetermineForwardDeclarations(fwd_decls);
   }
 }
 
+bool MessageGenerator::IncludesOneOfDefinition() const {
+  if (!oneof_generators_.empty()) {
+    return true;
+  }
+
+  for (std::vector<MessageGenerator*>::const_iterator iter =
+           nested_message_generators_.begin();
+       iter != nested_message_generators_.end(); ++iter) {
+    if ((*iter)->IncludesOneOfDefinition()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void MessageGenerator::GenerateEnumHeader(io::Printer* printer) {
-  for (vector<EnumGenerator*>::iterator iter = enum_generators_.begin();
+  for (std::vector<EnumGenerator*>::iterator iter = enum_generators_.begin();
        iter != enum_generators_.end(); ++iter) {
     (*iter)->GenerateHeader(printer);
   }
 
-  for (vector<MessageGenerator*>::iterator iter =
+  for (std::vector<MessageGenerator*>::iterator iter =
            nested_message_generators_.begin();
        iter != nested_message_generators_.end(); ++iter) {
     (*iter)->GenerateEnumHeader(printer);
@@ -261,13 +279,13 @@ void MessageGenerator::GenerateEnumHeader(io::Printer* printer) {
 
 void MessageGenerator::GenerateExtensionRegistrationSource(
     io::Printer* printer) {
-  for (vector<ExtensionGenerator*>::iterator iter =
+  for (std::vector<ExtensionGenerator*>::iterator iter =
            extension_generators_.begin();
        iter != extension_generators_.end(); ++iter) {
     (*iter)->GenerateRegistrationSource(printer);
   }
 
-  for (vector<MessageGenerator*>::iterator iter =
+  for (std::vector<MessageGenerator*>::iterator iter =
            nested_message_generators_.begin();
        iter != nested_message_generators_.end(); ++iter) {
     (*iter)->GenerateExtensionRegistrationSource(printer);
@@ -277,7 +295,7 @@ void MessageGenerator::GenerateExtensionRegistrationSource(
 void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
   // This a a map entry message, just recurse and do nothing directly.
   if (IsMapEntryMessage(descriptor_)) {
-    for (vector<MessageGenerator*>::iterator iter =
+    for (std::vector<MessageGenerator*>::iterator iter =
              nested_message_generators_.begin();
          iter != nested_message_generators_.end(); ++iter) {
       (*iter)->GenerateMessageHeader(printer);
@@ -291,7 +309,7 @@ void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
       "classname", class_name_);
 
   if (descriptor_->field_count()) {
-    scoped_array<const FieldDescriptor*> sorted_fields(
+    std::unique_ptr<const FieldDescriptor*[]> sorted_fields(
         SortFieldsByNumber(descriptor_));
 
     printer->Print("typedef GPB_ENUM($classname$_FieldNumber) {\n",
@@ -307,7 +325,7 @@ void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
     printer->Print("};\n\n");
   }
 
-  for (vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
+  for (std::vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
        iter != oneof_generators_.end(); ++iter) {
     (*iter)->GenerateCaseEnum(printer);
   }
@@ -315,7 +333,7 @@ void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
   string message_comments;
   SourceLocation location;
   if (descriptor_->GetSourceLocation(&location)) {
-    message_comments = BuildCommentsString(location);
+    message_comments = BuildCommentsString(location, false);
   } else {
     message_comments = "";
   }
@@ -323,10 +341,10 @@ void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
   printer->Print(
       "$comments$$deprecated_attribute$@interface $classname$ : GPBMessage\n\n",
       "classname", class_name_,
-      "deprecated_attribute", GetOptionalDeprecatedAttribute(descriptor_, false, true),
+      "deprecated_attribute", deprecated_attribute_,
       "comments", message_comments);
 
-  vector<char> seen_oneofs(descriptor_->oneof_decl_count(), 0);
+  std::vector<char> seen_oneofs(descriptor_->oneof_decl_count(), 0);
   for (int i = 0; i < descriptor_->field_count(); i++) {
     const FieldDescriptor* field = descriptor_->field(i);
     if (field->containing_oneof() != NULL) {
@@ -348,7 +366,7 @@ void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
   }
 
   if (!oneof_generators_.empty()) {
-    for (vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
+    for (std::vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
          iter != oneof_generators_.end(); ++iter) {
       (*iter)->GenerateClearFunctionDeclaration(printer);
     }
@@ -358,7 +376,7 @@ void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
   if (descriptor_->extension_count() > 0) {
     printer->Print("@interface $classname$ (DynamicMethods)\n\n",
                    "classname", class_name_);
-    for (vector<ExtensionGenerator*>::iterator iter =
+    for (std::vector<ExtensionGenerator*>::iterator iter =
              extension_generators_.begin();
          iter != extension_generators_.end(); ++iter) {
       (*iter)->GenerateMembersHeader(printer);
@@ -366,7 +384,7 @@ void MessageGenerator::GenerateMessageHeader(io::Printer* printer) {
     printer->Print("@end\n\n");
   }
 
-  for (vector<MessageGenerator*>::iterator iter =
+  for (std::vector<MessageGenerator*>::iterator iter =
            nested_message_generators_.begin();
        iter != nested_message_generators_.end(); ++iter) {
     (*iter)->GenerateMessageHeader(printer);
@@ -380,10 +398,18 @@ void MessageGenerator::GenerateSource(io::Printer* printer) {
         "\n",
         "classname", class_name_);
 
+    if (!deprecated_attribute_.empty()) {
+      // No warnings when compiling the impl of this deprecated class.
+      printer->Print(
+          "#pragma clang diagnostic push\n"
+          "#pragma clang diagnostic ignored \"-Wdeprecated-implementations\"\n"
+          "\n");
+    }
+
     printer->Print("@implementation $classname$\n\n",
                    "classname", class_name_);
 
-    for (vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
+    for (std::vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
          iter != oneof_generators_.end(); ++iter) {
       (*iter)->GeneratePropertyImplementation(printer);
     }
@@ -393,17 +419,17 @@ void MessageGenerator::GenerateSource(io::Printer* printer) {
           .GeneratePropertyImplementation(printer);
     }
 
-    scoped_array<const FieldDescriptor*> sorted_fields(
+    std::unique_ptr<const FieldDescriptor*[]> sorted_fields(
         SortFieldsByNumber(descriptor_));
-    scoped_array<const FieldDescriptor*> size_order_fields(
+    std::unique_ptr<const FieldDescriptor*[]> size_order_fields(
         SortFieldsByStorageSize(descriptor_));
 
-    vector<const Descriptor::ExtensionRange*> sorted_extensions;
+    std::vector<const Descriptor::ExtensionRange*> sorted_extensions;
     for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
       sorted_extensions.push_back(descriptor_->extension_range(i));
     }
 
-    sort(sorted_extensions.begin(), sorted_extensions.end(),
+    std::sort(sorted_extensions.begin(), sorted_extensions.end(),
          ExtensionRangeOrdering());
 
     // Assign has bits:
@@ -421,7 +447,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer) {
       sizeof_has_storage = 1;
     }
     // Tell all the fields the oneof base.
-    for (vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
+    for (std::vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
          iter != oneof_generators_.end(); ++iter) {
       (*iter)->SetOneofIndexBase(sizeof_has_storage);
     }
@@ -487,7 +513,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer) {
           "    };\n");
     }
 
-    map<string, string> vars;
+    std::map<string, string> vars;
     vars["classname"] = class_name_;
     vars["rootclassname"] = root_classname_;
     vars["fields"] = has_fields ? "fields" : "NULL";
@@ -505,7 +531,8 @@ void MessageGenerator::GenerateSource(io::Printer* printer) {
     if (descriptor_->options().message_set_wire_format()) {
       init_flags.push_back("GPBDescriptorInitializationFlag_WireFormat");
     }
-    vars["init_flags"] = BuildFlagsString(init_flags);
+    vars["init_flags"] = BuildFlagsString(FLAGTYPE_DESCRIPTOR_INITIALIZATION,
+                                          init_flags);
 
     printer->Print(
         vars,
@@ -520,7 +547,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer) {
     if (oneof_generators_.size() != 0) {
       printer->Print(
           "    static const char *oneofs[] = {\n");
-      for (vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
+      for (std::vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
            iter != oneof_generators_.end(); ++iter) {
         printer->Print(
             "      \"$name$\",\n",
@@ -563,31 +590,52 @@ void MessageGenerator::GenerateSource(io::Printer* printer) {
           "    [localDescriptor setupExtensionRanges:ranges\n"
           "                                    count:(uint32_t)(sizeof(ranges) / sizeof(GPBExtensionRange))];\n");
     }
+    if (descriptor_->containing_type() != NULL) {
+      string parent_class_name = ClassName(descriptor_->containing_type());
+      printer->Print(
+          "    [localDescriptor setupContainingMessageClassName:GPBStringifySymbol($parent_name$)];\n",
+          "parent_name", parent_class_name);
+    }
+    string suffix_added;
+    ClassName(descriptor_, &suffix_added);
+    if (suffix_added.size() > 0) {
+      printer->Print(
+          "    [localDescriptor setupMessageClassNameSuffix:@\"$suffix$\"];\n",
+          "suffix", suffix_added);
+    }
     printer->Print(
-        "    NSAssert(descriptor == nil, @\"Startup recursed!\");\n"
+        "    #if defined(DEBUG) && DEBUG\n"
+        "      NSAssert(descriptor == nil, @\"Startup recursed!\");\n"
+        "    #endif  // DEBUG\n"
         "    descriptor = localDescriptor;\n"
         "  }\n"
         "  return descriptor;\n"
         "}\n\n"
         "@end\n\n");
 
+    if (!deprecated_attribute_.empty()) {
+      printer->Print(
+          "#pragma clang diagnostic pop\n"
+          "\n");
+    }
+
     for (int i = 0; i < descriptor_->field_count(); i++) {
       field_generators_.get(descriptor_->field(i))
           .GenerateCFunctionImplementations(printer);
     }
 
-    for (vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
+    for (std::vector<OneofGenerator*>::iterator iter = oneof_generators_.begin();
          iter != oneof_generators_.end(); ++iter) {
       (*iter)->GenerateClearFunctionImplementation(printer);
     }
   }
 
-  for (vector<EnumGenerator*>::iterator iter = enum_generators_.begin();
+  for (std::vector<EnumGenerator*>::iterator iter = enum_generators_.begin();
        iter != enum_generators_.end(); ++iter) {
     (*iter)->GenerateSource(printer);
   }
 
-  for (vector<MessageGenerator*>::iterator iter =
+  for (std::vector<MessageGenerator*>::iterator iter =
            nested_message_generators_.begin();
        iter != nested_message_generators_.end(); ++iter) {
     (*iter)->GenerateSource(printer);

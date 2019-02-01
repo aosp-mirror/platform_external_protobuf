@@ -36,6 +36,7 @@
 
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/message.h>
+#include <google/protobuf/util/message_differencer.h>
 #include <google/protobuf/stubs/map_util.h>
 #include <google/protobuf/stubs/mathlimits.h>
 #include <google/protobuf/stubs/mathutil.h>
@@ -56,11 +57,9 @@ DefaultFieldComparator::DefaultFieldComparator()
 DefaultFieldComparator::~DefaultFieldComparator() {}
 
 FieldComparator::ComparisonResult DefaultFieldComparator::Compare(
-      const google::protobuf::Message& message_1,
-      const google::protobuf::Message& message_2,
-      const google::protobuf::FieldDescriptor* field,
-      int index_1, int index_2,
-      const google::protobuf::util::FieldContext* field_context) {
+    const Message& message_1, const Message& message_2,
+    const FieldDescriptor* field, int index_1, int index_2,
+    const util::FieldContext* field_context) {
   const Reflection* reflection_1 = message_1.GetReflection();
   const Reflection* reflection_2 = message_2.GetReflection();
 
@@ -130,6 +129,14 @@ FieldComparator::ComparisonResult DefaultFieldComparator::Compare(
   }
 }
 
+bool DefaultFieldComparator::Compare(MessageDifferencer* differencer,
+                                     const Message& message1,
+                                     const Message& message2,
+                                     const util::FieldContext* field_context) {
+  return differencer->Compare(
+      message1, message2, field_context->parent_fields());
+}
+
 void DefaultFieldComparator::SetDefaultFractionAndMargin(double fraction,
                                                          double margin) {
   default_tolerance_ = Tolerance(fraction, margin);
@@ -189,7 +196,7 @@ bool DefaultFieldComparator::CompareDoubleOrFloat(const FieldDescriptor& field,
       return MathUtil::AlmostEquals(value_1, value_2);
     } else {
       // Use user-provided fraction and margin. Since they are stored as
-      // doubles, we explicitely cast them to types of values provided. This
+      // doubles, we explicitly cast them to types of values provided. This
       // is very likely to fail if provided values are not numeric.
       return MathUtil::WithinFractionOrMargin(
           value_1, value_2, static_cast<T>(tolerance->fraction),

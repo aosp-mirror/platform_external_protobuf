@@ -46,7 +46,7 @@ struct Options {
       base_namespace(""),
       base_namespace_specified(false),
       internal_access(false),
-      legacy_enum_values(false) {
+      serializable(false) {
   }
   // Extension of the generated file. Defaults to ".cs"
   string file_extension;
@@ -69,12 +69,9 @@ struct Options {
   // Whether the generated classes should have accessibility level of "internal".
   // Defaults to false that generates "public" classes.
   bool internal_access;
-  // By default, C# codegen now uses PascalCased enum values names, after
-  // removing the enum type name as a prefix (if it *is* a prefix of the value).
-  // Setting this option reverts to the previous behavior of just copying the
-  // value name specified in the .proto file, allowing gradual migration.
-  // This option will be removed before final release.
-  bool legacy_enum_values;
+  // Whether the generated classes should have a global::System.Serializable attribute added
+  // Defaults to false
+  bool serializable;
 };
 
 }  // namespace csharp

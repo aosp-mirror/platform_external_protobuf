@@ -47,8 +47,7 @@ namespace java {
 
 class ImmutableMessageLiteGenerator : public MessageGenerator {
  public:
-  explicit ImmutableMessageLiteGenerator(const Descriptor* descriptor,
-                                     Context* context);
+  ImmutableMessageLiteGenerator(const Descriptor* descriptor, Context* context);
   virtual ~ImmutableMessageLiteGenerator();
 
   virtual void Generate(io::Printer* printer);
@@ -88,6 +87,6 @@ class ImmutableMessageLiteGenerator : public MessageGenerator {
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
-
 }  // namespace google
+
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_LITE_H__
