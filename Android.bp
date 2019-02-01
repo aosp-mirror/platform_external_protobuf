@@ -24,7 +24,7 @@ IGNORED_WARNINGS = [
 cc_defaults {
     name: "protobuf-cflags-defaults",
     clang_cflags: [
-        "-Wno-error=unused-const-variable",
+        "-Wno-unused-const-variable",
         "-Wno-error=user-defined-warnings",
     ],
     cflags: [
