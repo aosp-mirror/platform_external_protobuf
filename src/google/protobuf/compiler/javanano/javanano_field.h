@@ -32,9 +32,10 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_JAVA_FIELD_H__
-#define GOOGLE_PROTOBUF_COMPILER_JAVA_FIELD_H__
+#ifndef GOOGLE_PROTOBUF_COMPILER_JAVANANO_FIELD_H__
+#define GOOGLE_PROTOBUF_COMPILER_JAVANANO_FIELD_H__
 
+#include <map>
 #include <string>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/descriptor.h>
@@ -82,6 +83,7 @@ class FieldGenerator {
   virtual void GenerateSerializedSizeCode(io::Printer* printer) const = 0;
   virtual void GenerateEqualsCode(io::Printer* printer) const = 0;
   virtual void GenerateHashCodeCode(io::Printer* printer) const = 0;
+  virtual void GenerateFixClonedCode(io::Printer* printer) const {}
 
  protected:
   const Params& params_;
@@ -111,9 +113,18 @@ class FieldGeneratorMap {
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FieldGeneratorMap);
 };
 
+void SetCommonOneofVariables(const FieldDescriptor* descriptor,
+                             map<string, string>* variables);
+void GenerateOneofFieldEquals(const FieldDescriptor* descriptor,
+                              const map<string, string>& variables,
+                              io::Printer* printer);
+void GenerateOneofFieldHashCode(const FieldDescriptor* descriptor,
+                                const map<string, string>& variables,
+                                io::Printer* printer);
+
 }  // namespace javanano
 }  // namespace compiler
 }  // namespace protobuf
 
 }  // namespace google
-#endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_FIELD_H__
+#endif  // GOOGLE_PROTOBUF_COMPILER_JAVANANO_FIELD_H__

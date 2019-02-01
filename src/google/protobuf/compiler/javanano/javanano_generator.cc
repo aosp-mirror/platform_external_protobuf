@@ -67,8 +67,13 @@ void UpdateParamsRecursively(Params& params,
       file->name(), file->options().java_outer_classname());
   }
   if (file->options().has_java_package()) {
+    string result = file->options().java_package();
+    if (!result.empty()) {
+      result += ".";
+    }
+    result += "nano";
     params.set_java_package(
-      file->name(), file->options().java_package());
+      file->name(), result);
   }
   if (file->options().has_java_multiple_files()) {
     params.set_java_multiple_files(
@@ -87,7 +92,7 @@ JavaNanoGenerator::~JavaNanoGenerator() {}
 
 bool JavaNanoGenerator::Generate(const FileDescriptor* file,
                              const string& parameter,
-                             OutputDirectory* output_directory,
+                             GeneratorContext* output_directory,
                              string* error) const {
   vector<pair<string, string> > options;
 
@@ -152,6 +157,14 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
       params.set_ignore_services(option_value == "true");
     } else if (option_name == "parcelable_messages") {
       params.set_parcelable_messages(option_value == "true");
+    } else if (option_name == "generate_clone") {
+      params.set_generate_clone(option_value == "true");
+    } else if (option_name == "generate_intdefs") {
+      params.set_generate_intdefs(option_value == "true");
+    } else if (option_name == "generate_clear") {
+      params.set_generate_clear(option_value == "true");
+    } else if (option_name == "bytes_offset_length") {
+      params.set_bytes_offset_length(option_value == "true");
     } else {
       *error = "Ignore unknown javanano generator option: " + option_name;
     }
@@ -166,6 +179,14 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
           || params.use_reference_types_for_primitives())) {
     error->assign("java_nano_generate_has=true cannot be used in conjunction"
         " with optional_field_style=accessors or optional_field_style=reftypes");
+    return false;
+  }
+
+  // Theoretically possible, but not implemented.
+  if (params.bytes_offset_length()
+      && (params.optional_field_accessors() || params.generate_equals())) {
+    error->assign("bytes_offset_length=true cannot be used in conjunction"
+        " with optional_field_style=accessors or generate_equals=true");
     return false;
   }
 
