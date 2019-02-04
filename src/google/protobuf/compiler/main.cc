@@ -60,6 +60,7 @@ int ProtobufMain(int argc, char* argv[]) {
   cpp_generator.set_runtime_include_base(GOOGLE_PROTOBUF_RUNTIME_INCLUDE_BASE);
 #endif
 
+#ifndef ANDROID_EMULATOR
   // Proto2 Java
   java::JavaGenerator java_generator;
   cli.RegisterGenerator("--java_out", "--java_opt", &java_generator,
@@ -95,6 +96,7 @@ int ProtobufMain(int argc, char* argv[]) {
   js::Generator js_generator;
   cli.RegisterGenerator("--js_out", &js_generator,
                         "Generate JavaScript source.");
+#endif
 
   return cli.Run(argc, argv);
 }
