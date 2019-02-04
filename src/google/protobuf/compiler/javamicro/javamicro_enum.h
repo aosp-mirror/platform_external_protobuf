@@ -54,6 +54,7 @@ namespace javamicro {
 
 class EnumGenerator {
  public:
+<<<<<<< HEAD:src/google/protobuf/compiler/javamicro/javamicro_enum.h
   explicit EnumGenerator(const EnumDescriptor* descriptor, const Params& params);
   ~EnumGenerator();
 
@@ -77,11 +78,22 @@ class EnumGenerator {
   vector<Alias> aliases_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(EnumGenerator);
+=======
+  PaddingOptimizer() {}
+  ~PaddingOptimizer() override {}
+
+  void OptimizeLayout(std::vector<const FieldDescriptor*>* fields,
+                      const Options& options) override;
+>>>>>>> github/3.7.x:src/google/protobuf/compiler/cpp/cpp_padding_optimizer.h
 };
 
 }  // namespace javamicro
 }  // namespace compiler
 }  // namespace protobuf
-
 }  // namespace google
+<<<<<<< HEAD:src/google/protobuf/compiler/javamicro/javamicro_enum.h
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_ENUM_H__
+=======
+
+#endif  // GOOGLE_PROTOBUF_COMPILER_CPP_PADDING_OPTIMIZER_H__
+>>>>>>> github/3.7.x:src/google/protobuf/compiler/cpp/cpp_padding_optimizer.h

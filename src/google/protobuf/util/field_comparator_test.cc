@@ -38,7 +38,7 @@
 // This gtest header is put after mathutil.h intentionally. We have to do
 // this because mathutil.h includes mathlimits.h which requires cmath not
 // being included to compile on some versions of gcc:
-//   https://github.com/google/protobuf/blob/818c5eee08840355d70d2f3bdf1a2f17986a5e70/src/google/protobuf/stubs/mathlimits.h#L48
+//   https://github.com/protocolbuffers/protobuf/blob/818c5eee08840355d70d2f3bdf1a2f17986a5e70/src/google/protobuf/stubs/mathlimits.h#L48
 // and the opensource version gtest.h header includes cmath transitively
 // somehow.
 #include <gtest/gtest.h>
@@ -365,10 +365,10 @@ TEST_F(DefaultFieldComparatorTest,
 
   // +inf should be equal even though they are not technically within margin or
   // fraction.
-  message_1_.set_optional_float(numeric_limits<float>::infinity());
-  message_2_.set_optional_float(numeric_limits<float>::infinity());
-  message_1_.set_optional_double(numeric_limits<double>::infinity());
-  message_2_.set_optional_double(numeric_limits<double>::infinity());
+  message_1_.set_optional_float(std::numeric_limits<float>::infinity());
+  message_2_.set_optional_float(std::numeric_limits<float>::infinity());
+  message_1_.set_optional_double(std::numeric_limits<double>::infinity());
+  message_2_.set_optional_double(std::numeric_limits<double>::infinity());
   comparator_.SetFractionAndMargin(field_float, 0.0, 0.0);
   comparator_.SetFractionAndMargin(field_double, 0.0, 0.0);
   EXPECT_EQ(FieldComparator::SAME,
@@ -380,10 +380,10 @@ TEST_F(DefaultFieldComparatorTest,
 
   // -inf should be equal even though they are not technically within margin or
   // fraction.
-  message_1_.set_optional_float(-numeric_limits<float>::infinity());
-  message_2_.set_optional_float(-numeric_limits<float>::infinity());
-  message_1_.set_optional_double(-numeric_limits<double>::infinity());
-  message_2_.set_optional_double(-numeric_limits<double>::infinity());
+  message_1_.set_optional_float(-std::numeric_limits<float>::infinity());
+  message_2_.set_optional_float(-std::numeric_limits<float>::infinity());
+  message_1_.set_optional_double(-std::numeric_limits<double>::infinity());
+  message_2_.set_optional_double(-std::numeric_limits<double>::infinity());
   comparator_.SetFractionAndMargin(field_float, 0.0, 0.0);
   comparator_.SetFractionAndMargin(field_double, 0.0, 0.0);
   EXPECT_EQ(FieldComparator::SAME,
@@ -482,7 +482,7 @@ TEST_F(DefaultFieldComparatorTest, RepeatedFieldComparison) {
             comparator_.Compare(message_1_, message_2_, field, 1, 0, NULL));
 }
 
+}  // namespace
 }  // namespace util
 }  // namespace protobuf
-}  // namespace
 }  // namespace google

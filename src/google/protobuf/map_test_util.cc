@@ -744,6 +744,34 @@ void MapReflectionTester::SetMapFieldsViaMapReflection(
       sub_foreign_message, foreign_c_, 1);
 }
 
+void MapReflectionTester::GetMapValueViaMapReflection(Message* message,
+                                                      const string& field_name,
+                                                      const MapKey& map_key,
+                                                      MapValueRef* map_val) {
+  const Reflection* reflection = message->GetReflection();
+  EXPECT_FALSE(reflection->InsertOrLookupMapValue(message, F(field_name),
+                                                  map_key, map_val));
+}
+
+Message* MapReflectionTester::GetMapEntryViaReflection(Message* message,
+                                                       const string& field_name,
+                                                       int index) {
+  const Reflection* reflection = message->GetReflection();
+  return reflection->MutableRepeatedMessage(message, F(field_name), index);
+}
+
+MapIterator MapReflectionTester::MapBegin(Message* message,
+                                          const string& field_name) {
+  const Reflection* reflection = message->GetReflection();
+  return reflection->MapBegin(message, F(field_name));
+}
+
+MapIterator MapReflectionTester::MapEnd(Message* message,
+                                        const string& field_name) {
+  const Reflection* reflection = message->GetReflection();
+  return reflection->MapEnd(message, F(field_name));
+}
+
 void MapReflectionTester::ClearMapFieldsViaReflection(
     Message* message) {
   const Reflection* reflection = message->GetReflection();
@@ -867,7 +895,7 @@ void MapReflectionTester::RemoveLastMapsViaReflection(
     Message* message) {
   const Reflection* reflection = message->GetReflection();
 
-  vector<const FieldDescriptor*> output;
+  std::vector<const FieldDescriptor*> output;
   reflection->ListFields(*message, &output);
   for (int i = 0; i < output.size(); ++i) {
     const FieldDescriptor* field = output[i];
@@ -880,7 +908,7 @@ void MapReflectionTester::ReleaseLastMapsViaReflection(
     Message* message) {
   const Reflection* reflection = message->GetReflection();
 
-  vector<const FieldDescriptor*> output;
+  std::vector<const FieldDescriptor*> output;
   reflection->ListFields(*message, &output);
   for (int i = 0; i < output.size(); ++i) {
     const FieldDescriptor* field = output[i];
@@ -896,7 +924,7 @@ void MapReflectionTester::ReleaseLastMapsViaReflection(
 
 void MapReflectionTester::SwapMapsViaReflection(Message* message) {
   const Reflection* reflection = message->GetReflection();
-  vector<const FieldDescriptor*> output;
+  std::vector<const FieldDescriptor*> output;
   reflection->ListFields(*message, &output);
   for (int i = 0; i < output.size(); ++i) {
     const FieldDescriptor* field = output[i];
@@ -1554,6 +1582,8 @@ void MapReflectionTester::ExpectClearViaReflection(
   EXPECT_EQ(0, reflection->FieldSize(message, F("map_int32_bytes")));
   EXPECT_EQ(0, reflection->FieldSize(message, F("map_int32_enum")));
   EXPECT_EQ(0, reflection->FieldSize(message, F("map_int32_foreign_message")));
+  EXPECT_TRUE(reflection->GetMapData(
+      message, F("map_int32_foreign_message"))->IsMapValid());
 }
 
 void MapReflectionTester::ExpectClearViaReflectionIterator(

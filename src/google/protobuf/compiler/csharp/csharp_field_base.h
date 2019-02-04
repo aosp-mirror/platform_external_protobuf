@@ -36,6 +36,8 @@
 
 #include <google/protobuf/compiler/code_generator.h>
 #include <google/protobuf/compiler/csharp/csharp_source_generator_base.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/io/printer.h>
 
 namespace google {
 namespace protobuf {
@@ -45,7 +47,7 @@ namespace csharp {
 class FieldGeneratorBase : public SourceGeneratorBase {
  public:
   FieldGeneratorBase(const FieldDescriptor* descriptor,
-                     int fieldOrdinal,
+                     int presenceIndex,
                      const Options* options);
   ~FieldGeneratorBase();
 
@@ -65,15 +67,15 @@ class FieldGeneratorBase : public SourceGeneratorBase {
 
  protected:
   const FieldDescriptor* descriptor_;
-  const int fieldOrdinal_;
-  map<string, string> variables_;
+  const int presenceIndex_;
+  std::map<string, string> variables_;
 
   void AddDeprecatedFlag(io::Printer* printer);
   void AddNullCheck(io::Printer* printer);
   void AddNullCheck(io::Printer* printer, const std::string& name);
 
   void AddPublicMemberAttributes(io::Printer* printer);
-  void SetCommonOneofFieldVariables(map<string, string>* variables);
+  void SetCommonOneofFieldVariables(std::map<string, string>* variables);
 
   std::string oneof_property_name();
   std::string oneof_name();
@@ -82,16 +84,15 @@ class FieldGeneratorBase : public SourceGeneratorBase {
   std::string type_name();
   std::string type_name(const FieldDescriptor* descriptor);
   bool has_default_value();
-  bool is_nullable_type();
   std::string default_value();
   std::string default_value(const FieldDescriptor* descriptor);
   std::string number();
   std::string capitalized_type_name();
 
  private:
-  void SetCommonFieldVariables(map<string, string>* variables);
-  std::string GetStringDefaultValueInternal();
-  std::string GetBytesDefaultValueInternal();
+  void SetCommonFieldVariables(std::map<string, string>* variables);
+  std::string GetStringDefaultValueInternal(const FieldDescriptor* descriptor);
+  std::string GetBytesDefaultValueInternal(const FieldDescriptor* descriptor);
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FieldGeneratorBase);
 };

@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
+using Google.Protobuf.Collections;
 using Google.Protobuf.Compatibility;
 using Google.Protobuf.WellKnownTypes;
 using System;
@@ -225,6 +226,19 @@ namespace Google.Protobuf
         }
 
         /// <summary>
+        /// Retrieves a codec suitable for a group field with the given tag.
+        /// </summary>
+        /// <param name="startTag">The start group tag.</param>
+        /// <param name="endTag">The end group tag.</param>
+        /// <param name="parser">A parser to use for the group message type.</param>
+        /// <returns>A codec for given tag</returns>
+        public static FieldCodec<T> ForGroup<T>(uint startTag, uint endTag, MessageParser<T> parser) where T : IMessage<T>
+        {
+            return new FieldCodec<T>(input => { T message = parser.CreateTemplate(); input.ReadGroup(message); return message; },
+                (output, value) => output.WriteGroup(value), message => CodedOutputStream.ComputeGroupSize(message), startTag, endTag);
+        }
+
+        /// <summary>
         /// Creates a codec for a wrapper type of a class - which must be string or ByteString.
         /// </summary>
         public static FieldCodec<T> ForClassWrapper<T>(uint tag) where T : class
@@ -234,7 +248,7 @@ namespace Google.Protobuf
                 input => WrapperCodecs.Read<T>(input, nestedCodec),
                 (output, value) => WrapperCodecs.Write<T>(output, value, nestedCodec),
                 value => WrapperCodecs.CalculateSize<T>(value, nestedCodec),
-                tag,
+                tag, 0,
                 null); // Default value for the wrapper
         }
 
@@ -249,7 +263,7 @@ namespace Google.Protobuf
                 input => WrapperCodecs.Read<T>(input, nestedCodec),
                 (output, value) => WrapperCodecs.Write<T>(output, value.Value, nestedCodec),
                 value => value == null ? 0 : WrapperCodecs.CalculateSize<T>(value.Value, nestedCodec),
-                tag,
+                tag, 0,
                 null); // Default value for the wrapper
         }
 
@@ -346,8 +360,10 @@ namespace Google.Protobuf
     /// </remarks>
     public sealed class FieldCodec<T>
     {
+        private static readonly EqualityComparer<T> EqualityComparer = ProtobufEqualityComparers.GetEqualityComparer<T>();
         private static readonly T DefaultDefault;
-        private static readonly bool TypeSupportsPacking = typeof(T).IsValueType() && Nullable.GetUnderlyingType(typeof(T)) == null;
+        // Only non-nullable value types support packing. This is the simplest way of detecting that.
+        private static readonly bool TypeSupportsPacking = default(T) != null;
 
         static FieldCodec()
         {
@@ -397,6 +413,14 @@ namespace Google.Protobuf
         internal uint Tag { get; }
 
         /// <summary>
+        /// Gets the end tag of the codec or 0 if there is no end tag
+        /// </summary>
+        /// <value>
+        /// The end tag of the codec.
+        /// </value>
+        internal uint EndTag { get; }
+
+        /// <summary>
         /// Default value for this codec. Usually the same for every instance of the same type, but
         /// for string/ByteString wrapper fields the codec's default value is null, whereas for
         /// other string/ByteString fields it's "" or ByteString.Empty.
@@ -421,7 +445,8 @@ namespace Google.Protobuf
             Func<CodedInputStream, T> reader,
             Action<CodedOutputStream, T> writer,
             Func<T, int> sizeCalculator,
-            uint tag) : this(reader, writer, sizeCalculator, tag, DefaultDefault)
+            uint tag,
+            uint endTag = 0) : this(reader, writer, sizeCalculator, tag, endTag, DefaultDefault)
         {
         }
 
@@ -430,6 +455,7 @@ namespace Google.Protobuf
             Action<CodedOutputStream, T> writer,
             Func<T, int> sizeCalculator,
             uint tag,
+            uint endTag,
             T defaultValue)
         {
             ValueReader = reader;
@@ -452,6 +478,10 @@ namespace Google.Protobuf
             {
                 output.WriteTag(Tag);
                 ValueWriter(output, value);
+                if (EndTag != 0)
+                {
+                    output.WriteTag(EndTag);
+                }
             }
         }
 
@@ -468,6 +498,6 @@ namespace Google.Protobuf
         /// </summary>
         public int CalculateSizeWithTag(T value) => IsDefault(value) ? 0 : ValueSizeCalculator(value) + tagSize;
 
-        private bool IsDefault(T value) => EqualityComparer<T>.Default.Equals(value, DefaultValue);
+        private bool IsDefault(T value) => EqualityComparer.Equals(value, DefaultValue);
     }
 }

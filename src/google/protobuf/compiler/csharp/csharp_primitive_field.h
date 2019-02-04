@@ -46,7 +46,7 @@ struct Options;
 class PrimitiveFieldGenerator : public FieldGeneratorBase {
  public:
   PrimitiveFieldGenerator(const FieldDescriptor* descriptor,
-                          int fieldOrdinal,
+                          int presenceIndex,
                           const Options *options);
   ~PrimitiveFieldGenerator();
 
@@ -72,12 +72,13 @@ class PrimitiveFieldGenerator : public FieldGeneratorBase {
 class PrimitiveOneofFieldGenerator : public PrimitiveFieldGenerator {
  public:
   PrimitiveOneofFieldGenerator(const FieldDescriptor* descriptor,
-                               int fieldOrdinal,
+                               int presenceIndex,
                                const Options *options);
   ~PrimitiveOneofFieldGenerator();
 
   virtual void GenerateCloningCode(io::Printer* printer);
   virtual void GenerateMembers(io::Printer* printer);
+  virtual void GenerateMergingCode(io::Printer* printer);
   virtual void WriteToString(io::Printer* printer);
   virtual void GenerateParsingCode(io::Printer* printer);
 

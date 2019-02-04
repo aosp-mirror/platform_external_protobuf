@@ -31,9 +31,15 @@
 // Author: sven@google.com (Sven Mawson)
 //
 // Sample protos for testing.
+
+// Some of the older enums don't use CAPITALS_WITH_UNDERSCORES for testing.
+// LINT: LEGACY_NAMES
+
 syntax = "proto2";
 
 package google.protobuf.testing;
+
+import "google/protobuf/util/internal/testdata/anys.proto";
 
 // A book
 message Book {
@@ -60,8 +66,20 @@ message Book {
     FICTION = 1;
     KIDS = 2;
     ACTION_AND_ADVENTURE = 3;
+    arts_and_photography = 4;
+    I18N_Tech = 5;
   }
   optional Type type = 11;
+
+  // Useful for testing JSON snake/camel-case conversions.
+  optional string snake_field = 12;
+
+  // Used to test type not found in type info. Messages defined in other files
+  // are not added when adding Book to type info.
+  optional AnyWrapper type_not_found = 13;
+
+  // Used to test invalid value inside of primitive repeated fields.
+  repeated int32 primitive_repeated = 14;
 
   extensions 200 to 499;
 }
@@ -184,4 +202,13 @@ message Cyclic {
   optional Book m_book = 3;
   repeated Author m_author = 5;
   optional Cyclic m_cyclic = 4;
+}
+
+// Test that two messages can have different fields mapped to the same JSON
+// name. See: https://github.com/protocolbuffers/protobuf/issues/1415
+message TestJsonName1 {
+  optional int32 one_value = 1 [json_name = "value"];
+}
+message TestJsonName2 {
+  optional int32 another_value = 1 [json_name = "value"];
 }
