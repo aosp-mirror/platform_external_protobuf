@@ -110,6 +110,7 @@ cc_library {
     vndk: {
         enabled: true,
     },
+    double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
     cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
