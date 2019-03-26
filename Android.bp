@@ -75,6 +75,7 @@ cc_defaults {
         "src/google/protobuf/wire_format_lite.cc",
         "src/google/protobuf/io/coded_stream.cc",
         "src/google/protobuf/io/zero_copy_stream.cc",
+        "src/google/protobuf/io/zero_copy_stream_impl.cc",
         "src/google/protobuf/io/zero_copy_stream_impl_lite.cc",
     ],
 
@@ -179,7 +180,6 @@ cc_defaults {
         "src/google/protobuf/io/printer.cc",
         "src/google/protobuf/io/strtod.cc",
         "src/google/protobuf/io/tokenizer.cc",
-        "src/google/protobuf/io/zero_copy_stream_impl.cc",
         "src/google/protobuf/compiler/importer.cc",
         "src/google/protobuf/compiler/parser.cc",
         "src/google/protobuf/util/field_comparator.cc",
