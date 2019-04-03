@@ -985,7 +985,11 @@ inline std::pair<uint32, bool> CodedInputStream::ReadTagWithCutoff(
   }
   // Slow path
   last_tag_ = ReadTagFallback(first_byte_or_zero);
-  return std::make_pair(last_tag_, static_cast<uint32>(last_tag_ - 1) < cutoff);
+  // If last_tag_ == 0 we want to return { 0, false } so the following overflow is intended.
+  // We use __builtin_add_overflow to appease the sub-overflow UB sanitizer.
+  uint32_t last_tag_minus_one;
+  __builtin_add_overflow(last_tag_, -1, &last_tag_minus_one);
+  return std::make_pair(last_tag_, last_tag_minus_one < cutoff);
 }
 
 inline bool CodedInputStream::LastTagWas(uint32 expected) {
