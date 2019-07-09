@@ -598,6 +598,20 @@ java_library_host {
     java_version: "1.7",
 }
 
+java_library_host {
+  name: "libprotobuf-java-util-full",
+  defaults: ["libprotobuf_errorprone_defaults"],
+  srcs: [
+    "java/util/src/main/java/com/google/protobuf/util/*.java",
+  ],
+  static_libs: [
+    "gson-prebuilt-jar",
+    "guava-21.0",
+    "libprotobuf-java-full",
+  ],
+}
+
+
 // Java full library (compatibility for old host-side users)
 // =======================================================
 java_library_host {
