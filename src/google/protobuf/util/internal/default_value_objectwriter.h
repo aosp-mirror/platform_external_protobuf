@@ -122,6 +122,11 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
   // field_scrub_callback pointer is also transferred to this class
   void RegisterFieldScrubCallBack(FieldScrubCallBackPtr field_scrub_callback);
 
+  // If set to true, original proto field names are used
+  void set_preserve_proto_field_names(bool value) {
+    preserve_proto_field_names_ = value;
+  }
+
  private:
   enum NodeKind {
     PRIMITIVE = 0,
@@ -136,6 +141,7 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
    public:
     Node(const string& name, const google::protobuf::Type* type, NodeKind kind,
          const DataPiece& data, bool is_placeholder, const vector<string>& path,
+         bool preserve_proto_field_names,
          FieldScrubCallBack* field_scrub_callback);
     virtual ~Node() {
       for (int i = 0; i < children_.size(); ++i) {
@@ -212,6 +218,9 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
     // Path of the field of this node
     std::vector<string> path_;
 
+    // Whether to preserve original proto field names
+    bool preserve_proto_field_names_;
+
     // Pointer to function for determining whether a field needs to be scrubbed
     // or not. This callback is owned by the creator of this node.
     FieldScrubCallBack* field_scrub_callback_;
@@ -256,6 +265,9 @@ class LIBPROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
   google::protobuf::scoped_ptr<Node> root_;
   // The stack to hold the path of Nodes from current_ to root_;
   std::stack<Node*> stack_;
+
+  // Whether to preserve original proto field names
+  bool preserve_proto_field_names_;
 
   // Unique Pointer to function for determining whether a field needs to be
   // scrubbed or not.
