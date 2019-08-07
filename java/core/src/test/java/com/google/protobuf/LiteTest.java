@@ -57,6 +57,8 @@ import protobuf_unittest.lite_equals_and_hash.LiteEqualsAndHash.TestOneofEquals;
 import protobuf_unittest.lite_equals_and_hash.LiteEqualsAndHash.TestRecursiveOneof;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -79,7 +81,7 @@ public class LiteTest extends TestCase {
     //
     // We put this in setUp() rather than in its own test method because we
     // need to make sure it runs before any actual tests.
-    assertTrue(TestNestedExtensionLite.nestedExtension != null);
+    assertNotNull(TestNestedExtensionLite.nestedExtension);
   }
 
   public void testLite() throws Exception {
@@ -318,16 +320,16 @@ public class LiteTest extends TestCase {
     assertEquals(foreignMessage, messageAfterBuild.getOptionalForeignMessage());
 
     message = builder.build();
-    ForeignMessageLite.Builder foreignMessageBuilder = ForeignMessageLite.newBuilder().setC(3);
-    builder.setOptionalForeignMessage(foreignMessageBuilder);
+    ForeignMessageLite foreignMessageC3 = ForeignMessageLite.newBuilder().setC(3).build();
+    builder.setOptionalForeignMessage(foreignMessageC3);
     assertEquals(ForeignMessageLite.getDefaultInstance(), message.getOptionalForeignMessage());
-    assertEquals(foreignMessageBuilder.build(), builder.getOptionalForeignMessage());
+    assertEquals(foreignMessageC3, builder.getOptionalForeignMessage());
     messageAfterBuild = builder.build();
-    assertEquals(foreignMessageBuilder.build(), messageAfterBuild.getOptionalForeignMessage());
+    assertEquals(foreignMessageC3, messageAfterBuild.getOptionalForeignMessage());
     assertEquals(ForeignMessageLite.getDefaultInstance(), message.getOptionalForeignMessage());
     builder.clearOptionalForeignMessage();
     assertEquals(ForeignMessageLite.getDefaultInstance(), builder.getOptionalForeignMessage());
-    assertEquals(foreignMessageBuilder.build(), messageAfterBuild.getOptionalForeignMessage());
+    assertEquals(foreignMessageC3, messageAfterBuild.getOptionalForeignMessage());
 
     message = builder.build();
     OptionalGroup optionalGroup = OptionalGroup.newBuilder().setA(1).build();
@@ -1031,11 +1033,11 @@ public class LiteTest extends TestCase {
     builder.clearRepeatedForeignMessage();
 
     message = builder.build();
-    builder.addRepeatedForeignMessage(foreignMessageBuilder);
+    builder.addRepeatedForeignMessage(foreignMessageC3);
     messageAfterBuild = builder.build();
     assertEquals(0, message.getRepeatedForeignMessageCount());
     builder.setRepeatedForeignMessage(0, ForeignMessageLite.getDefaultInstance());
-    assertEquals(foreignMessageBuilder.build(), messageAfterBuild.getRepeatedForeignMessage(0));
+    assertEquals(foreignMessageC3, messageAfterBuild.getRepeatedForeignMessage(0));
     assertEquals(ForeignMessageLite.getDefaultInstance(), builder.getRepeatedForeignMessage(0));
     builder.clearRepeatedForeignMessage();
 
@@ -1043,9 +1045,9 @@ public class LiteTest extends TestCase {
     builder.addRepeatedForeignMessage(0, foreignMessage);
     messageAfterBuild = builder.build();
     assertEquals(0, message.getRepeatedForeignMessageCount());
-    builder.setRepeatedForeignMessage(0, foreignMessageBuilder);
+    builder.setRepeatedForeignMessage(0, foreignMessageC3);
     assertEquals(foreignMessage, messageAfterBuild.getRepeatedForeignMessage(0));
-    assertEquals(foreignMessageBuilder.build(), builder.getRepeatedForeignMessage(0));
+    assertEquals(foreignMessageC3, builder.getRepeatedForeignMessage(0));
     builder.clearRepeatedForeignMessage();
 
     message = builder.build();
@@ -1531,7 +1533,7 @@ public class LiteTest extends TestCase {
   private static void assertToStringEquals(String expected, MessageLite message) {
     String toString = message.toString();
     assertEquals('#', toString.charAt(0));
-    if (toString.indexOf("\n") >= 0) {
+    if (toString.contains("\n")) {
       toString = toString.substring(toString.indexOf("\n") + 1);
     } else {
       toString = "";
@@ -2208,29 +2210,29 @@ public class LiteTest extends TestCase {
 
   public void testAddAllIteratesOnce() {
     TestAllTypesLite.newBuilder()
-        .addAllRepeatedBool(new OneTimeIterableList(false))
-        .addAllRepeatedInt32(new OneTimeIterableList(0))
-        .addAllRepeatedInt64(new OneTimeIterableList(0L))
-        .addAllRepeatedFloat(new OneTimeIterableList(0f))
-        .addAllRepeatedDouble(new OneTimeIterableList(0d))
-        .addAllRepeatedBytes(new OneTimeIterableList(ByteString.EMPTY))
-        .addAllRepeatedString(new OneTimeIterableList(""))
-        .addAllRepeatedNestedMessage(new OneTimeIterableList(NestedMessage.getDefaultInstance()))
-        .addAllRepeatedBool(new OneTimeIterable(false))
-        .addAllRepeatedInt32(new OneTimeIterable(0))
-        .addAllRepeatedInt64(new OneTimeIterable(0L))
-        .addAllRepeatedFloat(new OneTimeIterable(0f))
-        .addAllRepeatedDouble(new OneTimeIterable(0d))
-        .addAllRepeatedBytes(new OneTimeIterable(ByteString.EMPTY))
-        .addAllRepeatedString(new OneTimeIterable(""))
-        .addAllRepeatedNestedMessage(new OneTimeIterable(NestedMessage.getDefaultInstance()))
+        .addAllRepeatedBool(new OneTimeIterableList<>(false))
+        .addAllRepeatedInt32(new OneTimeIterableList<>(0))
+        .addAllRepeatedInt64(new OneTimeIterableList<>(0L))
+        .addAllRepeatedFloat(new OneTimeIterableList<>(0f))
+        .addAllRepeatedDouble(new OneTimeIterableList<>(0d))
+        .addAllRepeatedBytes(new OneTimeIterableList<>(ByteString.EMPTY))
+        .addAllRepeatedString(new OneTimeIterableList<>(""))
+        .addAllRepeatedNestedMessage(new OneTimeIterableList<>(NestedMessage.getDefaultInstance()))
+        .addAllRepeatedBool(new OneTimeIterable<>(false))
+        .addAllRepeatedInt32(new OneTimeIterable<>(0))
+        .addAllRepeatedInt64(new OneTimeIterable<>(0L))
+        .addAllRepeatedFloat(new OneTimeIterable<>(0f))
+        .addAllRepeatedDouble(new OneTimeIterable<>(0d))
+        .addAllRepeatedBytes(new OneTimeIterable<>(ByteString.EMPTY))
+        .addAllRepeatedString(new OneTimeIterable<>(""))
+        .addAllRepeatedNestedMessage(new OneTimeIterable<>(NestedMessage.getDefaultInstance()))
         .build();
   }
 
   public void testAddAllIteratesOnce_throwsOnNull() {
     TestAllTypesLite.Builder builder = TestAllTypesLite.newBuilder();
     try {
-      builder.addAllRepeatedBool(new OneTimeIterableList(true, false, (Boolean) null));
+      builder.addAllRepeatedBool(new OneTimeIterableList<>(true, false, null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 2 is null.", expected.getMessage());
@@ -2238,7 +2240,7 @@ public class LiteTest extends TestCase {
     }
 
     try {
-      builder.addAllRepeatedBool(new OneTimeIterable(true, false, (Boolean) null));
+      builder.addAllRepeatedBool(new OneTimeIterable<>(true, false, null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 2 is null.", expected.getMessage());
@@ -2247,7 +2249,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedBool(new OneTimeIterableList((Boolean) null));
+      builder.addAllRepeatedBool(new OneTimeIterableList<>((Boolean) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2256,7 +2258,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedInt32(new OneTimeIterableList((Integer) null));
+      builder.addAllRepeatedInt32(new OneTimeIterableList<>((Integer) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2265,7 +2267,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedInt64(new OneTimeIterableList((Long) null));
+      builder.addAllRepeatedInt64(new OneTimeIterableList<>((Long) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2274,7 +2276,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedFloat(new OneTimeIterableList((Float) null));
+      builder.addAllRepeatedFloat(new OneTimeIterableList<>((Float) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2283,7 +2285,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedDouble(new OneTimeIterableList((Double) null));
+      builder.addAllRepeatedDouble(new OneTimeIterableList<>((Double) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2292,7 +2294,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedBytes(new OneTimeIterableList((ByteString) null));
+      builder.addAllRepeatedBytes(new OneTimeIterableList<>((ByteString) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2301,7 +2303,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedString(new OneTimeIterableList("", "", (String) null, ""));
+      builder.addAllRepeatedString(new OneTimeIterableList<>("", "", null, ""));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 2 is null.", expected.getMessage());
@@ -2310,7 +2312,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedString(new OneTimeIterable("", "", (String) null, ""));
+      builder.addAllRepeatedString(new OneTimeIterable<>("", "", null, ""));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 2 is null.", expected.getMessage());
@@ -2319,7 +2321,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedString(new OneTimeIterableList((String) null));
+      builder.addAllRepeatedString(new OneTimeIterableList<>((String) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2328,7 +2330,7 @@ public class LiteTest extends TestCase {
 
     try {
       builder = TestAllTypesLite.newBuilder();
-      builder.addAllRepeatedNestedMessage(new OneTimeIterableList((NestedMessage) null));
+      builder.addAllRepeatedNestedMessage(new OneTimeIterableList<>((NestedMessage) null));
       fail();
     } catch (NullPointerException expected) {
       assertEquals("Element at index 0 is null.", expected.getMessage());
@@ -2377,5 +2379,64 @@ public class LiteTest extends TestCase {
       fail();
     } catch (NullPointerException expected) {
     }
+  }
+
+  public void testSerializeToOutputStreamThrowsIOException() {
+    try {
+      TestAllTypesLite.newBuilder()
+          .setOptionalBytes(ByteString.copyFromUtf8("hello"))
+          .build()
+          .writeTo(
+              new OutputStream() {
+
+                @Override
+                public void write(int b) throws IOException {
+                  throw new IOException();
+                }
+              });
+      fail();
+    } catch (IOException expected) {
+    }
+  }
+
+  public void testUnpairedSurrogatesReplacedByQuestionMark() throws InvalidProtocolBufferException {
+    String testString = "foo \ud83d bar";
+    String expectedString = "foo ? bar";
+
+    TestAllTypesLite testMessage =
+        TestAllTypesLite.newBuilder().setOptionalString(testString).build();
+    ByteString serializedMessage = testMessage.toByteString();
+
+    // Behavior is compatible with String.getBytes("UTF-8"), which replaces
+    // unpaired surrogates with a question mark.
+    TestAllTypesLite parsedMessage = TestAllTypesLite.parseFrom(serializedMessage);
+    assertEquals(expectedString, parsedMessage.getOptionalString());
+
+    // Conversion happens during serialization.
+    ByteString expectedBytes = ByteString.copyFromUtf8(expectedString);
+    assertTrue(
+        String.format(
+            "Expected serializedMessage (%s) to contain \"%s\" (%s).",
+            encodeHex(serializedMessage), expectedString, encodeHex(expectedBytes)),
+        contains(serializedMessage, expectedBytes));
+  }
+
+  private String encodeHex(ByteString bytes) {
+    String hexDigits = "0123456789abcdef";
+    StringBuilder stringBuilder = new StringBuilder(bytes.size() * 2);
+    for (byte b : bytes) {
+      stringBuilder.append(hexDigits.charAt((b & 0xf0) >> 4));
+      stringBuilder.append(hexDigits.charAt(b & 0x0f));
+    }
+    return stringBuilder.toString();
+  }
+
+  private boolean contains(ByteString a, ByteString b) {
+    for (int i = 0; i <= a.size() - b.size(); ++i) {
+      if (a.substring(i, i + b.size()).equals(b)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

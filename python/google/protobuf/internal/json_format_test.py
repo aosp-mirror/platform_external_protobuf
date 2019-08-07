@@ -49,9 +49,11 @@ from google.protobuf import field_mask_pb2
 from google.protobuf import struct_pb2
 from google.protobuf import timestamp_pb2
 from google.protobuf import wrappers_pb2
+from google.protobuf import any_test_pb2
 from google.protobuf import unittest_mset_pb2
 from google.protobuf import unittest_pb2
 from google.protobuf.internal import well_known_types
+from google.protobuf import descriptor_pool
 from google.protobuf import json_format
 from google.protobuf.util import json_format_proto3_pb2
 
@@ -199,6 +201,16 @@ class JsonFormatTest(JsonFormatBase):
     parsed_message = unittest_mset_pb2.TestMessageSetContainer()
     json_format.ParseDict(message_dict, parsed_message)
     self.assertEqual(message, parsed_message)
+
+  def testJsonParseDictToAnyDoesNotAlterInput(self):
+    orig_dict = {
+        'int32Value': 20,
+        '@type': 'type.googleapis.com/proto3.TestMessage'
+    }
+    copied_dict = json.loads(json.dumps(orig_dict))
+    parsed_message = any_pb2.Any()
+    json_format.ParseDict(copied_dict, parsed_message)
+    self.assertEqual(copied_dict, orig_dict)
 
   def testExtensionSerializationDictMatchesProto3Spec(self):
     """See go/proto3-json-spec for spec.
@@ -495,6 +507,8 @@ class JsonFormatTest(JsonFormatBase):
     message.value['email'] = None
     message.value.get_or_create_struct('address')['city'] = 'SFO'
     message.value['address']['house_number'] = 1024
+    message.value.get_or_create_struct('empty_struct')
+    message.value.get_or_create_list('empty_list')
     struct_list = message.value.get_or_create_list('list')
     struct_list.extend([6, 'seven', True, False, None])
     struct_list.add_struct()['subkey2'] = 9
@@ -509,6 +523,8 @@ class JsonFormatTest(JsonFormatBase):
             '      "city": "SFO", '
             '      "house_number": 1024'
             '    }, '
+            '    "empty_struct": {}, '
+            '    "empty_list": [], '
             '    "age": 10, '
             '    "name": "Jim", '
             '    "attend": true, '
@@ -519,6 +535,9 @@ class JsonFormatTest(JsonFormatBase):
             '}'))
     parsed_message = json_format_proto3_pb2.TestStruct()
     self.CheckParseBack(message, parsed_message)
+    # check for regression; this used to raise
+    parsed_message.value['empty_struct']
+    parsed_message.value['empty_list']
 
   def testValueMessage(self):
     message = json_format_proto3_pb2.TestValue()
@@ -610,6 +629,19 @@ class JsonFormatTest(JsonFormatBase):
         '{\n'
         '  "value": {\n'
         '    "@type": "type.googleapis.com/proto3.TestMessage"')
+
+  def testAnyMessageDescriptorPoolMissingType(self):
+    packed_message = unittest_pb2.OneString()
+    packed_message.data = 'string'
+    message = any_test_pb2.TestAny()
+    message.any_value.Pack(packed_message)
+    empty_pool = descriptor_pool.DescriptorPool()
+    with self.assertRaises(TypeError) as cm:
+      json_format.MessageToJson(message, True, descriptor_pool=empty_pool)
+    self.assertEqual(
+        'Can not find message descriptor by type_url:'
+        ' type.googleapis.com/protobuf_unittest.OneString.',
+        str(cm.exception))
 
   def testWellKnownInAnyMessage(self):
     message = any_pb2.Any()
@@ -791,9 +823,6 @@ class JsonFormatTest(JsonFormatBase):
     json_format.Parse(text, parsed_message, ignore_unknown_fields=True)
 
   def testDuplicateField(self):
-    # Duplicate key check is not supported for python2.6
-    if sys.version_info < (2, 7):
-      return
     self.CheckError('{"int32Value": 1,\n"int32Value":2}',
                     'Failed to load JSON: duplicate key int32Value.')
 
@@ -1001,6 +1030,32 @@ class JsonFormatTest(JsonFormatBase):
     message = json_format_proto3_pb2.TestMessage()
     json_format.ParseDict(js_dict, message)
     self.assertEqual(expected, message.int32_value)
+
+  def testParseDictAnyDescriptorPoolMissingType(self):
+    # Confirm that ParseDict does not raise ParseError with default pool
+    js_dict = {
+        'any_value': {
+            '@type': 'type.googleapis.com/proto3.MessageType',
+            'value': 1234
+        }
+    }
+    json_format.ParseDict(js_dict, any_test_pb2.TestAny())
+    # Check ParseDict raises ParseError with empty pool
+    js_dict = {
+        'any_value': {
+            '@type': 'type.googleapis.com/proto3.MessageType',
+            'value': 1234
+        }
+    }
+    with self.assertRaises(json_format.ParseError) as cm:
+      empty_pool = descriptor_pool.DescriptorPool()
+      json_format.ParseDict(js_dict,
+                            any_test_pb2.TestAny(),
+                            descriptor_pool=empty_pool)
+    self.assertEqual(
+        str(cm.exception),
+        'Failed to parse any_value field: Can not find message descriptor by'
+        ' type_url: type.googleapis.com/proto3.MessageType..')
 
   def testMessageToDict(self):
     message = json_format_proto3_pb2.TestMessage()

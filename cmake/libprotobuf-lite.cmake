@@ -1,11 +1,12 @@
 set(libprotobuf_lite_files
   ${protobuf_source_dir}/src/google/protobuf/arena.cc
-  ${protobuf_source_dir}/src/google/protobuf/arenastring.cc
   ${protobuf_source_dir}/src/google/protobuf/extension_set.cc
   ${protobuf_source_dir}/src/google/protobuf/generated_message_table_driven_lite.cc
   ${protobuf_source_dir}/src/google/protobuf/generated_message_util.cc
   ${protobuf_source_dir}/src/google/protobuf/implicit_weak_message.cc
+  ${protobuf_source_dir}/src/google/protobuf/parse_context.cc
   ${protobuf_source_dir}/src/google/protobuf/io/coded_stream.cc
+  ${protobuf_source_dir}/src/google/protobuf/io/strtod.cc
   ${protobuf_source_dir}/src/google/protobuf/io/zero_copy_stream.cc
   ${protobuf_source_dir}/src/google/protobuf/io/zero_copy_stream_impl_lite.cc
   ${protobuf_source_dir}/src/google/protobuf/message_lite.cc
@@ -30,7 +31,9 @@ set(libprotobuf_lite_includes
   ${protobuf_source_dir}/src/google/protobuf/extension_set.h
   ${protobuf_source_dir}/src/google/protobuf/generated_message_util.h
   ${protobuf_source_dir}/src/google/protobuf/implicit_weak_message.h
+  ${protobuf_source_dir}/src/google/protobuf/parse_context.h
   ${protobuf_source_dir}/src/google/protobuf/io/coded_stream.h
+  ${protobuf_source_dir}/src/google/protobuf/io/strtod.h
   ${protobuf_source_dir}/src/google/protobuf/io/zero_copy_stream.h
   ${protobuf_source_dir}/src/google/protobuf/io/zero_copy_stream_impl_lite.h
   ${protobuf_source_dir}/src/google/protobuf/message_lite.h
@@ -48,8 +51,14 @@ set(libprotobuf_lite_includes
   ${protobuf_source_dir}/src/google/protobuf/wire_format_lite.h
 )
 
+if (MSVC)
+set(libprotobuf_lite_rc_files
+  ${CMAKE_CURRENT_BINARY_DIR}/version.rc
+)
+endif()
+
 add_library(libprotobuf-lite ${protobuf_SHARED_OR_STATIC}
-  ${libprotobuf_lite_files} ${libprotobuf_lite_includes})
+  ${libprotobuf_lite_files} ${libprotobuf_lite_includes} ${libprotobuf_lite_rc_files})
 target_link_libraries(libprotobuf-lite ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(libprotobuf-lite PUBLIC ${protobuf_source_dir}/src)
 if(MSVC AND protobuf_BUILD_SHARED_LIBS)

@@ -44,6 +44,7 @@
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/stubs/strutil.h>
 
+
 namespace google {
 namespace protobuf {
 namespace compiler {
@@ -96,8 +97,8 @@ void EnumGenerator::Generate(io::Printer* printer) {
   for (int i = 0; i < canonical_values_.size(); i++) {
     std::map<string, string> vars;
     vars["name"] = canonical_values_[i]->name();
-    vars["index"] = SimpleItoa(canonical_values_[i]->index());
-    vars["number"] = SimpleItoa(canonical_values_[i]->number());
+    vars["index"] = StrCat(canonical_values_[i]->index());
+    vars["number"] = StrCat(canonical_values_[i]->number());
     WriteEnumValueDocComment(printer, canonical_values_[i]);
     if (canonical_values_[i]->options().deprecated()) {
       printer->Print("@java.lang.Deprecated\n");
@@ -141,7 +142,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
   for (int i = 0; i < descriptor_->value_count(); i++) {
     std::map<string, string> vars;
     vars["name"] = descriptor_->value(i)->name();
-    vars["number"] = SimpleItoa(descriptor_->value(i)->number());
+    vars["number"] = StrCat(descriptor_->value(i)->number());
     vars["{"] = "";
     vars["}"] = "";
     WriteEnumValueDocComment(printer, descriptor_->value(i));
@@ -190,10 +191,9 @@ void EnumGenerator::Generate(io::Printer* printer) {
   printer->Indent();
 
   for (int i = 0; i < canonical_values_.size(); i++) {
-    printer->Print(
-      "case $number$: return $name$;\n",
-      "name", canonical_values_[i]->name(),
-      "number", SimpleItoa(canonical_values_[i]->number()));
+    printer->Print("case $number$: return $name$;\n", "name",
+                   canonical_values_[i]->name(), "number",
+                   StrCat(canonical_values_[i]->number()));
   }
 
   printer->Outdent();
@@ -242,20 +242,23 @@ void EnumGenerator::Generate(io::Printer* printer) {
       // extensions in both the mutable and immutable cases. (In the mutable api
       // this is accomplished by attempting to load the immutable outer class).
       printer->Print(
-        "  return $file$.getDescriptor().getEnumTypes().get($index$);\n",
-        "file", name_resolver_->GetClassName(descriptor_->file(),
-                                             immutable_api_),
-        "index", SimpleItoa(descriptor_->index()));
+          "  return $file$.getDescriptor().getEnumTypes().get($index$);\n",
+          "file",
+          name_resolver_->GetClassName(descriptor_->file(), immutable_api_),
+          "index", StrCat(descriptor_->index()));
     } else {
       printer->Print(
           "  return $parent$.$descriptor$.getEnumTypes().get($index$);\n",
-          "parent", name_resolver_->GetClassName(descriptor_->containing_type(),
-                                                 immutable_api_),
-          "descriptor", descriptor_->containing_type()->options()
-                        .no_standard_descriptor_accessor()
-                        ? "getDefaultInstance().getDescriptorForType()"
-                        : "getDescriptor()",
-          "index", SimpleItoa(descriptor_->index()));
+          "parent",
+          name_resolver_->GetClassName(descriptor_->containing_type(),
+                                       immutable_api_),
+          "descriptor",
+          descriptor_->containing_type()
+                  ->options()
+                  .no_standard_descriptor_accessor()
+              ? "getDefaultInstance().getDescriptorForType()"
+              : "getDescriptor()",
+          "index", StrCat(descriptor_->index()));
     }
 
     printer->Print(

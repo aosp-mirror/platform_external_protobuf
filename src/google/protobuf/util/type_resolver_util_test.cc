@@ -40,6 +40,7 @@
 #include <google/protobuf/map_unittest.pb.h>
 #include <google/protobuf/test_util.h>
 #include <google/protobuf/unittest.pb.h>
+#include <google/protobuf/unittest_custom_options.pb.h>
 #include <google/protobuf/util/json_format_proto3.pb.h>
 #include <google/protobuf/util/type_resolver.h>
 #include <google/protobuf/testing/googletest.h>
@@ -49,11 +50,14 @@ namespace google {
 namespace protobuf {
 namespace util {
 namespace {
-using google::protobuf::Type;
-using google::protobuf::Enum;
-using google::protobuf::Field;
-using google::protobuf::Option;
 using google::protobuf::BoolValue;
+using google::protobuf::Enum;
+using google::protobuf::EnumValue;
+using google::protobuf::Field;
+using google::protobuf::Int32Value;
+using google::protobuf::Option;
+using google::protobuf::Type;
+using google::protobuf::UInt64Value;
 
 static const char kUrlPrefix[] = "type.googleapis.com";
 
@@ -115,24 +119,42 @@ class DescriptorPoolTypeResolverTest : public testing::Test {
     return field->packed();
   }
 
-  bool EnumHasValue(const Enum& type, const string& name, int number) {
-    for (int i = 0; i < type.enumvalue_size(); ++i) {
-      if (type.enumvalue(i).name() == name &&
-          type.enumvalue(i).number() == number) {
-        return true;
+  const EnumValue* FindEnumValue(const Enum& type, const string& name) {
+    for (const EnumValue& value : type.enumvalue()) {
+      if (value.name() == name) {
+        return &value;
       }
     }
-    return false;
+    return nullptr;
+  }
+
+  bool EnumHasValue(const Enum& type, const string& name, int number) {
+    const EnumValue* value = FindEnumValue(type, name);
+    return value != nullptr && value->number() == number;
   }
 
   bool HasBoolOption(const RepeatedPtrField<Option>& options,
                      const string& name, bool value) {
-    for (int i = 0; i < options.size(); ++i) {
-      const Option& option = options.Get(i);
+    return HasOption<BoolValue>(options, name, value);
+  }
+
+  bool HasInt32Option(const RepeatedPtrField<Option>& options,
+                      const string& name, int32 value) {
+    return HasOption<Int32Value>(options, name, value);
+  }
+
+  bool HasUInt64Option(const RepeatedPtrField<Option>& options,
+                       const string& name, uint64 value) {
+    return HasOption<UInt64Value>(options, name, value);
+  }
+
+  template <typename WrapperT, typename T>
+  bool HasOption(const RepeatedPtrField<Option>& options, const string& name,
+                 T value) {
+    for (const Option& option : options) {
       if (option.name() == name) {
-        BoolValue bool_value;
-        if (option.value().UnpackTo(&bool_value) &&
-            bool_value.value() == value) {
+        WrapperT wrapper;
+        if (option.value().UnpackTo(&wrapper) && wrapper.value() == value) {
           return true;
         }
       }
@@ -327,6 +349,32 @@ TEST_F(DescriptorPoolTypeResolverTest, TestMap) {
   EXPECT_TRUE(HasBoolOption(type.options(), "map_entry", true));
 }
 
+TEST_F(DescriptorPoolTypeResolverTest, TestCustomMessageOptions) {
+  Type type;
+  ASSERT_TRUE(
+      resolver_
+          ->ResolveMessageType(
+              GetTypeUrl<protobuf_unittest::TestMessageWithCustomOptions>(),
+              &type)
+          .ok());
+  EXPECT_TRUE(
+      HasInt32Option(type.options(), "protobuf_unittest.message_opt1", -56));
+}
+
+TEST_F(DescriptorPoolTypeResolverTest, TestCustomFieldOptions) {
+  Type type;
+  ASSERT_TRUE(
+      resolver_
+          ->ResolveMessageType(
+              GetTypeUrl<protobuf_unittest::TestMessageWithCustomOptions>(),
+              &type)
+          .ok());
+  const Field* field = FindField(type, "field1");
+  ASSERT_TRUE(field != nullptr);
+  EXPECT_TRUE(HasUInt64Option(field->options(), "protobuf_unittest.field_opt1",
+                              8765432109));
+}
+
 TEST_F(DescriptorPoolTypeResolverTest, TestEnum) {
   Enum type;
   ASSERT_TRUE(resolver_->ResolveEnumType(
@@ -335,6 +383,32 @@ TEST_F(DescriptorPoolTypeResolverTest, TestEnum) {
   EnumHasValue(type, "BAR", 2);
   EnumHasValue(type, "BAZ", 3);
   EnumHasValue(type, "NEG", -1);
+}
+
+TEST_F(DescriptorPoolTypeResolverTest, TestCustomEnumOptions) {
+  Enum type;
+  ASSERT_TRUE(
+      resolver_
+          ->ResolveEnumType(
+              GetTypeUrl("protobuf_unittest.TestMessageWithCustomOptions.AnEnum"),
+              &type)
+          .ok());
+  ASSERT_TRUE(
+      HasInt32Option(type.options(), "protobuf_unittest.enum_opt1", -789));
+}
+
+TEST_F(DescriptorPoolTypeResolverTest, TestCustomValueOptions) {
+  Enum type;
+  ASSERT_TRUE(
+      resolver_
+          ->ResolveEnumType(
+              GetTypeUrl("protobuf_unittest.TestMessageWithCustomOptions.AnEnum"),
+              &type)
+          .ok());
+  const EnumValue* value = FindEnumValue(type, "ANENUM_VAL2");
+  ASSERT_TRUE(value != nullptr);
+  ASSERT_TRUE(
+      HasInt32Option(value->options(), "protobuf_unittest.enum_value_opt1", 123));
 }
 
 TEST_F(DescriptorPoolTypeResolverTest, TestJsonName) {

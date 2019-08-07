@@ -34,6 +34,10 @@
 #include <google/protobuf/arena.h>
 #include <google/protobuf/wire_format_lite_inl.h>
 
+#ifdef SWIG
+#error "You cannot SWIG proto headers"
+#endif
+
 namespace google {
 namespace protobuf {
 namespace internal {
@@ -163,9 +167,6 @@ class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
                           MapEntryAccessorType* value);
   static inline void Write(int field, const MapEntryAccessorType& value,
                            io::CodedOutputStream* output);
-  static inline uint8* InternalWriteToArray(int field,
-                                            const MapEntryAccessorType& value,
-                                            bool deterministic, uint8* target);
   static inline uint8* WriteToArray(int field,
                                     const MapEntryAccessorType& value,
                                     uint8* target);
@@ -222,14 +223,9 @@ class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
                             MapEntryAccessorType* value);                     \
     static inline void Write(int field, const MapEntryAccessorType& value,    \
                              io::CodedOutputStream* output);                  \
-    static inline uint8* InternalWriteToArray(                                \
-        int field, const MapEntryAccessorType& value, bool deterministic,     \
-        uint8* target);                                                       \
     static inline uint8* WriteToArray(int field,                              \
                                       const MapEntryAccessorType& value,      \
-                                      uint8* target) {                        \
-      return InternalWriteToArray(field, value, false, target);               \
-    }                                                                         \
+                                      uint8* target);                         \
     static inline const MapEntryAccessorType& GetExternalReference(           \
         const TypeOnMemory& value);                                           \
     static inline void DeleteNoArena(const TypeOnMemory& x);                  \
@@ -241,7 +237,7 @@ class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
                                                int default_enum);             \
     static inline size_t SpaceUsedInMapEntryLong(const TypeOnMemory& value);  \
     static inline size_t SpaceUsedInMapLong(const TypeOnMemory& value);       \
-    static inline size_t SpaceUsedInMapLong(const string& value);             \
+    static inline size_t SpaceUsedInMapLong(const std::string& value);             \
     static inline void AssignDefaultValue(TypeOnMemory* value);               \
     static inline const MapEntryAccessorType& DefaultIfNotInitialized(        \
         const TypeOnMemory& value, const TypeOnMemory& default_value);        \
@@ -370,12 +366,9 @@ inline void MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::Write(
 }
 
 template <typename Type>
-inline uint8*
-MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::InternalWriteToArray(
-    int field, const MapEntryAccessorType& value, bool deterministic,
-    uint8* target) {
-  return WireFormatLite::InternalWriteMessageToArray(field, value,
-                                                     deterministic, target);
+inline uint8* MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::WriteToArray(
+    int field, const MapEntryAccessorType& value, uint8* target) {
+  return WireFormatLite::InternalWriteMessageToArray(field, value, target);
 }
 
 #define WRITE_METHOD(FieldType, DeclaredType)                                  \
@@ -387,9 +380,8 @@ MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::InternalWriteToArray(
   }                                                                            \
   template <typename Type>                                                     \
   inline uint8*                                                                \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType,                             \
-                 Type>::InternalWriteToArray(                                  \
-      int field, const MapEntryAccessorType& value, bool, uint8* target) {     \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::WriteToArray(        \
+      int field, const MapEntryAccessorType& value, uint8* target) {           \
     return WireFormatLite::Write##DeclaredType##ToArray(field, value, target); \
   }
 
@@ -548,92 +540,89 @@ inline bool MapTypeHandler<WireFormatLite::TYPE_MESSAGE,
 
 // Definition for string/bytes handler
 
-#define STRING_OR_BYTES_HANDLER_FUNCTIONS(FieldType)                           \
-  template <typename Type>                                                     \
-  inline const typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,       \
-                                       Type>::MapEntryAccessorType&            \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType,                             \
-                 Type>::GetExternalReference(const TypeOnMemory& value) {      \
-    return value.Get();                                                        \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline size_t                                                                \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType,                             \
-                 Type>::SpaceUsedInMapEntryLong(const TypeOnMemory& value) {   \
-    return sizeof(value);                                                      \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline size_t                                                                \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::SpaceUsedInMapLong(  \
-      const TypeOnMemory& value) {                                             \
-    return sizeof(value);                                                      \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline size_t                                                                \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::SpaceUsedInMapLong(  \
-      const string& value) {                                                   \
-    return sizeof(value);                                                      \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Clear(   \
-      TypeOnMemory* value, Arena* arena) {                                     \
-    value->ClearToEmpty(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),    \
-                        arena);                                                \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::         \
-      ClearMaybeByDefaultEnum(TypeOnMemory* value, Arena* arena,               \
-                              int /* default_enum */) {                        \
-    Clear(value, arena);                                                       \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Merge(   \
-      const MapEntryAccessorType& from, TypeOnMemory* to, Arena* arena) {      \
-    to->Set(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from, arena);  \
-  }                                                                            \
-  template <typename Type>                                                     \
-  void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::DeleteNoArena(  \
-      TypeOnMemory& value) {                                                   \
-    value.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());  \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType,                 \
-                             Type>::AssignDefaultValue(TypeOnMemory* /* value */) {} \
-  template <typename Type>                                                     \
-  inline void                                                                  \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Initialize(          \
-      TypeOnMemory* value, Arena* /* arena */) {                               \
-    value->UnsafeSetDefault(                                                   \
-        &::google::protobuf::internal::GetEmptyStringAlreadyInited());                   \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::         \
-      InitializeMaybeByDefaultEnum(TypeOnMemory* value,                        \
-                                   int /* default_enum_value */,               \
-                                   Arena* arena) {                             \
-    Initialize(value, arena);                                                  \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,             \
-                                 Type>::MapEntryAccessorType*                  \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::EnsureMutable(       \
-      TypeOnMemory* value, Arena* arena) {                                     \
-    return value->Mutable(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),  \
-                          arena);                                              \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline const typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,       \
-                                       Type>::MapEntryAccessorType&            \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType,                             \
-                 Type>::DefaultIfNotInitialized(const TypeOnMemory& value,     \
-                                                const TypeOnMemory&            \
-                                                    /* default_value */) {     \
-    return value.Get();                                                        \
-  }                                                                            \
-  template <typename Type>                                                     \
-  inline bool MapTypeHandler<WireFormatLite::TYPE_##FieldType,                 \
-                             Type>::IsInitialized(const TypeOnMemory& /* value */) { \
-    return true;                                                               \
+#define STRING_OR_BYTES_HANDLER_FUNCTIONS(FieldType)                          \
+  template <typename Type>                                                    \
+  inline const typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,      \
+                                       Type>::MapEntryAccessorType&           \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType,                            \
+                 Type>::GetExternalReference(const TypeOnMemory& value) {     \
+    return value.Get();                                                       \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline size_t                                                               \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType,                            \
+                 Type>::SpaceUsedInMapEntryLong(const TypeOnMemory& value) {  \
+    return sizeof(value);                                                     \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline size_t                                                               \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::SpaceUsedInMapLong( \
+      const TypeOnMemory& value) {                                            \
+    return sizeof(value);                                                     \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline size_t                                                               \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::SpaceUsedInMapLong( \
+      const std::string& value) {                                                  \
+    return sizeof(value);                                                     \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Clear(  \
+      TypeOnMemory* value, Arena* arena) {                                    \
+    value->ClearToEmpty(&internal::GetEmptyStringAlreadyInited(), arena);     \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::        \
+      ClearMaybeByDefaultEnum(TypeOnMemory* value, Arena* arena,              \
+                              int /* default_enum */) {                       \
+    Clear(value, arena);                                                      \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Merge(  \
+      const MapEntryAccessorType& from, TypeOnMemory* to, Arena* arena) {     \
+    to->Set(&internal::GetEmptyStringAlreadyInited(), from, arena);           \
+  }                                                                           \
+  template <typename Type>                                                    \
+  void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::DeleteNoArena( \
+      TypeOnMemory& value) {                                                  \
+    value.DestroyNoArena(&internal::GetEmptyStringAlreadyInited());           \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline void                                                                 \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::AssignDefaultValue( \
+      TypeOnMemory* /* value */) {}                                           \
+  template <typename Type>                                                    \
+  inline void                                                                 \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Initialize(         \
+      TypeOnMemory* value, Arena* /* arena */) {                              \
+    value->UnsafeSetDefault(&internal::GetEmptyStringAlreadyInited());        \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::        \
+      InitializeMaybeByDefaultEnum(                                           \
+          TypeOnMemory* value, int /* default_enum_value */, Arena* arena) {  \
+    Initialize(value, arena);                                                 \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,            \
+                                 Type>::MapEntryAccessorType*                 \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::EnsureMutable(      \
+      TypeOnMemory* value, Arena* arena) {                                    \
+    return value->Mutable(&internal::GetEmptyStringAlreadyInited(), arena);   \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline const typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,      \
+                                       Type>::MapEntryAccessorType&           \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::                    \
+      DefaultIfNotInitialized(const TypeOnMemory& value,                      \
+                              const TypeOnMemory& /* default_value */) {      \
+    return value.Get();                                                       \
+  }                                                                           \
+  template <typename Type>                                                    \
+  inline bool                                                                 \
+  MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::IsInitialized(      \
+      const TypeOnMemory& /* value */) {                                      \
+    return true;                                                              \
   }
 STRING_OR_BYTES_HANDLER_FUNCTIONS(STRING)
 STRING_OR_BYTES_HANDLER_FUNCTIONS(BYTES)
@@ -734,6 +723,6 @@ PRIMITIVE_HANDLER_FUNCTIONS(BOOL)
 
 }  // namespace internal
 }  // namespace protobuf
-
 }  // namespace google
+
 #endif  // GOOGLE_PROTOBUF_TYPE_HANDLER_H__

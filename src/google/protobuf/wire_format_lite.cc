@@ -43,6 +43,7 @@
 #include <google/protobuf/io/coded_stream_inl.h>
 #include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl_lite.h>
+#include <google/protobuf/port_def.inc>
 
 
 namespace google {
@@ -301,8 +302,7 @@ bool WireFormatLite::ReadPackedEnumNoInline(io::CodedInputStream* input,
   io::CodedInputStream::Limit limit = input->PushLimit(length);
   while (input->BytesUntilLimit() > 0) {
     int value;
-    if (!google::protobuf::internal::WireFormatLite::ReadPrimitive<
-        int, WireFormatLite::TYPE_ENUM>(input, &value)) {
+    if (!ReadPrimitive<int, WireFormatLite::TYPE_ENUM>(input, &value)) {
       return false;
     }
     if (is_valid == NULL || is_valid(value)) {
@@ -324,8 +324,7 @@ bool WireFormatLite::ReadPackedEnumPreserveUnknowns(
   io::CodedInputStream::Limit limit = input->PushLimit(length);
   while (input->BytesUntilLimit() > 0) {
     int value;
-    if (!google::protobuf::internal::WireFormatLite::ReadPrimitive<
-        int, WireFormatLite::TYPE_ENUM>(input, &value)) {
+    if (!ReadPrimitive<int, WireFormatLite::TYPE_ENUM>(input, &value)) {
       return false;
     }
     if (is_valid == NULL || is_valid(value)) {
@@ -551,19 +550,25 @@ void WireFormatLite::WriteMessage(int field_number,
   value.SerializeWithCachedSizes(output);
 }
 
+void WireFormatLite::WriteSubMessageMaybeToArray(
+    int size, const MessageLite& value, io::CodedOutputStream* output) {
+  if (!output->IsSerializationDeterministic()) {
+    uint8* target = output->GetDirectBufferForNBytesAndAdvance(size);
+    if (target != nullptr) {
+      uint8* end = value.InternalSerializeWithCachedSizesToArray(target);
+      GOOGLE_DCHECK_EQ(end - target, size);
+      return;
+    }
+  }
+  value.SerializeWithCachedSizes(output);
+}
+
 void WireFormatLite::WriteGroupMaybeToArray(int field_number,
                                             const MessageLite& value,
                                             io::CodedOutputStream* output) {
   WriteTag(field_number, WIRETYPE_START_GROUP, output);
   const int size = value.GetCachedSize();
-  uint8* target = output->GetDirectBufferForNBytesAndAdvance(size);
-  if (target != NULL) {
-    uint8* end = value.InternalSerializeWithCachedSizesToArray(
-        output->IsSerializationDeterministic(), target);
-    GOOGLE_DCHECK_EQ(end - target, size);
-  } else {
-    value.SerializeWithCachedSizes(output);
-  }
+  WriteSubMessageMaybeToArray(size, value, output);
   WriteTag(field_number, WIRETYPE_END_GROUP, output);
 }
 
@@ -573,17 +578,10 @@ void WireFormatLite::WriteMessageMaybeToArray(int field_number,
   WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
   const int size = value.GetCachedSize();
   output->WriteVarint32(size);
-  uint8* target = output->GetDirectBufferForNBytesAndAdvance(size);
-  if (target != NULL) {
-    uint8* end = value.InternalSerializeWithCachedSizesToArray(
-        output->IsSerializationDeterministic(), target);
-    GOOGLE_DCHECK_EQ(end - target, size);
-  } else {
-    value.SerializeWithCachedSizes(output);
-  }
+  WriteSubMessageMaybeToArray(size, value, output);
 }
 
-GOOGLE_PROTOBUF_ATTRIBUTE_ALWAYS_INLINE static bool ReadBytesToString(
+PROTOBUF_ALWAYS_INLINE static bool ReadBytesToString(
     io::CodedInputStream* input, string* value);
 inline static bool ReadBytesToString(io::CodedInputStream* input,
                                      string* value) {
@@ -597,10 +595,23 @@ bool WireFormatLite::ReadBytes(io::CodedInputStream* input, string* value) {
 }
 
 bool WireFormatLite::ReadBytes(io::CodedInputStream* input, string** p) {
-  if (*p == &::google::protobuf::internal::GetEmptyStringAlreadyInited()) {
+  if (*p == &GetEmptyStringAlreadyInited()) {
     *p = new ::std::string();
   }
   return ReadBytesToString(input, *p);
+}
+
+void PrintUTF8ErrorLog(const char* field_name, const char* operation_str,
+                       bool emit_stacktrace) {
+  string stacktrace;
+  string quoted_field_name = "";
+  if (field_name != nullptr) {
+    quoted_field_name = StringPrintf(" '%s'", field_name);
+  }
+  GOOGLE_LOG(ERROR) << "String field" << quoted_field_name << " contains invalid "
+             << "UTF-8 data when " << operation_str << " a protocol "
+             << "buffer. Use the 'bytes' type if you intend to send raw "
+             << "bytes. " << stacktrace;
 }
 
 bool WireFormatLite::VerifyUtf8String(const char* data,
@@ -618,15 +629,7 @@ bool WireFormatLite::VerifyUtf8String(const char* data,
         break;
       // no default case: have the compiler warn if a case is not covered.
     }
-    string quoted_field_name = "";
-    if (field_name != NULL) {
-      quoted_field_name = StringPrintf(" '%s'", field_name);
-    }
-    // no space below to avoid double space when the field name is missing.
-    GOOGLE_LOG(ERROR) << "String field" << quoted_field_name << " contains invalid "
-               << "UTF-8 data when " << operation_str << " a protocol "
-               << "buffer. Use the 'bytes' type if you intend to send raw "
-               << "bytes. ";
+    PrintUTF8ErrorLog(field_name, operation_str, false);
     return false;
   }
   return true;

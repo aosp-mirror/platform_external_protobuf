@@ -42,6 +42,7 @@
 #ifndef GOOGLE_PROTOBUF_UTIL_MESSAGE_DIFFERENCER_H__
 #define GOOGLE_PROTOBUF_UTIL_MESSAGE_DIFFERENCER_H__
 
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -50,6 +51,8 @@
 #include <google/protobuf/message.h>  // Message
 #include <google/protobuf/unknown_field_set.h>
 #include <google/protobuf/util/field_comparator.h>
+
+#include <google/protobuf/port_def.inc>
 
 namespace google {
 namespace protobuf {
@@ -60,12 +63,13 @@ class FieldDescriptor;
 namespace io {
 class ZeroCopyOutputStream;
 class Printer;
-}
+}  // namespace io
 
 namespace util {
 
 class DefaultFieldComparator;
 class FieldContext;  // declared below MessageDifferencer
+
 
 // A basic differencer that can be used to determine
 // the differences between two specified Protocol Messages. If any differences
@@ -106,13 +110,14 @@ class FieldContext;  // declared below MessageDifferencer
 // guard it with a lock to use the same MessageDifferencer instance from
 // multiple threads. Note that it's fine to call static comparison methods
 // (like MessageDifferencer::Equals) concurrently.
-class LIBPROTOBUF_EXPORT MessageDifferencer {
+class PROTOBUF_EXPORT MessageDifferencer {
  public:
   // Determines whether the supplied messages are equal. Equality is defined as
   // all fields within the two messages being set to the same value. Primitive
   // fields and strings are compared by value while embedded messages/groups
-  // are compared as if via a recursive call. Use IgnoreField() and Compare()
-  // if some fields should be ignored in the comparison.
+  // are compared as if via a recursive call. Use Compare() with IgnoreField()
+  // if some fields should be ignored in the comparison. Use Compare() with
+  // TreatAsSet() if there are repeated fields where ordering does not matter.
   //
   // This method REQUIRES that the two messages have the same
   // Descriptor (message1.GetDescriptor() == message2.GetDescriptor()).
@@ -212,7 +217,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   // FieldDescriptors. The first will be the field of the embedded message
   // itself and the second will be the actual field in the embedded message
   // that was added/deleted/modified.
-  class LIBPROTOBUF_EXPORT Reporter {
+  class PROTOBUF_EXPORT Reporter {
    public:
     Reporter();
     virtual ~Reporter();
@@ -290,7 +295,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
 
   // MapKeyComparator is used to determine if two elements have the same key
   // when comparing elements of a repeated field as a map.
-  class LIBPROTOBUF_EXPORT MapKeyComparator {
+  class PROTOBUF_EXPORT MapKeyComparator {
    public:
     MapKeyComparator();
     virtual ~MapKeyComparator();
@@ -313,7 +318,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   // field IsIgnored is called on each added IgnoreCriteria until one returns
   // true or all return false.
   // IsIgnored is called for fields where at least one side has a value.
-  class LIBPROTOBUF_EXPORT IgnoreCriteria {
+  class PROTOBUF_EXPORT IgnoreCriteria {
    public:
     IgnoreCriteria();
     virtual ~IgnoreCriteria();
@@ -366,13 +371,18 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   };
 
   enum RepeatedFieldComparison {
-    AS_LIST,     // Repeated fields are compared in order.  Differing values at
-                 // the same index are reported using ReportModified().  If the
-                 // repeated fields have different numbers of elements, the
-                 // unpaired elements are reported using ReportAdded() or
-                 // ReportDeleted().
-    AS_SET,      // Treat all the repeated fields as sets.
-                 // See TreatAsSet(), as below.
+    AS_LIST,      // Repeated fields are compared in order.  Differing values at
+                  // the same index are reported using ReportModified().  If the
+                  // repeated fields have different numbers of elements, the
+                  // unpaired elements are reported using ReportAdded() or
+                  // ReportDeleted().
+    AS_SET,       // Treat all the repeated fields as sets.
+                  // See TreatAsSet(), as below.
+    AS_SMART_LIST,  // Similar to AS_SET, but preserve the order and find the
+                    // longest matching sequence from the first matching
+                    // element. To use an optimal solution, call
+                    // SetMatchIndicesForSmartListCallback() to pass it in.
+    AS_SMART_SET,   // Similar to AS_SET, but match elements with fewest diffs.
   };
 
   // The elements of the given repeated field will be treated as a set for
@@ -404,6 +414,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   //
   // REQUIRES:  field->is_repeated() and field not registered with TreatAsList
   void TreatAsSet(const FieldDescriptor* field);
+  void TreatAsSmartSet(const FieldDescriptor* field);
 
   // The elements of the given repeated field will be treated as a list for
   // diffing purposes, so different orderings of the same elements will NOT be
@@ -411,6 +422,8 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   //
   // REQUIRED: field->is_repeated() and field not registered with TreatAsSet
   void TreatAsList(const FieldDescriptor* field);
+  // Note that the complexity is similar to treating as SET.
+  void TreatAsSmartList(const FieldDescriptor* field);
 
   // The elements of the given repeated field will be treated as a map for
   // diffing purposes, with |key| being the map key.  Thus, elements with the
@@ -533,6 +546,12 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
     report_moves_ = report_moves;
   }
 
+  // Tells the differencer whether or not to report ignored values. This method
+  // must be called before Compare. The default for a new differencer is true.
+  void set_report_ignores(bool report_ignores) {
+    report_ignores_ = report_ignores;
+  }
+
   // Sets the scope of the comparison (as defined in the Scope enumeration
   // above) that is used by this differencer when determining which fields to
   // compare between the messages.
@@ -573,7 +592,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   // Automatically creates a reporter that will output the differences
   // found (if any) to the specified output string pointer. Note that this
   // method must be called before Compare.
-  void ReportDifferencesToString(string* output);
+  void ReportDifferencesToString(std::string* output);
 
   // Tells the MessageDifferencer to report differences via the specified
   // reporter. Note that this method must be called before Compare for
@@ -593,11 +612,11 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   // complete until after you destroy the reporter. For example, if you use a
   // StreamReporter to write to a StringOutputStream, the target string may
   // contain uninitialized data until the reporter is destroyed.
-  class LIBPROTOBUF_EXPORT StreamReporter : public Reporter {
+  class PROTOBUF_EXPORT StreamReporter : public Reporter {
    public:
     explicit StreamReporter(io::ZeroCopyOutputStream* output);
     explicit StreamReporter(io::Printer* printer);  // delimiter '$'
-    virtual ~StreamReporter();
+    ~StreamReporter() override;
 
     // When set to true, the stream reporter will also output aggregates nodes
     // (i.e. messages and groups) whose subfields have been modified. When
@@ -607,32 +626,28 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
     }
 
     // The following are implementations of the methods described above.
-    virtual void ReportAdded(const Message& message1, const Message& message2,
-                             const std::vector<SpecificField>& field_path);
 
-    virtual void ReportDeleted(const Message& message1,
-                               const Message& message2,
-                               const std::vector<SpecificField>& field_path);
+    void ReportAdded(const Message& message1, const Message& message2,
+                     const std::vector<SpecificField>& field_path) override;
 
-    virtual void ReportModified(const Message& message1,
-                                const Message& message2,
-                                const std::vector<SpecificField>& field_path);
+    void ReportDeleted(const Message& message1, const Message& message2,
+                       const std::vector<SpecificField>& field_path) override;
 
-    virtual void ReportMoved(const Message& message1,
-                             const Message& message2,
-                             const std::vector<SpecificField>& field_path);
+    void ReportModified(const Message& message1, const Message& message2,
+                        const std::vector<SpecificField>& field_path) override;
 
-    virtual void ReportMatched(const Message& message1,
-                               const Message& message2,
-                               const std::vector<SpecificField>& field_path);
+    void ReportMoved(const Message& message1, const Message& message2,
+                     const std::vector<SpecificField>& field_path) override;
 
-    virtual void ReportIgnored(const Message& message1,
-                               const Message& message2,
-                               const std::vector<SpecificField>& field_path);
+    void ReportMatched(const Message& message1, const Message& message2,
+                       const std::vector<SpecificField>& field_path) override;
 
-    virtual void ReportUnknownFieldIgnored(
+    void ReportIgnored(const Message& message1, const Message& message2,
+                       const std::vector<SpecificField>& field_path) override;
+
+    void ReportUnknownFieldIgnored(
         const Message& message1, const Message& message2,
-        const std::vector<SpecificField>& field_path);
+        const std::vector<SpecificField>& field_path) override;
 
    protected:
     // Prints the specified path of fields to the buffer.  message is used to
@@ -657,7 +672,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
     virtual void PrintUnknownFieldValue(const UnknownField* unknown_field);
 
     // Just print a string
-    void Print(const string& str);
+    void Print(const std::string& str);
 
    private:
     io::Printer* printer_;
@@ -677,11 +692,12 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   class MultipleFieldsMapKeyComparator;
 
   // A MapKeyComparator for use with map_entries.
-  class LIBPROTOBUF_EXPORT MapEntryKeyComparator : public MapKeyComparator {
+  class PROTOBUF_EXPORT MapEntryKeyComparator : public MapKeyComparator {
    public:
     explicit MapEntryKeyComparator(MessageDifferencer* message_differencer);
-    virtual bool IsMatch(const Message& message1, const Message& message2,
-                         const std::vector<SpecificField>& parent_fields) const;
+    bool IsMatch(
+        const Message& message1, const Message& message2,
+        const std::vector<SpecificField>& parent_fields) const override;
 
    private:
     MessageDifferencer* message_differencer_;
@@ -711,8 +727,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
 
   // Compares all the unknown fields in two messages.
   bool CompareUnknownFields(const Message& message1, const Message& message2,
-                            const google::protobuf::UnknownFieldSet&,
-                            const google::protobuf::UnknownFieldSet&,
+                            const UnknownFieldSet&, const UnknownFieldSet&,
                             std::vector<SpecificField>* parent_fields);
 
   // Compares the specified messages for the requested field lists. The field
@@ -774,11 +789,20 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
                const MapKeyComparator* key_comparator,
                const Message* message1, const Message* message2,
                const std::vector<SpecificField>& parent_fields,
-               int index1, int index2);
+               Reporter* reporter, int index1, int index2);
 
   // Returns true when this repeated field has been configured to be treated
-  // as a set.
+  // as a Set / SmartSet / SmartList.
   bool IsTreatedAsSet(const FieldDescriptor* field);
+  bool IsTreatedAsSmartSet(const FieldDescriptor* field);
+
+  bool IsTreatedAsSmartList(const FieldDescriptor* field);
+  // When treating as SMART_LIST, it uses MatchIndicesPostProcessorForSmartList
+  // by default to find the longest matching sequence from the first matching
+  // element. The callback takes two vectors showing the matching indices from
+  // the other vector, where -1 means an unmatch.
+  void SetMatchIndicesForSmartListCallback(
+      std::function<void(std::vector<int>*, std::vector<int>*)> callback);
 
   // Returns true when this repeated field is to be compared as a subset, ie.
   // has been configured to be treated as a set or map and scope is set to
@@ -826,6 +850,12 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   // Checks if index is equal to new_index in all the specific fields.
   static bool CheckPathChanged(const std::vector<SpecificField>& parent_fields);
 
+  // CHECKs that the given repeated field can be compared according to
+  // new_comparison.
+  void CheckRepeatedFieldComparisons(
+      const FieldDescriptor* field,
+      const RepeatedFieldComparison& new_comparison);
+
   // Defines a map between field descriptors and their MapKeyComparators.
   // Used for repeated fields when they are configured as TreatAsMap.
   typedef std::map<const FieldDescriptor*,
@@ -834,6 +864,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   // Defines a set to store field descriptors.  Used for repeated fields when
   // they are configured as TreatAsSet.
   typedef std::set<const FieldDescriptor*> FieldSet;
+  typedef std::map<const FieldDescriptor*, RepeatedFieldComparison> FieldMap;
 
   Reporter* reporter_;
   DefaultFieldComparator default_field_comparator_;
@@ -842,8 +873,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
   Scope scope_;
   RepeatedFieldComparison repeated_field_comparison_;
 
-  FieldSet set_fields_;
-  FieldSet list_fields_;
+  FieldMap repeated_field_comparisons_;
   // Keeps track of MapKeyComparators that are created within
   // MessageDifferencer. These MapKeyComparators should be deleted
   // before MessageDifferencer is destroyed.
@@ -859,8 +889,13 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
 
   bool report_matches_;
   bool report_moves_;
+  bool report_ignores_;
 
-  string* output_string_;
+  std::string* output_string_;
+
+  // Callback to post-process the matched indices to support SMART_LIST.
+  std::function<void(std::vector<int>*,
+                     std::vector<int>*)> match_indices_for_smart_list_callback_;
 
   std::unique_ptr<DynamicMessageFactory> dynamic_message_factory_;
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(MessageDifferencer);
@@ -868,7 +903,7 @@ class LIBPROTOBUF_EXPORT MessageDifferencer {
 
 // This class provides extra information to the FieldComparator::Compare
 // function.
-class LIBPROTOBUF_EXPORT FieldContext {
+class PROTOBUF_EXPORT FieldContext {
  public:
   explicit FieldContext(
       std::vector<MessageDifferencer::SpecificField>* parent_fields)
@@ -882,8 +917,10 @@ class LIBPROTOBUF_EXPORT FieldContext {
   std::vector<MessageDifferencer::SpecificField>* parent_fields_;
 };
 
-}
-}
-
+}  // namespace util
+}  // namespace protobuf
 }  // namespace google
+
+#include <google/protobuf/port_undef.inc>
+
 #endif  // GOOGLE_PROTOBUF_UTIL_MESSAGE_DIFFERENCER_H__

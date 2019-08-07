@@ -35,9 +35,11 @@
 // Recursive descent FTW.
 
 #include <float.h>
-#include <google/protobuf/stubs/hash.h>
 #include <limits>
+#include <unordered_map>
 
+
+#include <google/protobuf/stubs/hash.h>
 
 #include <google/protobuf/stubs/casts.h>
 #include <google/protobuf/stubs/logging.h>
@@ -58,7 +60,7 @@ using internal::WireFormat;
 
 namespace {
 
-typedef hash_map<string, FieldDescriptorProto::Type> TypeNameMap;
+typedef std::unordered_map<string, FieldDescriptorProto::Type> TypeNameMap;
 
 TypeNameMap MakeTypeNameTable() {
   TypeNameMap result;
@@ -336,9 +338,9 @@ void Parser::AddError(const string& error) {
 // -------------------------------------------------------------------
 
 Parser::LocationRecorder::LocationRecorder(Parser* parser)
-  : parser_(parser),
-    source_code_info_(parser->source_code_info_),
-    location_(parser_->source_code_info_->add_location()) {
+    : parser_(parser),
+      source_code_info_(parser->source_code_info_),
+      location_(parser_->source_code_info_->add_location()) {
   location_->add_span(parser_->input_->current().line);
   location_->add_span(parser_->input_->current().column);
 }
@@ -1153,7 +1155,7 @@ bool Parser::ParseDefaultAssignment(
       DO(ConsumeInteger64(max_value, &value,
                           "Expected integer for field default value."));
       // And stringify it again.
-      default_value->append(SimpleItoa(value));
+      default_value->append(StrCat(value));
       break;
     }
 
@@ -1176,7 +1178,7 @@ bool Parser::ParseDefaultAssignment(
       DO(ConsumeInteger64(max_value, &value,
                           "Expected integer for field default value."));
       // And stringify it again.
-      default_value->append(SimpleItoa(value));
+      default_value->append(StrCat(value));
       break;
     }
 
@@ -1511,7 +1513,6 @@ bool Parser::ParseExtensions(DescriptorProto* message,
     range->set_end(end);
   } while (TryConsume(","));
 
-
   if (LookingAt("[")) {
     int range_number_index = extensions_location.CurrentPathSize();
     SourceCodeInfo info;
@@ -1525,8 +1526,7 @@ bool Parser::ParseExtensions(DescriptorProto* message,
           extensions_location, 0 /* we fill this in w/ actual index below */,
           &info);
       LocationRecorder location(
-          index_location,
-          DescriptorProto::ExtensionRange::kOptionsFieldNumber);
+          index_location, DescriptorProto::ExtensionRange::kOptionsFieldNumber);
       DO(Consume("["));
 
       do {
@@ -1546,12 +1546,12 @@ bool Parser::ParseExtensions(DescriptorProto* message,
     for (int i = old_range_size; i < message->extension_range_size(); i++) {
       for (int j = 0; j < info.location_size(); j++) {
         if (info.location(j).path_size() == range_number_index + 1) {
-          // this location's path is up to the extension range index, but doesn't
-          // include options; so it's redundant with location above
+          // this location's path is up to the extension range index, but
+          // doesn't include options; so it's redundant with location above
           continue;
         }
         SourceCodeInfo_Location* dest = source_code_info_->add_location();
-        dest->CopyFrom(info.location(j));
+        *dest = info.location(j);
         dest->set_path(range_number_index, i);
       }
     }
@@ -1565,15 +1565,18 @@ bool Parser::ParseExtensions(DescriptorProto* message,
 // name literals.
 bool Parser::ParseReserved(DescriptorProto* message,
                            const LocationRecorder& message_location) {
+  io::Tokenizer::Token start_token = input_->current();
   // Parse the declaration.
   DO(Consume("reserved"));
   if (LookingAtType(io::Tokenizer::TYPE_STRING)) {
     LocationRecorder location(message_location,
                               DescriptorProto::kReservedNameFieldNumber);
+    location.StartAt(start_token);
     return ParseReservedNames(message, location);
   } else {
     LocationRecorder location(message_location,
                               DescriptorProto::kReservedRangeFieldNumber);
+    location.StartAt(start_token);
     return ParseReservedNumbers(message, location);
   }
 }
@@ -1639,16 +1642,19 @@ bool Parser::ParseReservedNumbers(DescriptorProto* message,
 }
 
 bool Parser::ParseReserved(EnumDescriptorProto* message,
-                          const LocationRecorder& message_location) {
+                           const LocationRecorder& message_location) {
+  io::Tokenizer::Token start_token = input_->current();
   // Parse the declaration.
   DO(Consume("reserved"));
   if (LookingAtType(io::Tokenizer::TYPE_STRING)) {
     LocationRecorder location(message_location,
                               DescriptorProto::kReservedNameFieldNumber);
+    location.StartAt(start_token);
     return ParseReservedNames(message, location);
   } else {
     LocationRecorder location(message_location,
                               DescriptorProto::kReservedRangeFieldNumber);
+    location.StartAt(start_token);
     return ParseReservedNumbers(message, location);
   }
 }
@@ -2185,25 +2191,21 @@ bool Parser::ParsePackage(FileDescriptorProto* file,
     file->clear_package();
   }
 
+  LocationRecorder location(root_location,
+                            FileDescriptorProto::kPackageFieldNumber);
+  location.RecordLegacyLocation(file, DescriptorPool::ErrorCollector::NAME);
+
   DO(Consume("package"));
 
-  {
-    LocationRecorder location(root_location,
-                              FileDescriptorProto::kPackageFieldNumber);
-    location.RecordLegacyLocation(file, DescriptorPool::ErrorCollector::NAME);
-
-    while (true) {
-      string identifier;
-      DO(ConsumeIdentifier(&identifier, "Expected identifier."));
-      file->mutable_package()->append(identifier);
-      if (!TryConsume(".")) break;
-      file->mutable_package()->append(".");
-    }
-
-    location.EndAt(input_->previous());
-
-    DO(ConsumeEndOfDeclaration(";", &location));
+  while (true) {
+    string identifier;
+    DO(ConsumeIdentifier(&identifier, "Expected identifier."));
+    file->mutable_package()->append(identifier);
+    if (!TryConsume(".")) break;
+    file->mutable_package()->append(".");
   }
+
+  DO(ConsumeEndOfDeclaration(";", &location));
 
   return true;
 }
@@ -2213,31 +2215,30 @@ bool Parser::ParseImport(RepeatedPtrField<string>* dependency,
                          RepeatedField<int32>* weak_dependency,
                          const LocationRecorder& root_location,
                          const FileDescriptorProto* containing_file) {
+  LocationRecorder location(root_location,
+                            FileDescriptorProto::kDependencyFieldNumber,
+                            dependency->size());
+
   DO(Consume("import"));
+
   if (LookingAt("public")) {
-    LocationRecorder location(
+    LocationRecorder public_location(
         root_location, FileDescriptorProto::kPublicDependencyFieldNumber,
         public_dependency->size());
     DO(Consume("public"));
     *public_dependency->Add() = dependency->size();
   } else if (LookingAt("weak")) {
-    LocationRecorder location(
+    LocationRecorder weak_location(
         root_location, FileDescriptorProto::kWeakDependencyFieldNumber,
         weak_dependency->size());
     DO(Consume("weak"));
     *weak_dependency->Add() = dependency->size();
   }
-  {
-    LocationRecorder location(root_location,
-                              FileDescriptorProto::kDependencyFieldNumber,
-                              dependency->size());
-    DO(ConsumeString(dependency->Add(),
-      "Expected a string naming the file to import."));
 
-    location.EndAt(input_->previous());
+  DO(ConsumeString(dependency->Add(),
+                   "Expected a string naming the file to import."));
+  DO(ConsumeEndOfDeclaration(";", &location));
 
-    DO(ConsumeEndOfDeclaration(";", &location));
-  }
   return true;
 }
 
@@ -2277,5 +2278,4 @@ void SourceLocationTable::Clear() {
 
 }  // namespace compiler
 }  // namespace protobuf
-
 }  // namespace google

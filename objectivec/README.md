@@ -1,7 +1,7 @@
 Protocol Buffers - Google's data interchange format
 ===================================================
 
-[![Build Status](https://travis-ci.org/google/protobuf.svg?branch=master)](https://travis-ci.org/google/protobuf)
+[![Build status](https://storage.googleapis.com/protobuf-kokoro-results/status-badge/macos-objectivec_cocoapods_integration.png)](https://fusion.corp.google.com/projectanalysis/current/KOKORO/prod:protobuf%2Fgithub%2Fmaster%2Fmacos%2Fobjectivec_cocoapods_integration%2Fcontinuous) [![Build status](https://storage.googleapis.com/protobuf-kokoro-results/status-badge/macos-objectivec_ios_debug.png)](https://fusion.corp.google.com/projectanalysis/current/KOKORO/prod:protobuf%2Fgithub%2Fmaster%2Fmacos%2Fobjectivec_ios_debug%2Fcontinuous) [![Build status](https://storage.googleapis.com/protobuf-kokoro-results/status-badge/macos-objectivec_ios_release.png)](https://fusion.corp.google.com/projectanalysis/current/KOKORO/prod:protobuf%2Fgithub%2Fmaster%2Fmacos%2Fobjectivec_ios_release%2Fcontinuous) [![Build status](https://storage.googleapis.com/protobuf-kokoro-results/status-badge/macos-objectivec_osx.png)](https://fusion.corp.google.com/projectanalysis/current/KOKORO/prod:protobuf%2Fgithub%2Fmaster%2Fmacos%2Fobjectivec_osx%2Fcontinuous)
 
 Copyright 2008 Google Inc.
 
@@ -20,9 +20,10 @@ The Objective C implementation requires:
 Installation
 ------------
 
-The full distribution pulled from github includes the sources for both the
-compiler (protoc) and the runtime (this directory). To build the compiler
-and run the runtime tests, you can use:
+The distribution pulled from github includes the sources for both the
+compiler (protoc) and the runtime (this directory). After cloning the distribution
+and needed submodules ([see the src directory's README](../src/README.md)),
+to build the compiler and run the runtime tests, you can use:
 
      $ objectivec/DevTools/full_mac_build.sh
 

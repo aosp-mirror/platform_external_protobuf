@@ -38,7 +38,10 @@
 
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/compiler/scc.h>
 #include <google/protobuf/compiler/code_generator.h>
+
+#include <google/protobuf/port_def.inc>
 
 namespace google {
 namespace protobuf {
@@ -56,17 +59,18 @@ namespace js {
 
 struct GeneratorOptions {
   // Output path.
-  string output_dir;
+  std::string output_dir;
   // Namespace prefix.
-  string namespace_prefix;
+  std::string namespace_prefix;
   // Enable binary-format support?
   bool binary;
   // What style of imports should be used.
   enum ImportStyle {
-    kImportClosure,   // goog.require()
-    kImportCommonJs,  // require()
-    kImportBrowser,   // no import statements
-    kImportEs6,       // import { member } from ''
+    kImportClosure,         // goog.require()
+    kImportCommonJs,        // require()
+    kImportCommonJsStrict,  // require() with no global export
+    kImportBrowser,         // no import statements
+    kImportEs6,             // import { member } from ''
   } import_style;
 
   GeneratorOptions()
@@ -83,11 +87,11 @@ struct GeneratorOptions {
         annotate_code(false) {}
 
   bool ParseFromOptions(
-      const std::vector< std::pair< string, string > >& options,
-      string* error);
+      const std::vector< std::pair< std::string, std::string > >& options,
+      std::string* error);
 
   // Returns the file name extension to use for generated code.
-  string GetFileNameExtension() const {
+  std::string GetFileNameExtension() const {
     return import_style == kImportClosure ? extension : "_pb.js";
   }
 
@@ -95,7 +99,7 @@ struct GeneratorOptions {
     // Create an output file for each input .proto file.
     kOneOutputFilePerInputFile,
     // Create an output file for each type.
-    kOneOutputFilePerType,
+    kOneOutputFilePerSCC,
     // Put everything in a single file named by the library option.
     kEverythingInOneFile,
   };
@@ -112,11 +116,11 @@ struct GeneratorOptions {
   bool testonly;
   // Create a library with name <name>_lib.js rather than a separate .js file
   // per type?
-  string library;
+  std::string library;
   // Error if there are two types that would generate the same output file?
   bool error_on_name_conflict;
   // The extension to use for output file names.
-  string extension;
+  std::string extension;
   // Create a separate output file for each input file?
   bool one_output_file_per_input_file;
   // If true, we should build .meta files that contain annotations for
@@ -128,15 +132,15 @@ struct GeneratorOptions {
 // header.  If you create your own protocol compiler binary and you want it to
 // support JavaScript output, you can do so by registering an instance of this
 // CodeGenerator with the CommandLineInterface in your main() function.
-class LIBPROTOC_EXPORT Generator : public CodeGenerator {
+class PROTOC_EXPORT Generator : public CodeGenerator {
  public:
   Generator() {}
   virtual ~Generator() {}
 
   virtual bool Generate(const FileDescriptor* file,
-                        const string& parameter,
+                        const std::string& parameter,
                         GeneratorContext* context,
-                        string* error) const {
+                        std::string* error) const {
     *error = "Unimplemented Generate() method. Call GenerateAll() instead.";
     return false;
   }
@@ -144,9 +148,9 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   virtual bool HasGenerateAll() const { return true; }
 
   virtual bool GenerateAll(const std::vector<const FileDescriptor*>& files,
-                           const string& parameter,
+                           const std::string& parameter,
                            GeneratorContext* context,
-                           string* error) const;
+                           std::string* error) const;
 
  private:
   void GenerateHeader(const GeneratorOptions& options,
@@ -156,28 +160,28 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   void FindProvides(const GeneratorOptions& options,
                     io::Printer* printer,
                     const std::vector<const FileDescriptor*>& file,
-                    std::set<string>* provided) const;
+                    std::set<std::string>* provided) const;
   void FindProvidesForFile(const GeneratorOptions& options,
                            io::Printer* printer,
                            const FileDescriptor* file,
-                           std::set<string>* provided) const;
+                           std::set<std::string>* provided) const;
   void FindProvidesForMessage(const GeneratorOptions& options,
                               io::Printer* printer,
                               const Descriptor* desc,
-                              std::set<string>* provided) const;
+                              std::set<std::string>* provided) const;
   void FindProvidesForEnum(const GeneratorOptions& options,
                            io::Printer* printer,
                            const EnumDescriptor* enumdesc,
-                           std::set<string>* provided) const;
+                           std::set<std::string>* provided) const;
   // For extension fields at file scope.
   void FindProvidesForFields(const GeneratorOptions& options,
                              io::Printer* printer,
                              const std::vector<const FieldDescriptor*>& fields,
-                             std::set<string>* provided) const;
+                             std::set<std::string>* provided) const;
   // Print the goog.provides() found by the methods above.
   void GenerateProvides(const GeneratorOptions& options,
                         io::Printer* printer,
-                        std::set<string>* provided) const;
+                        std::set<std::string>* provided) const;
 
   // Generate goog.setTestOnly() if indicated.
   void GenerateTestOnly(const GeneratorOptions& options,
@@ -187,35 +191,41 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   void GenerateRequiresForLibrary(
       const GeneratorOptions& options, io::Printer* printer,
       const std::vector<const FileDescriptor*>& files,
-      std::set<string>* provided) const;
-  void GenerateRequiresForMessage(const GeneratorOptions& options,
-                        io::Printer* printer,
-                        const Descriptor* desc,
-                        std::set<string>* provided) const;
+      std::set<std::string>* provided) const;
+  void GenerateRequiresForSCC(const GeneratorOptions& options,
+                              io::Printer* printer,
+                              const SCC* scc,
+                              std::set<std::string>* provided) const;
   // For extension fields at file scope.
   void GenerateRequiresForExtensions(
       const GeneratorOptions& options, io::Printer* printer,
       const std::vector<const FieldDescriptor*>& fields,
-      std::set<string>* provided) const;
+      std::set<std::string>* provided) const;
   void GenerateRequiresImpl(const GeneratorOptions& options,
-                            io::Printer* printer, std::set<string>* required,
-                            std::set<string>* forwards,
-                            std::set<string>* provided, bool require_jspb,
+                            io::Printer* printer, std::set<std::string>* required,
+                            std::set<std::string>* forwards,
+                            std::set<std::string>* provided, bool require_jspb,
                             bool require_extension, bool require_map) const;
   void FindRequiresForMessage(const GeneratorOptions& options,
                               const Descriptor* desc,
-                              std::set<string>* required,
-                              std::set<string>* forwards,
+                              std::set<std::string>* required,
+                              std::set<std::string>* forwards,
                               bool* have_message) const;
   void FindRequiresForField(const GeneratorOptions& options,
                             const FieldDescriptor* field,
-                            std::set<string>* required,
-                            std::set<string>* forwards) const;
+                            std::set<std::string>* required,
+                            std::set<std::string>* forwards) const;
   void FindRequiresForExtension(const GeneratorOptions& options,
                                 const FieldDescriptor* field,
-                                std::set<string>* required,
-                                std::set<string>* forwards) const;
-
+                                std::set<std::string>* required,
+                                std::set<std::string>* forwards) const;
+  // Generate all things in a proto file into one file.
+  // If use_short_name is true, the generated file's name will only be short
+  // name that without directory, otherwise filename equals file->name()
+  bool GenerateFile(const FileDescriptor* file,
+                    const GeneratorOptions &options,
+                    GeneratorContext* context,
+                    bool use_short_name) const;
   void GenerateFile(const GeneratorOptions& options,
                     io::Printer* printer,
                     const FileDescriptor* file) const;
@@ -252,6 +262,10 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
   void GenerateClassFieldInfo(const GeneratorOptions& options,
                               io::Printer* printer,
                               const Descriptor* desc) const;
+  void GenerateClassConstructorAndDeclareExtensionFieldInfo(
+      const GeneratorOptions& options,
+      io::Printer* printer,
+      const Descriptor* desc) const;
   void GenerateClassXid(const GeneratorOptions& options,
                         io::Printer* printer,
                         const Descriptor* desc) const;
@@ -328,6 +342,8 @@ class LIBPROTOC_EXPORT Generator : public CodeGenerator {
 }  // namespace js
 }  // namespace compiler
 }  // namespace protobuf
-
 }  // namespace google
+
+#include <google/protobuf/port_undef.inc>
+
 #endif  // GOOGLE_PROTOBUF_COMPILER_JS_GENERATOR_H__

@@ -57,25 +57,24 @@ class MessageGenerator : public SourceGeneratorBase {
 
  private:
   const Descriptor* descriptor_;
-  std::vector<std::string> field_names_;
   std::vector<const FieldDescriptor*> fields_by_number_;
+  int has_bit_field_count_;
+  uint end_tag_;
 
   void GenerateMessageSerializationMethods(io::Printer* printer);
   void GenerateMergingMethods(io::Printer* printer);
 
-  int GetFieldOrdinal(const FieldDescriptor* descriptor);
+  int GetPresenceIndex(const FieldDescriptor* descriptor);
   FieldGeneratorBase* CreateFieldGeneratorInternal(
       const FieldDescriptor* descriptor);
 
   bool HasNestedGeneratedTypes();
 
   void AddDeprecatedFlag(io::Printer* printer);
+  void AddSerializableAttribute(io::Printer* printer);
   
   std::string class_name();
   std::string full_class_name();
-
-  // field names sorted alphabetically
-  const std::vector<std::string>& field_names();
 
   // field descriptors sorted by number
   const std::vector<const FieldDescriptor*>& fields_by_number();

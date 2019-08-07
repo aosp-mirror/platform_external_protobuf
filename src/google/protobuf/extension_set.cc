@@ -32,16 +32,24 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <google/protobuf/stubs/hash.h>
+#include <google/protobuf/extension_set.h>
+
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <google/protobuf/stubs/common.h>
-#include <google/protobuf/extension_set.h>
-#include <google/protobuf/message_lite.h>
+#include <google/protobuf/extension_set_inl.h>
+#include <google/protobuf/parse_context.h>
 #include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/wire_format_lite_inl.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
+#include <google/protobuf/message_lite.h>
+#include <google/protobuf/metadata_lite.h>
 #include <google/protobuf/repeated_field.h>
+#include <google/protobuf/wire_format_lite_inl.h>
 #include <google/protobuf/stubs/map_util.h>
+#include <google/protobuf/stubs/hash.h>
+
+#include <google/protobuf/port_def.inc>
 
 namespace google {
 namespace protobuf {
@@ -77,8 +85,16 @@ inline bool is_packable(WireFormatLite::WireType type) {
 }
 
 // Registry stuff.
-typedef hash_map<std::pair<const MessageLite*, int>,
-                 ExtensionInfo> ExtensionRegistry;
+struct ExtensionHasher {
+  std::size_t operator()(const std::pair<const MessageLite*, int>& p) const {
+    return std::hash<const MessageLite*>{}(p.first) ^
+           std::hash<int>{}(p.second);
+  }
+};
+
+typedef std::unordered_map<std::pair<const MessageLite*, int>, ExtensionInfo,
+                           ExtensionHasher>
+    ExtensionRegistry;
 
 static const ExtensionRegistry* global_registry = nullptr;
 
@@ -89,7 +105,7 @@ void Register(const MessageLite* containing_type,
   static auto local_static_registry = OnShutdownDelete(new ExtensionRegistry);
   global_registry = local_static_registry;
   if (!InsertIfNotPresent(local_static_registry,
-                          std::make_pair(containing_type, number), info)) {
+                               std::make_pair(containing_type, number), info)) {
     GOOGLE_LOG(FATAL) << "Multiple extension registrations for type \""
                << containing_type->GetTypeName()
                << "\", field number " << number << ".";
@@ -99,8 +115,9 @@ void Register(const MessageLite* containing_type,
 const ExtensionInfo* FindRegisteredExtension(
     const MessageLite* containing_type, int number) {
   return global_registry == nullptr
-      ? nullptr
-      : FindOrNull(*global_registry, std::make_pair(containing_type, number));
+             ? nullptr
+             : FindOrNull(*global_registry,
+                               std::make_pair(containing_type, number));
 }
 
 }  // namespace
@@ -160,7 +177,11 @@ void ExtensionSet::RegisterMessageExtension(const MessageLite* containing_type,
   GOOGLE_CHECK(type == WireFormatLite::TYPE_MESSAGE ||
         type == WireFormatLite::TYPE_GROUP);
   ExtensionInfo info(type, is_repeated, is_packed);
-  info.message_prototype = prototype;
+#if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
+  info.message_info = {prototype, prototype->_ParseFunc()};
+#else
+  info.message_info = {prototype};
+#endif
   Register(containing_type, number, info);
 }
 
@@ -168,32 +189,48 @@ void ExtensionSet::RegisterMessageExtension(const MessageLite* containing_type,
 // ===================================================================
 // Constructors and basic methods.
 
-ExtensionSet::ExtensionSet(::google::protobuf::Arena* arena)
+ExtensionSet::ExtensionSet(Arena* arena)
     : arena_(arena),
       flat_capacity_(0),
       flat_size_(0),
-      map_{flat_capacity_ == 0 ? NULL
-                               : ::google::protobuf::Arena::CreateArray<KeyValue>(
-                                     arena_, flat_capacity_)} {}
+      map_{flat_capacity_ == 0
+               ? NULL
+               : Arena::CreateArray<KeyValue>(arena_, flat_capacity_)} {}
 
 ExtensionSet::ExtensionSet()
     : arena_(NULL),
       flat_capacity_(0),
       flat_size_(0),
-      map_{flat_capacity_ == 0 ? NULL
-                               : ::google::protobuf::Arena::CreateArray<KeyValue>(
-                                     arena_, flat_capacity_)} {}
+      map_{flat_capacity_ == 0
+               ? NULL
+               : Arena::CreateArray<KeyValue>(arena_, flat_capacity_)} {}
 
 ExtensionSet::~ExtensionSet() {
   // Deletes all allocated extensions.
   if (arena_ == NULL) {
     ForEach([](int /* number */, Extension& ext) { ext.Free(); });
-    if (GOOGLE_PREDICT_FALSE(is_large())) {
+    if (PROTOBUF_PREDICT_FALSE(is_large())) {
       delete map_.large;
     } else {
-      delete[] map_.flat;
+      DeleteFlatMap(map_.flat, flat_capacity_);
     }
   }
+}
+
+void ExtensionSet::DeleteFlatMap(
+    const ExtensionSet::KeyValue* flat, uint16 flat_capacity) {
+#ifdef __cpp_sized_deallocation
+  // Arena::CreateArray already requires a trivially destructible type, but
+  // ensure this constraint is not violated in the future.
+  static_assert(std::is_trivially_destructible<KeyValue>::value,
+                "CreateArray requires a trivially destructible type");
+  // A const-cast is needed, but this is safe as we are about to deallocate the
+  // array.
+  ::operator delete[](
+      const_cast<ExtensionSet::KeyValue*>(flat), sizeof(*flat) * flat_capacity);
+#else  // !__cpp_sized_deallocation
+  delete[] flat;
+#endif  // !__cpp_sized_deallocation
 }
 
 // Defined in extension_set_heavy.cc.
@@ -246,7 +283,7 @@ void ExtensionSet::ClearExtension(int number) {
 
 namespace {
 
-enum Cardinality {
+enum {
   REPEATED,
   OPTIONAL
 };
@@ -594,7 +631,7 @@ void ExtensionSet::SetAllocatedMessage(int number, FieldType type,
     ClearExtension(number);
     return;
   }
-  ::google::protobuf::Arena* message_arena = message->GetArena();
+  Arena* message_arena = message->GetArena();
   Extension* extension;
   if (MaybeNewExtension(number, descriptor, &extension)) {
     extension->type = type;
@@ -746,10 +783,9 @@ MessageLite* ExtensionSet::AddMessage(int number, FieldType type,
 
   // RepeatedPtrField<MessageLite> does not know how to Add() since it cannot
   // allocate an abstract object, so we have to be tricky.
-  MessageLite* result =
-      reinterpret_cast<::google::protobuf::internal::RepeatedPtrFieldBase*>(
-          extension->repeated_message_value)
-          ->AddFromCleared<GenericTypeHandler<MessageLite> >();
+  MessageLite* result = reinterpret_cast<internal::RepeatedPtrFieldBase*>(
+                            extension->repeated_message_value)
+                            ->AddFromCleared<GenericTypeHandler<MessageLite>>();
   if (result == NULL) {
     result = prototype.New(arena_);
     extension->repeated_message_value->AddAllocated(result);
@@ -879,8 +915,8 @@ size_t SizeOfUnion(ItX it_xs, ItX end_xs, ItY it_ys, ItY end_ys) {
 }  // namespace
 
 void ExtensionSet::MergeFrom(const ExtensionSet& other) {
-  if (GOOGLE_PREDICT_TRUE(!is_large())) {
-    if (GOOGLE_PREDICT_TRUE(!other.is_large())) {
+  if (PROTOBUF_PREDICT_TRUE(!is_large())) {
+    if (PROTOBUF_PREDICT_TRUE(!other.is_large())) {
       GrowCapacity(SizeOfUnion(flat_begin(), flat_end(), other.flat_begin(),
                                other.flat_end()));
     } else {
@@ -945,9 +981,9 @@ void ExtensionSet::InternalExtensionMergeFrom(
         for (int i = 0; i < other_repeated_message->size(); i++) {
           const MessageLite& other_message = other_repeated_message->Get(i);
           MessageLite* target =
-              reinterpret_cast<::google::protobuf::internal::RepeatedPtrFieldBase*>(
+              reinterpret_cast<internal::RepeatedPtrFieldBase*>(
                   extension->repeated_message_value)
-                  ->AddFromCleared<GenericTypeHandler<MessageLite> >();
+                  ->AddFromCleared<GenericTypeHandler<MessageLite>>();
           if (target == NULL) {
             target = other_message.New(arena_);
             extension->repeated_message_value->AddAllocated(target);
@@ -1108,7 +1144,7 @@ void ExtensionSet::SwapExtension(ExtensionSet* other,
 bool ExtensionSet::IsInitialized() const {
   // Extensions are never required.  However, we need to check that all
   // embedded messages are initialized.
-  if (GOOGLE_PREDICT_FALSE(is_large())) {
+  if (PROTOBUF_PREDICT_FALSE(is_large())) {
     for (const auto& kv : *map_.large) {
       if (!kv.second.IsInitialized()) return false;
     }
@@ -1166,6 +1202,26 @@ bool ExtensionSet::ParseField(uint32 tag, io::CodedInputStream* input,
         number, was_packed_on_wire, extension, input, field_skipper);
   }
 }
+
+#if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
+std::pair<const char*, bool> ExtensionSet::ParseField(
+    uint64 tag, ParseClosure parent, const char* begin, const char* end,
+    const MessageLite* containing_type,
+    internal::InternalMetadataWithArenaLite* metadata,
+    internal::ParseContext* ctx) {
+  GeneratedExtensionFinder finder(containing_type);
+  int number = tag >> 3;
+  bool was_packed_on_wire;
+  ExtensionInfo extension;
+  if (!FindExtensionInfoFromFieldNumber(tag & 7, number, &finder, &extension,
+                                        &was_packed_on_wire)) {
+    return UnknownFieldParse(tag, parent, begin, end,
+                             metadata->mutable_unknown_fields(), ctx);
+  }
+  return ParseFieldWithExtensionInfo(number, was_packed_on_wire, extension,
+                                     metadata, parent, begin, end, ctx);
+}
+#endif
 
 bool ExtensionSet::ParseFieldWithExtensionInfo(
     int number, bool was_packed_on_wire, const ExtensionInfo& extension,
@@ -1303,21 +1359,27 @@ bool ExtensionSet::ParseFieldWithExtensionInfo(
       }
 
       case WireFormatLite::TYPE_GROUP: {
-        MessageLite* value = extension.is_repeated ?
-            AddMessage(number, WireFormatLite::TYPE_GROUP,
-                       *extension.message_prototype, extension.descriptor) :
-            MutableMessage(number, WireFormatLite::TYPE_GROUP,
-                           *extension.message_prototype, extension.descriptor);
+        MessageLite* value =
+            extension.is_repeated
+                ? AddMessage(number, WireFormatLite::TYPE_GROUP,
+                             *extension.message_info.prototype,
+                             extension.descriptor)
+                : MutableMessage(number, WireFormatLite::TYPE_GROUP,
+                                 *extension.message_info.prototype,
+                                 extension.descriptor);
         if (!WireFormatLite::ReadGroup(number, input, value)) return false;
         break;
       }
 
       case WireFormatLite::TYPE_MESSAGE: {
-        MessageLite* value = extension.is_repeated ?
-            AddMessage(number, WireFormatLite::TYPE_MESSAGE,
-                       *extension.message_prototype, extension.descriptor) :
-            MutableMessage(number, WireFormatLite::TYPE_MESSAGE,
-                           *extension.message_prototype, extension.descriptor);
+        MessageLite* value =
+            extension.is_repeated
+                ? AddMessage(number, WireFormatLite::TYPE_MESSAGE,
+                             *extension.message_info.prototype,
+                             extension.descriptor)
+                : MutableMessage(number, WireFormatLite::TYPE_MESSAGE,
+                                 *extension.message_info.prototype,
+                                 extension.descriptor);
         if (!WireFormatLite::ReadMessage(input, value)) return false;
         break;
       }
@@ -1342,20 +1404,65 @@ bool ExtensionSet::ParseField(uint32 tag, io::CodedInputStream* input,
   return ParseField(tag, input, &finder, &skipper);
 }
 
-// Defined in extension_set_heavy.cc.
-// bool ExtensionSet::ParseField(uint32 tag, io::CodedInputStream* input,
-//                               const MessageLite* containing_type,
-//                               UnknownFieldSet* unknown_fields)
+bool ExtensionSet::ParseMessageSetLite(io::CodedInputStream* input,
+                                       ExtensionFinder* extension_finder,
+                                       FieldSkipper* field_skipper) {
+  while (true) {
+    const uint32 tag = input->ReadTag();
+    switch (tag) {
+      case 0:
+        return true;
+      case WireFormatLite::kMessageSetItemStartTag:
+        if (!ParseMessageSetItemLite(input, extension_finder, field_skipper)) {
+          return false;
+        }
+        break;
+      default:
+        if (!ParseField(tag, input, extension_finder, field_skipper)) {
+          return false;
+        }
+        break;
+    }
+  }
+}
 
-// Defined in extension_set_heavy.cc.
-// bool ExtensionSet::ParseMessageSet(io::CodedInputStream* input,
-//                                    const MessageLite* containing_type,
-//                                    UnknownFieldSet* unknown_fields);
+bool ExtensionSet::ParseMessageSetItemLite(io::CodedInputStream* input,
+                                           ExtensionFinder* extension_finder,
+                                           FieldSkipper* field_skipper) {
+  struct MSLite {
+    bool ParseField(int type_id, io::CodedInputStream* input) {
+      return me->ParseField(
+          WireFormatLite::WIRETYPE_LENGTH_DELIMITED + 8 * type_id, input,
+          extension_finder, field_skipper);
+    }
+
+    bool SkipField(uint32 tag, io::CodedInputStream* input) {
+      return field_skipper->SkipField(input, tag);
+    }
+
+    ExtensionSet* me;
+    ExtensionFinder* extension_finder;
+    FieldSkipper* field_skipper;
+  };
+
+  return ParseMessageSetItemImpl(input,
+                                 MSLite{this, extension_finder, field_skipper});
+}
+
+bool ExtensionSet::ParseMessageSet(io::CodedInputStream* input,
+                                   const MessageLite* containing_type,
+                                   string* unknown_fields) {
+  io::StringOutputStream zcis(unknown_fields);
+  io::CodedOutputStream output(&zcis);
+  CodedOutputStreamFieldSkipper skipper(&output);
+  GeneratedExtensionFinder finder(containing_type);
+  return ParseMessageSetLite(input, &finder, &skipper);
+}
 
 void ExtensionSet::SerializeWithCachedSizes(
     int start_field_number, int end_field_number,
     io::CodedOutputStream* output) const {
-  if (GOOGLE_PREDICT_FALSE(is_large())) {
+  if (PROTOBUF_PREDICT_FALSE(is_large())) {
     const auto& end = map_.large->end();
     for (auto it = map_.large->lower_bound(start_field_number);
          it != end && it->first < end_field_number; ++it) {
@@ -1785,7 +1892,7 @@ bool ExtensionSet::Extension::IsInitialized() const {
 void ExtensionSet::LazyMessageExtension::UnusedKeyMethod() {}
 
 const ExtensionSet::Extension* ExtensionSet::FindOrNull(int key) const {
-  if (GOOGLE_PREDICT_FALSE(is_large())) {
+  if (PROTOBUF_PREDICT_FALSE(is_large())) {
     return FindOrNullInLargeMap(key);
   }
   const KeyValue* end = flat_end();
@@ -1808,7 +1915,7 @@ const ExtensionSet::Extension* ExtensionSet::FindOrNullInLargeMap(
 }
 
 ExtensionSet::Extension* ExtensionSet::FindOrNull(int key) {
-  if (GOOGLE_PREDICT_FALSE(is_large())) {
+  if (PROTOBUF_PREDICT_FALSE(is_large())) {
     return FindOrNullInLargeMap(key);
   }
   KeyValue* end = flat_end();
@@ -1830,7 +1937,7 @@ ExtensionSet::Extension* ExtensionSet::FindOrNullInLargeMap(int key) {
 }
 
 std::pair<ExtensionSet::Extension*, bool> ExtensionSet::Insert(int key) {
-  if (GOOGLE_PREDICT_FALSE(is_large())) {
+  if (PROTOBUF_PREDICT_FALSE(is_large())) {
     auto maybe = map_.large->insert({key, Extension()});
     return {&maybe.first->second, maybe.second};
   }
@@ -1852,12 +1959,14 @@ std::pair<ExtensionSet::Extension*, bool> ExtensionSet::Insert(int key) {
 }
 
 void ExtensionSet::GrowCapacity(size_t minimum_new_capacity) {
-  if (GOOGLE_PREDICT_FALSE(is_large())) {
+  if (PROTOBUF_PREDICT_FALSE(is_large())) {
     return;  // LargeMap does not have a "reserve" method.
   }
   if (flat_capacity_ >= minimum_new_capacity) {
     return;
   }
+
+  const auto old_flat_capacity = flat_capacity_;
 
   do {
     flat_capacity_ = flat_capacity_ == 0 ? 1 : flat_capacity_ * 4;
@@ -1867,24 +1976,26 @@ void ExtensionSet::GrowCapacity(size_t minimum_new_capacity) {
   const KeyValue* end = flat_end();
   if (flat_capacity_ > kMaximumFlatCapacity) {
     // Switch to LargeMap
-    map_.large = ::google::protobuf::Arena::Create<LargeMap>(arena_);
+    map_.large = Arena::Create<LargeMap>(arena_);
     LargeMap::iterator hint = map_.large->begin();
     for (const KeyValue* it = begin; it != end; ++it) {
       hint = map_.large->insert(hint, {it->first, it->second});
     }
     flat_size_ = 0;
   } else {
-    map_.flat = ::google::protobuf::Arena::CreateArray<KeyValue>(arena_, flat_capacity_);
+    map_.flat = Arena::CreateArray<KeyValue>(arena_, flat_capacity_);
     std::copy(begin, end, map_.flat);
   }
-  if (arena_ == NULL) delete[] begin;
+  if (arena_ == nullptr) {
+    DeleteFlatMap(begin, old_flat_capacity);
+  }
 }
 
 // static
 constexpr uint16 ExtensionSet::kMaximumFlatCapacity;
 
 void ExtensionSet::Erase(int key) {
-  if (GOOGLE_PREDICT_FALSE(is_large())) {
+  if (PROTOBUF_PREDICT_FALSE(is_large())) {
     map_.large->erase(key);
     return;
   }
@@ -1909,6 +2020,82 @@ const RepeatedStringTypeTraits::RepeatedFieldType*
 RepeatedStringTypeTraits::GetDefaultRepeatedField() {
   static auto instance = OnShutdownDelete(new RepeatedFieldType);
   return instance;
+}
+
+void ExtensionSet::Extension::SerializeMessageSetItemWithCachedSizes(
+    int number,
+    io::CodedOutputStream* output) const {
+  if (type != WireFormatLite::TYPE_MESSAGE || is_repeated) {
+    // Not a valid MessageSet extension, but serialize it the normal way.
+    SerializeFieldWithCachedSizes(number, output);
+    return;
+  }
+
+  if (is_cleared) return;
+
+  // Start group.
+  output->WriteTag(WireFormatLite::kMessageSetItemStartTag);
+
+  // Write type ID.
+  WireFormatLite::WriteUInt32(WireFormatLite::kMessageSetTypeIdNumber,
+                              number,
+                              output);
+  // Write message.
+  if (is_lazy) {
+    lazymessage_value->WriteMessage(
+        WireFormatLite::kMessageSetMessageNumber, output);
+  } else {
+    WireFormatLite::WriteMessageMaybeToArray(
+        WireFormatLite::kMessageSetMessageNumber,
+        *message_value,
+        output);
+  }
+
+  // End group.
+  output->WriteTag(WireFormatLite::kMessageSetItemEndTag);
+}
+
+size_t ExtensionSet::Extension::MessageSetItemByteSize(int number) const {
+  if (type != WireFormatLite::TYPE_MESSAGE || is_repeated) {
+    // Not a valid MessageSet extension, but compute the byte size for it the
+    // normal way.
+    return ByteSize(number);
+  }
+
+  if (is_cleared) return 0;
+
+  size_t our_size = WireFormatLite::kMessageSetItemTagsSize;
+
+  // type_id
+  our_size += io::CodedOutputStream::VarintSize32(number);
+
+  // message
+  size_t message_size = 0;
+  if (is_lazy) {
+    message_size = lazymessage_value->ByteSizeLong();
+  } else {
+    message_size = message_value->ByteSizeLong();
+  }
+
+  our_size += io::CodedOutputStream::VarintSize32(message_size);
+  our_size += message_size;
+
+  return our_size;
+}
+
+void ExtensionSet::SerializeMessageSetWithCachedSizes(
+    io::CodedOutputStream* output) const {
+  ForEach([output](int number, const Extension& ext) {
+    ext.SerializeMessageSetItemWithCachedSizes(number, output);
+  });
+}
+
+size_t ExtensionSet::MessageSetByteSize() const {
+  size_t total_size = 0;
+  ForEach([&total_size](int number, const Extension& ext) {
+    total_size += ext.MessageSetItemByteSize(number);
+  });
+  return total_size;
 }
 
 }  // namespace internal

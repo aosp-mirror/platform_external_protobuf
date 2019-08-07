@@ -44,6 +44,8 @@
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/stubs/strutil.h>
 
+#include <google/protobuf/stubs/map_util.h>
+
 namespace google {
 namespace protobuf {
 namespace compiler {
@@ -86,7 +88,7 @@ void EnumLiteGenerator::Generate(io::Printer* printer) {
   for (int i = 0; i < canonical_values_.size(); i++) {
     std::map<string, string> vars;
     vars["name"] = canonical_values_[i]->name();
-    vars["number"] = SimpleItoa(canonical_values_[i]->number());
+    vars["number"] = StrCat(canonical_values_[i]->number());
     WriteEnumValueDocComment(printer, canonical_values_[i]);
     if (canonical_values_[i]->options().deprecated()) {
       printer->Print("@java.lang.Deprecated\n");
@@ -121,7 +123,7 @@ void EnumLiteGenerator::Generate(io::Printer* printer) {
   for (int i = 0; i < descriptor_->value_count(); i++) {
     std::map<string, string> vars;
     vars["name"] = descriptor_->value(i)->name();
-    vars["number"] = SimpleItoa(descriptor_->value(i)->number());
+    vars["number"] = StrCat(descriptor_->value(i)->number());
     vars["{"] = "";
     vars["}"] = "";
     WriteEnumValueDocComment(printer, descriptor_->value(i));
@@ -163,33 +165,47 @@ void EnumLiteGenerator::Generate(io::Printer* printer) {
   printer->Indent();
 
   for (int i = 0; i < canonical_values_.size(); i++) {
-    printer->Print(
-      "case $number$: return $name$;\n",
-      "name", canonical_values_[i]->name(),
-      "number", SimpleItoa(canonical_values_[i]->number()));
+    printer->Print("case $number$: return $name$;\n", "name",
+                   canonical_values_[i]->name(), "number",
+                   StrCat(canonical_values_[i]->number()));
   }
 
   printer->Outdent();
   printer->Outdent();
   printer->Print(
-    "    default: return null;\n"
-    "  }\n"
-    "}\n"
-    "\n"
-    "public static com.google.protobuf.Internal.EnumLiteMap<$classname$>\n"
-    "    internalGetValueMap() {\n"
-    "  return internalValueMap;\n"
-    "}\n"
-    "private static final com.google.protobuf.Internal.EnumLiteMap<\n"
-    "    $classname$> internalValueMap =\n"
-    "      new com.google.protobuf.Internal.EnumLiteMap<$classname$>() {\n"
-    "        @java.lang.Override\n"
-    "        public $classname$ findValueByNumber(int number) {\n"
-    "          return $classname$.forNumber(number);\n"
-    "        }\n"
-    "      };\n"
-    "\n",
-    "classname", descriptor_->name());
+      "    default: return null;\n"
+      "  }\n"
+      "}\n"
+      "\n"
+      "public static com.google.protobuf.Internal.EnumLiteMap<$classname$>\n"
+      "    internalGetValueMap() {\n"
+      "  return internalValueMap;\n"
+      "}\n"
+      "private static final com.google.protobuf.Internal.EnumLiteMap<\n"
+      "    $classname$> internalValueMap =\n"
+      "      new com.google.protobuf.Internal.EnumLiteMap<$classname$>() {\n"
+      "        @java.lang.Override\n"
+      "        public $classname$ findValueByNumber(int number) {\n"
+      "          return $classname$.forNumber(number);\n"
+      "        }\n"
+      "      };\n"
+      "\n"
+      "public static com.google.protobuf.Internal.EnumVerifier \n"
+      "    internalGetVerifier() {\n"
+      "  return $classname$Verifier.INSTANCE;\n"
+      "}\n"
+      "\n"
+      "private static final class $classname$Verifier implements \n"
+      "     com.google.protobuf.Internal.EnumVerifier { \n"
+      "        static final com.google.protobuf.Internal.EnumVerifier "
+      "          INSTANCE = new $classname$Verifier();\n"
+      "        @java.lang.Override\n"
+      "        public boolean isInRange(int number) {\n"
+      "          return $classname$.forNumber(number) != null;\n"
+      "        }\n"
+      "      };\n"
+      "\n",
+      "classname", descriptor_->name());
 
   printer->Print(
     "private final int value;\n\n"

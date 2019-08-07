@@ -72,8 +72,6 @@ final class UnsafeUtil {
 
   private static final long BUFFER_ADDRESS_OFFSET = fieldOffset(bufferAddressField());
 
-  private static final long STRING_VALUE_OFFSET = fieldOffset(stringValueField());
-
   private UnsafeUtil() {}
 
   static boolean hasUnsafeArrayOperations() {
@@ -84,6 +82,15 @@ final class UnsafeUtil {
     return HAS_UNSAFE_BYTEBUFFER_OPERATIONS;
   }
 
+
+  @SuppressWarnings("unchecked") // safe by method contract
+  static <T> T allocateInstance(Class<T> clazz) {
+    try {
+      return (T) UNSAFE.allocateInstance(clazz);
+    } catch (InstantiationException e) {
+      throw new IllegalStateException(e);
+    }
+  }
 
   static long objectFieldOffset(Field field) {
     return MEMORY_ACCESSOR.objectFieldOffset(field);
@@ -228,7 +235,7 @@ final class UnsafeUtil {
   }
 
   static void copyMemory(byte[] src, long srcIndex, byte[] target, long targetIndex, long length) {
-    System.arraycopy(src, (int) srcIndex, target, (int) targetIndex, (int) length); 
+    System.arraycopy(src, (int) srcIndex, target, (int) targetIndex, (int) length);
   }
 
   static byte getByte(long address) {
@@ -255,31 +262,9 @@ final class UnsafeUtil {
     MEMORY_ACCESSOR.putLong(address, value);
   }
 
-  /**
-   * Gets the offset of the {@code address} field of the given direct {@link ByteBuffer}.
-   */
+  /** Gets the offset of the {@code address} field of the given direct {@link ByteBuffer}. */
   static long addressOffset(ByteBuffer buffer) {
     return MEMORY_ACCESSOR.getLong(buffer, BUFFER_ADDRESS_OFFSET);
-  }
-
-  /**
-   * Returns a new {@link String} backed by the given {@code chars}. The char array should not
-   * be mutated any more after calling this function.
-   */
-  static String moveToString(char[] chars) {
-    if (STRING_VALUE_OFFSET == -1) {
-      // In the off-chance that this JDK does not implement String as we'd expect, just do a copy.
-      return new String(chars);
-    }
-    final String str;
-    try {
-      str = (String) UNSAFE.allocateInstance(String.class);
-    } catch (InstantiationException e) {
-      // This should never happen, but return a copy as a fallback just in case.
-      return new String(chars);
-    }
-    putObject(str, STRING_VALUE_OFFSET, chars);
-    return str;
   }
 
   static Object getStaticObject(Field field) {
@@ -397,12 +382,6 @@ final class UnsafeUtil {
     return field != null && field.getType() == long.class ? field : null;
   }
 
-  /** Finds the value field within a {@link String}. */
-  private static Field stringValueField() {
-    Field field = field(String.class, "value");
-    return field != null && field.getType() == char[].class ? field : null;
-  }
-
   /**
    * Returns the offset of the provided field, or {@code -1} if {@code sun.misc.Unsafe} is not
    * available.
@@ -412,14 +391,12 @@ final class UnsafeUtil {
   }
 
   /**
-   * Gets the field with the given name within the class, or {@code null} if not found. If found,
-   * the field is made accessible.
+   * Gets the field with the given name within the class, or {@code null} if not found.
    */
   private static Field field(Class<?> clazz, String fieldName) {
     Field field;
     try {
       field = clazz.getDeclaredField(fieldName);
-      field.setAccessible(true);
     } catch (Throwable t) {
       // Failed to access the fields.
       field = null;
@@ -500,9 +477,9 @@ final class UnsafeUtil {
     public abstract void putLong(long address, long value);
 
     public abstract Object getStaticObject(Field field);
-    
+
     public abstract void copyMemory(long srcOffset, byte[] target, long targetIndex, long length);
-    
+
     public abstract void copyMemory(byte[] src, long srcIndex, long targetOffset, long length);
   }
 
@@ -581,12 +558,12 @@ final class UnsafeUtil {
     public void putDouble(Object target, long offset, double value) {
       unsafe.putDouble(target, offset, value);
     }
-    
-    @Override 
+
+    @Override
     public void copyMemory(long srcOffset, byte[] target, long targetIndex, long length) {
       unsafe.copyMemory(null, srcOffset, target, BYTE_ARRAY_BASE_OFFSET + targetIndex, length);
     }
-    
+
     @Override
     public void copyMemory(byte[] src, long srcIndex, long targetOffset, long length) {
       unsafe.copyMemory(src, BYTE_ARRAY_BASE_OFFSET + srcIndex, null, targetOffset, length);

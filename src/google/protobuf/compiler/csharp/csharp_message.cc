@@ -42,6 +42,7 @@
 #include <google/protobuf/wire_format.h>
 #include <google/protobuf/wire_format_lite.h>
 
+#include <google/protobuf/compiler/csharp/csharp_options.h>
 #include <google/protobuf/compiler/csharp/csharp_doc_comment.h>
 #include <google/protobuf/compiler/csharp/csharp_enum.h>
 #include <google/protobuf/compiler/csharp/csharp_field_base.h>
@@ -61,20 +62,28 @@ bool CompareFieldNumbers(const FieldDescriptor* d1, const FieldDescriptor* d2) {
 MessageGenerator::MessageGenerator(const Descriptor* descriptor,
                                    const Options* options)
     : SourceGeneratorBase(descriptor->file(), options),
-      descriptor_(descriptor) {
-
-  // sorted field names
-  for (int i = 0; i < descriptor_->field_count(); i++) {
-    field_names_.push_back(descriptor_->field(i)->name());
-  }
-  std::sort(field_names_.begin(), field_names_.end());
-
+      descriptor_(descriptor),
+      has_bit_field_count_(0),
+      end_tag_(GetGroupEndTag(descriptor)) {
   // fields by number
   for (int i = 0; i < descriptor_->field_count(); i++) {
     fields_by_number_.push_back(descriptor_->field(i));
   }
   std::sort(fields_by_number_.begin(), fields_by_number_.end(),
             CompareFieldNumbers);
+
+  if (IsProto2(descriptor_->file())) {
+    int primitiveCount = 0;
+    for (int i = 0; i < descriptor_->field_count(); i++) {
+      const FieldDescriptor* field = descriptor_->field(i);
+      if (!IsNullable(field)) {
+        primitiveCount++;
+        if (has_bit_field_count_ == 0 || (primitiveCount % 32) == 0) {
+          has_bit_field_count_++;
+        }
+      }
+    }
+  }
 }
 
 MessageGenerator::~MessageGenerator() {
@@ -88,10 +97,6 @@ std::string MessageGenerator::full_class_name() {
   return GetClassName(descriptor_);
 }
 
-const std::vector<std::string>& MessageGenerator::field_names() {
-  return field_names_;
-}
-
 const std::vector<const FieldDescriptor*>& MessageGenerator::fields_by_number() {
   return fields_by_number_;
 }
@@ -102,6 +107,12 @@ void MessageGenerator::AddDeprecatedFlag(io::Printer* printer) {
   }
 }
 
+void MessageGenerator::AddSerializableAttribute(io::Printer* printer) {
+  if (this->options()->serializable) {
+    printer->Print("[global::System.SerializableAttribute]\n");
+  }
+}
+
 void MessageGenerator::Generate(io::Printer* printer) {
   std::map<string, string> vars;
   vars["class_name"] = class_name();
@@ -109,6 +120,7 @@ void MessageGenerator::Generate(io::Printer* printer) {
 
   WriteMessageDocComment(printer, descriptor_);
   AddDeprecatedFlag(printer);
+  AddSerializableAttribute(printer);
 
   printer->Print(
     vars,
@@ -122,6 +134,12 @@ void MessageGenerator::Generate(io::Printer* printer) {
 
   printer->Print(
       "private pb::UnknownFieldSet _unknownFields;\n");
+
+  for (int i = 0; i < has_bit_field_count_; i++) {
+    // don't use arrays since all arrays are heap allocated, saving allocations
+    // use ints instead of bytes since bytes lack bitwise operators, saving casts
+    printer->Print("private int _hasBits$i$;\n", "i", SimpleItoa(i));
+  }
 
   WriteGeneratedCodeAttributes(printer);
 
@@ -288,6 +306,9 @@ void MessageGenerator::GenerateCloningCode(io::Printer* printer) {
     vars,
     "public $class_name$($class_name$ other) : this() {\n");
   printer->Indent();
+  for (int i = 0; i < has_bit_field_count_; i++) {
+    printer->Print("_hasBits$i$ = other._hasBits$i$;\n", "i", SimpleItoa(i));
+  }
   // Clone non-oneof fields first
   for (int i = 0; i < descriptor_->field_count(); i++) {
     if (!descriptor_->field(i)->containing_oneof()) {
@@ -521,6 +542,12 @@ void MessageGenerator::GenerateMergingMethods(io::Printer* printer) {
       "default:\n"
       "  _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);\n"
       "  break;\n");
+    if (end_tag_ != 0) {
+      printer->Print(
+        "$end_tag$:\n"
+        "  return;\n",
+        "end_tag", SimpleItoa(end_tag_));
+    }
   }
   for (int i = 0; i < fields_by_number().size(); i++) {
     const FieldDescriptor* field = fields_by_number()[i];
@@ -559,19 +586,29 @@ void MessageGenerator::GenerateMergingMethods(io::Printer* printer) {
   printer->Print("}\n\n"); // method
 }
 
-int MessageGenerator::GetFieldOrdinal(const FieldDescriptor* descriptor) {
-  for (int i = 0; i < field_names().size(); i++) {
-    if (field_names()[i] == descriptor->name()) {
-      return i;
+// it's a waste of space to track presence for all values, so we only track them if they're not nullable
+int MessageGenerator::GetPresenceIndex(const FieldDescriptor* descriptor) {
+  if (IsNullable(descriptor) || !IsProto2(descriptor_->file())) {
+    return -1;
+  }
+
+  int index = 0;
+  for (int i = 0; i < fields_by_number().size(); i++) {
+    const FieldDescriptor* field = fields_by_number()[i];
+    if (field == descriptor) {
+      return index;
+    }
+    if (!IsNullable(field)) {
+      index++;
     }
   }
-  GOOGLE_LOG(DFATAL)<< "Could not find ordinal for field " << descriptor->name();
+  GOOGLE_LOG(DFATAL)<< "Could not find presence index for field " << descriptor->name();
   return -1;
 }
 
 FieldGeneratorBase* MessageGenerator::CreateFieldGeneratorInternal(
     const FieldDescriptor* descriptor) {
-  return CreateFieldGenerator(descriptor, GetFieldOrdinal(descriptor), this->options());
+  return CreateFieldGenerator(descriptor, GetPresenceIndex(descriptor), this->options());
 }
 
 }  // namespace csharp

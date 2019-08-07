@@ -35,7 +35,6 @@
 #include <google/protobuf/compiler/java/java_message_builder.h>
 
 #include <algorithm>
-#include <google/protobuf/stubs/hash.h>
 #include <map>
 #include <memory>
 #include <vector>
@@ -51,8 +50,9 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/wire_format.h>
-#include <google/protobuf/stubs/substitute.h>
 #include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/stubs/substitute.h>
+
 
 
 namespace google {
@@ -126,7 +126,7 @@ Generate(io::Printer* printer) {
         descriptor_->oneof_decl(i))->name;
     vars["oneof_capitalized_name"] = context_->GetOneofGeneratorInfo(
         descriptor_->oneof_decl(i))->capitalized_name;
-    vars["oneof_index"] = SimpleItoa(descriptor_->oneof_decl(i)->index());
+    vars["oneof_index"] = StrCat(descriptor_->oneof_decl(i)->index());
     // oneofCase_ and oneof_
     printer->Print(vars,
       "private int $oneof_name$Case_ = 0;\n"
@@ -169,8 +169,6 @@ Generate(io::Printer* printer) {
                      .GenerateBuilderMembers(printer);
   }
 
-  bool is_proto3 =
-      descriptor_->file()->syntax() == FileDescriptor::SYNTAX_PROTO3;
     // Override methods declared in GeneratedMessage to return the concrete
     // generated type so callsites won't depend on GeneratedMessage. This
     // is needed to keep binary compatibility when we change generated code
@@ -180,7 +178,7 @@ Generate(io::Printer* printer) {
     "@java.lang.Override\n"
     "public final Builder setUnknownFields(\n"
     "    final com.google.protobuf.UnknownFieldSet unknownFields) {\n"
-    "  return super.setUnknownFields$suffix$(unknownFields);\n"
+    "  return super.setUnknownFields(unknownFields);\n"
     "}\n"
     "\n"
     "@java.lang.Override\n"
@@ -188,8 +186,7 @@ Generate(io::Printer* printer) {
     "    final com.google.protobuf.UnknownFieldSet unknownFields) {\n"
     "  return super.mergeUnknownFields(unknownFields);\n"
     "}\n"
-    "\n",
-    "suffix", is_proto3 ? "Proto3" : "");
+    "\n");
 
   printer->Print(
     "\n"
@@ -234,10 +231,10 @@ GenerateDescriptorMethods(io::Printer* printer) {
       const FieldDescriptor* field = map_fields[i];
       const FieldGeneratorInfo* info = context_->GetFieldGeneratorInfo(field);
       printer->Print(
-        "case $number$:\n"
-        "  return internalGet$capitalized_name$();\n",
-        "number", SimpleItoa(field->number()),
-        "capitalized_name", info->capitalized_name);
+          "case $number$:\n"
+          "  return internalGet$capitalized_name$();\n",
+          "number", StrCat(field->number()), "capitalized_name",
+          info->capitalized_name);
     }
     printer->Print(
         "default:\n"
@@ -260,10 +257,10 @@ GenerateDescriptorMethods(io::Printer* printer) {
       const FieldGeneratorInfo* info =
           context_->GetFieldGeneratorInfo(field);
       printer->Print(
-        "case $number$:\n"
-        "  return internalGetMutable$capitalized_name$();\n",
-        "number", SimpleItoa(field->number()),
-        "capitalized_name", info->capitalized_name);
+          "case $number$:\n"
+          "  return internalGetMutable$capitalized_name$();\n",
+          "number", StrCat(field->number()), "capitalized_name",
+          info->capitalized_name);
     }
     printer->Print(
         "default:\n"
@@ -464,35 +461,35 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
   printer->Print(
     "@java.lang.Override\n"
     "public Builder clone() {\n"
-    "  return (Builder) super.clone();\n"
+    "  return super.clone();\n"
     "}\n"
     "@java.lang.Override\n"
     "public Builder setField(\n"
     "    com.google.protobuf.Descriptors.FieldDescriptor field,\n"
     "    java.lang.Object value) {\n"
-    "  return (Builder) super.setField(field, value);\n"
+    "  return super.setField(field, value);\n"
     "}\n"
     "@java.lang.Override\n"
     "public Builder clearField(\n"
     "    com.google.protobuf.Descriptors.FieldDescriptor field) {\n"
-    "  return (Builder) super.clearField(field);\n"
+    "  return super.clearField(field);\n"
     "}\n"
     "@java.lang.Override\n"
     "public Builder clearOneof(\n"
     "    com.google.protobuf.Descriptors.OneofDescriptor oneof) {\n"
-    "  return (Builder) super.clearOneof(oneof);\n"
+    "  return super.clearOneof(oneof);\n"
     "}\n"
     "@java.lang.Override\n"
     "public Builder setRepeatedField(\n"
     "    com.google.protobuf.Descriptors.FieldDescriptor field,\n"
     "    int index, java.lang.Object value) {\n"
-    "  return (Builder) super.setRepeatedField(field, index, value);\n"
+    "  return super.setRepeatedField(field, index, value);\n"
     "}\n"
     "@java.lang.Override\n"
     "public Builder addRepeatedField(\n"
     "    com.google.protobuf.Descriptors.FieldDescriptor field,\n"
     "    java.lang.Object value) {\n"
-    "  return (Builder) super.addRepeatedField(field, value);\n"
+    "  return super.addRepeatedField(field, value);\n"
     "}\n");
 
   if (descriptor_->extension_range_count() > 0) {
@@ -502,27 +499,27 @@ GenerateCommonBuilderMethods(io::Printer* printer) {
       "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
       "        $classname$, Type> extension,\n"
       "    Type value) {\n"
-      "  return (Builder) super.setExtension(extension, value);\n"
+      "  return super.setExtension(extension, value);\n"
       "}\n"
       "@java.lang.Override\n"
       "public <Type> Builder setExtension(\n"
       "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
       "        $classname$, java.util.List<Type>> extension,\n"
       "    int index, Type value) {\n"
-      "  return (Builder) super.setExtension(extension, index, value);\n"
+      "  return super.setExtension(extension, index, value);\n"
       "}\n"
       "@java.lang.Override\n"
       "public <Type> Builder addExtension(\n"
       "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
       "        $classname$, java.util.List<Type>> extension,\n"
       "    Type value) {\n"
-      "  return (Builder) super.addExtension(extension, value);\n"
+      "  return super.addExtension(extension, value);\n"
       "}\n"
       "@java.lang.Override\n"
       "public <Type> Builder clearExtension(\n"
       "    com.google.protobuf.GeneratedMessage.GeneratedExtension<\n"
       "        $classname$, ?> extension) {\n"
-      "  return (Builder) super.clearExtension(extension);\n"
+      "  return super.clearExtension(extension);\n"
       "}\n",
       "classname", name_resolver_->GetImmutableClassName(descriptor_));
   }
@@ -686,10 +683,9 @@ void MessageBuilderGenerator::GenerateIsInitialized(
             const OneofDescriptor* oneof = field->containing_oneof();
             const OneofGeneratorInfo* oneof_info =
                 context_->GetOneofGeneratorInfo(oneof);
-            printer->Print(
-              "if ($oneof_name$Case_ == $field_number$) {\n",
-              "oneof_name", oneof_info->name,
-              "field_number", SimpleItoa(field->number()));
+            printer->Print("if ($oneof_name$Case_ == $field_number$) {\n",
+                           "oneof_name", oneof_info->name, "field_number",
+                           StrCat(field->number()));
           } else {
             printer->Print(
               "if (has$name$()) {\n",

@@ -36,7 +36,7 @@ protoc_middleman2:  make_tmp_dir $(top_srcdir)/src/protoc$(EXEEXT) $(benchmarks_
 	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd/cpp --java_out=$$oldpwd/tmp/java/src/main/java --python_out=$$oldpwd/tmp $(benchmarks_protoc_inputs_proto2) )
 	touch protoc_middleman2
 
-all_data = $$(find $(srcdir) -type f -name "dataset.*.pb" -not -path "./tmp/*")
+all_data = $$(find $$(cd $(srcdir) && pwd) -type f -name "dataset.*.pb" -not -path "$$(cd $(srcdir) && pwd)/tmp/*")
 
 ############# CPP RULES ##############
 
@@ -90,9 +90,8 @@ $(benchmarks_protoc_outputs_proto2_header): protoc_middleman2
 
 initialize_submodule:
 	oldpwd=`pwd`
-	cd $(top_srcdir)/third_party
-	git submodule update --init -r
-	cd $(top_srcdir)/third_party/benchmark && cmake -DCMAKE_BUILD_TYPE=Release && make
+	cd $(top_srcdir) && git submodule update --init -r third_party/benchmark && \
+		cd third_party/benchmark && cmake -DCMAKE_BUILD_TYPE=Release && make
 	cd $$oldpwd
 	touch initialize_submodule
 
@@ -127,8 +126,10 @@ java_benchmark_testing_files =                                      \
 	java/src/main/java/com/google/protobuf/ProtoCaliperBenchmark.java
 
 javac_middleman: $(java_benchmark_testing_files) protoc_middleman protoc_middleman2
-	cp -r $(srcdir)/java tmp && cd tmp/java &&  mvn clean compile assembly:single
-	cd ../..
+	cp -r $(srcdir)/java tmp 
+	mkdir -p tmp/java/lib
+	cp $(top_srcdir)/java/core/target/*.jar tmp/java/lib/protobuf-java.jar
+	cd tmp/java && mvn clean compile assembly:single -Dprotobuf.version=$(PACKAGE_VERSION) && cd ../..
 	@touch javac_middleman
 
 java-benchmark: javac_middleman
@@ -138,10 +139,10 @@ java-benchmark: javac_middleman
 	@echo 'conf=()' >> java-benchmark
 	@echo 'data_files=""' >> java-benchmark
 	@echo 'for arg in $$@; do if [[ $${arg:0:1} == "-" ]]; then conf+=($$arg); else data_files+="$$arg,"; fi; done' >> java-benchmark
-	@echo 'java -cp '"tmp/java/target/*.jar"' com.google.caliper.runner.CaliperMain com.google.protobuf.ProtoCaliperBenchmark -i runtime '"\\"  >> java-benchmark
-	@echo '-b serializeToByteString,serializeToByteArray,serializeToMemoryStream,'"\\"  >> java-benchmark
-	@echo 'deserializeFromByteString,deserializeFromByteArray,deserializeFromMemoryStream '"\\" >> java-benchmark
-	@echo '-DdataFile=$${data_files:0:-1} $${conf[*]}' >> java-benchmark
+	@echo 'java -cp '\"tmp/java/target/*:$(top_srcdir)/java/core/target/*:$(top_srcdir)/java/util/target/*\"" \\" >>java-benchmark
+	@echo '   com.google.caliper.runner.CaliperMain com.google.protobuf.ProtoCaliperBenchmark -i runtime '"\\"  >> java-benchmark
+	@echo '   -b serializeToByteArray,serializeToMemoryStream,deserializeFromByteArray,deserializeFromMemoryStream '"\\" >> java-benchmark
+	@echo '   -DdataFile=$${data_files:0:-1} $${conf[*]}' >> java-benchmark
 	@chmod +x java-benchmark
 
 java: protoc_middleman protoc_middleman2 java-benchmark
@@ -180,8 +181,8 @@ nodist_libbenchmark_messages_la_SOURCES =                         \
 python-pure-python-benchmark: python_add_init
 	@echo "Writing shortcut script python-pure-python-benchmark..."
 	@echo '#! /bin/bash' > python-pure-python-benchmark
-	@echo export LD_LIBRARY_PATH=$(top_srcdir)/src/libprotobuf.la >> python-pure-python-benchmark
-	@echo export DYLD_LIBRARY_PATH=$(top_srcdir)/src/libprotobuf.la >> python-pure-python-benchmark
+	@echo export LD_LIBRARY_PATH=$(top_srcdir)/src/.libs >> python-pure-python-benchmark
+	@echo export DYLD_LIBRARY_PATH=$(top_srcdir)/src/.libs >> python-pure-python-benchmark
 	@echo export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=\'python\' >> python-pure-python-benchmark
 	@echo cp $(srcdir)/python/py_benchmark.py tmp >> python-pure-python-benchmark
 	@echo python tmp/py_benchmark.py '$$@' >> python-pure-python-benchmark
@@ -190,8 +191,8 @@ python-pure-python-benchmark: python_add_init
 python-cpp-reflection-benchmark: python_add_init
 	@echo "Writing shortcut script python-cpp-reflection-benchmark..."
 	@echo '#! /bin/bash' > python-cpp-reflection-benchmark
-	@echo export LD_LIBRARY_PATH=$(top_srcdir)/src/libprotobuf.la >> python-cpp-reflection-benchmark
-	@echo export DYLD_LIBRARY_PATH=$(top_srcdir)/src/libprotobuf.la >> python-cpp-reflection-benchmark
+	@echo export LD_LIBRARY_PATH=$(top_srcdir)/src/.libs >> python-cpp-reflection-benchmark
+	@echo export DYLD_LIBRARY_PATH=$(top_srcdir)/src/.libs >> python-cpp-reflection-benchmark
 	@echo export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=\'cpp\' >> python-cpp-reflection-benchmark
 	@echo cp $(srcdir)/python/py_benchmark.py tmp >> python-cpp-reflection-benchmark
 	@echo python tmp/py_benchmark.py '$$@' >> python-cpp-reflection-benchmark
@@ -200,8 +201,8 @@ python-cpp-reflection-benchmark: python_add_init
 python-cpp-generated-code-benchmark: python_add_init libbenchmark_messages.la
 	@echo "Writing shortcut script python-cpp-generated-code-benchmark..."
 	@echo '#! /bin/bash' > python-cpp-generated-code-benchmark
-	@echo export LD_LIBRARY_PATH=$(top_srcdir)/src/libprotobuf.la >> python-cpp-generated-code-benchmark
-	@echo export DYLD_LIBRARY_PATH=$(top_srcdir)/src/libprotobuf.la >> python-cpp-generated-code-benchmark
+	@echo export LD_LIBRARY_PATH=$(top_srcdir)/src/.libs >> python-cpp-generated-code-benchmark
+	@echo export DYLD_LIBRARY_PATH=$(top_srcdir)/src/.libs >> python-cpp-generated-code-benchmark
 	@echo export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=\'cpp\' >> python-cpp-generated-code-benchmark
 	@echo cp $(srcdir)/python/py_benchmark.py tmp >> python-cpp-generated-code-benchmark
 	@echo python tmp/py_benchmark.py --cpp_generated '$$@' >> python-cpp-generated-code-benchmark
@@ -259,7 +260,7 @@ go-benchmark: go_protoc_middleman
 	@echo 'all_data=""' >> go-benchmark
 	@echo 'conf=()' >> go-benchmark
 	@echo 'data_files=()' >> go-benchmark
-	@echo 'for arg in $$@; do if [[ $${arg:0:1} == "-" ]]; then conf+=($$arg); else data_files+=("../$$arg"); fi; done' >> go-benchmark
+	@echo 'for arg in $$@; do if [[ $${arg:0:1} == "-" ]]; then conf+=($$arg); else data_files+=("$$arg"); fi; done' >> go-benchmark
 	@echo 'go test -bench=. $${conf[*]} -- $${data_files[*]}' >> go-benchmark
 	@echo 'cd ..' >> go-benchmark
 	@chmod +x go-benchmark
@@ -348,11 +349,11 @@ gogo_proto_middleman: protoc-gen-gogoproto
 	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I$(srcdir) -I$(top_srcdir) --plugin=protoc-gen-gogoproto --gogoproto_out=$$oldpwd/tmp/gogo_proto $(benchmarks_protoc_inputs) $(benchmarks_protoc_inputs_benchmark_wrapper) $(benchmarks_protoc_inputs_proto2) )
 	touch gogo_proto_middleman
 
-new_data = $$(for data in $(all_data); do echo "tmp$${data\#$(srcdir)}"; done | xargs)
+gogo_data = $$(for data in $(all_data); do echo "tmp/gogo_data$${data\#$(srcdir)}"; done | xargs)
 
 generate_gogo_data: protoc_middleman protoc_middleman2 gogo-data-scrubber
-	mkdir -p `dirname $(new_data)`
-	./gogo-data-scrubber $(all_data) $(new_data)
+	mkdir -p `dirname $(gogo_data)`
+	./gogo-data-scrubber $(all_data) $(gogo_data)
 	touch generate_gogo_data
 	
 make_tmp_dir_gogo:
@@ -407,8 +408,6 @@ gogoslick_protoc_middleman: make_tmp_dir_gogo $(top_srcdir)/src/protoc$(EXEEXT) 
 	oldpwd=`pwd` && ( cd $(srcdir)/tmp/gogo_proto && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$$oldpwd/$(top_srcdir)/src --gogoslick_out=$$oldpwd/tmp/gogoslick $(benchmarks_protoc_inputs_proto2_message4) )
 	touch gogoslick_protoc_middleman
 
-gogo_data = $$(find . -type f -name "dataset.*.pb" -path "./tmp/*")
-
 generate-gogo-benchmark-code:
 	@echo '#! /bin/bash' > generate-gogo-benchmark-code
 	@echo 'cp $(srcdir)/go/go_benchmark_test.go tmp/$$1/benchmark_code/$$1_benchmark1_test.go' >> generate-gogo-benchmark-code
@@ -452,7 +451,7 @@ gogoslick: gogoslick_protoc_middleman  generate_gogo_data gogo-benchmark generat
  
 ############ UTIL RULES BEGIN ############
 
-bin_PROGRAMS += protoc-gen-gogoproto gogo-data-scrubber
+bin_PROGRAMS += protoc-gen-gogoproto gogo-data-scrubber protoc-gen-proto2_to_proto3 proto3-data-stripper
 
 protoc_gen_gogoproto_LDADD = $(top_srcdir)/src/libprotobuf.la $(top_srcdir)/src/libprotoc.la
 protoc_gen_gogoproto_SOURCES = util/protoc-gen-gogoproto.cc
@@ -467,8 +466,136 @@ nodist_gogo_data_scrubber_SOURCES =                                        \
 	$(benchmarks_protoc_outputs_proto2)                                      \
 	$(benchmarks_protoc_outputs_proto2_header)                               \
 	$(benchmarks_protoc_outputs_header)
+
+protoc_gen_proto2_to_proto3_LDADD = $(top_srcdir)/src/libprotobuf.la $(top_srcdir)/src/libprotoc.la
+protoc_gen_proto2_to_proto3_SOURCES = util/protoc-gen-proto2_to_proto3.cc
+protoc_gen_proto2_to_proto3_CPPFLAGS = -I$(top_srcdir)/src -I$(srcdir)/cpp -I$(srcdir)/util
+
+proto3_data_stripper_LDADD = $(top_srcdir)/src/libprotobuf.la
+proto3_data_stripper_SOURCES = util/proto3_data_stripper.cc
+proto3_data_stripper_CPPFLAGS = -I$(top_srcdir)/src -I$(srcdir)/cpp -I$(srcdir)/util
+util/proto3_data_stripper-proto3_data_stripper.$(OBJEXT): $(benchmarks_protoc_outputs) $(benchmarks_protoc_outputs_proto2) $(benchmarks_protoc_outputs_header) $(benchmarks_protoc_outputs_proto2_header)
+nodist_proto3_data_stripper_SOURCES =                                      \
+	$(benchmarks_protoc_outputs)                                             \
+	$(benchmarks_protoc_outputs_proto2)                                      \
+	$(benchmarks_protoc_outputs_proto2_header)                               \
+	$(benchmarks_protoc_outputs_header)
+
 	
 ############ UTIL RULES END ############
+
+############ PROTO3 PREPARATION BEGIN #############
+
+proto3_proto_middleman: protoc-gen-proto2_to_proto3
+	mkdir -p "tmp/proto3_proto"
+	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I$(srcdir) -I$(top_srcdir) --plugin=protoc-gen-proto2_to_proto3 --proto2_to_proto3_out=$$oldpwd/tmp/proto3_proto $(benchmarks_protoc_inputs) $(benchmarks_protoc_inputs_benchmark_wrapper) $(benchmarks_protoc_inputs_proto2) )
+	touch proto3_proto_middleman
+
+full_srcdir = $$(cd $(srcdir) && pwd)
+proto3_data = $$(for data in $(all_data); do echo $(full_srcdir)"/tmp/proto3_data$${data\#$(full_srcdir)}"; done | xargs)
+
+generate_proto3_data: protoc_middleman protoc_middleman2 proto3-data-stripper
+	mkdir -p `dirname $(proto3_data)`
+	./proto3-data-stripper $(all_data) $(proto3_data)
+	touch generate_proto3_data
+
+############ PROTO3 PREPARATION END #############
+
+############ PHP RULES BEGIN #################
+
+proto3_middleman_php: proto3_proto_middleman
+	mkdir -p "tmp/php"
+	oldpwd=`pwd` && ( cd tmp/proto3_proto && $$oldpwd/../src/protoc$(EXEEXT) -I$(srcdir) -I$(top_srcdir) --php_out=$$oldpwd/tmp/php $(benchmarks_protoc_inputs) $(benchmarks_protoc_inputs_benchmark_wrapper) $(benchmarks_protoc_inputs_proto2) )
+	touch proto3_middleman_php
+
+php-benchmark: proto3_middleman_php generate_proto3_data
+	mkdir -p "tmp/php/Google/Protobuf/Benchmark" && cp php/PhpBenchmark.php "tmp/php/Google/Protobuf/Benchmark"
+	cp php/autoload.php "tmp/php"  
+	@echo "Writing shortcut script php-benchmark..."
+	@echo '#! /bin/bash' > php-benchmark
+	@echo 'export PROTOBUF_PHP_SRCDIR="$$(cd $(top_srcdir) && pwd)/php/src"' >> php-benchmark
+	@echo 'cd tmp/php' >> php-benchmark
+	@echo 'export CURRENT_DIR=$$(pwd)' >> php-benchmark
+	@echo 'php -d auto_prepend_file="autoload.php" -d include_path="$$(pwd)" Google/Protobuf/Benchmark/PhpBenchmark.php $$@' >> php-benchmark
+	@echo 'cd ../..' >> php-benchmark
+	@chmod +x php-benchmark
+
+php: php-benchmark proto3_middleman_php
+	./php-benchmark --behavior_prefix="php" $(proto3_data)
+
+php_c_extension:
+	cd $(top_srcdir)/php/ext/google/protobuf && phpize && ./configure CFLAGS='-O3' && make -j8
+
+php-c-benchmark: proto3_middleman_php generate_proto3_data php_c_extension php_c_extension
+	mkdir -p "tmp/php/Google/Protobuf/Benchmark" && cp php/PhpBenchmark.php "tmp/php/Google/Protobuf/Benchmark" 
+	cp php/autoload.php "tmp/php"  
+	@echo "Writing shortcut script php-c-benchmark..."
+	@echo '#! /bin/bash' > php-c-benchmark
+	@echo 'export PROTOBUF_PHP_SRCDIR="$$(cd $(top_srcdir) && pwd)/php/src"' >> php-c-benchmark
+	@echo 'export PROTOBUF_PHP_EXTDIR="$$PROTOBUF_PHP_SRCDIR/../ext/google/protobuf/modules"' >> php-c-benchmark
+	@echo 'cd tmp/php' >> php-c-benchmark
+	@echo 'export CURRENT_DIR=$$(pwd)' >> php-c-benchmark
+	@echo 'php -d auto_prepend_file="autoload.php" -d include_path="$$(pwd)" -d extension="$$PROTOBUF_PHP_EXTDIR/protobuf.so" Google/Protobuf/Benchmark/PhpBenchmark.php $$@' >> php-c-benchmark
+	@echo 'cd ../..' >> php-c-benchmark
+	@chmod +x php-c-benchmark
+
+php_c: php-c-benchmark proto3_middleman_php
+	./php-c-benchmark --behavior_prefix="php_c" $(proto3_data)
+
+
+############ PHP RULES END #################
+
+############ protobuf.js RULE BEGIN #############
+
+pbjs_preparation:
+	mkdir -p tmp/protobuf.js
+	cd tmp/protobuf.js && git clone https://github.com/dcodeIO/protobuf.js.git && \
+			cd protobuf.js && npm install && npm run build
+	cd tmp/protobuf.js && npm install benchmark
+	cp protobuf.js/* tmp/protobuf.js
+	cp js/benchmark_suite.js tmp/protobuf.js
+	touch pbjs_preparation
+
+pbjs_middleman: pbjs_preparation
+	export OLDDIR=$$(pwd) && cd tmp/protobuf.js && node generate_pbjs_files.js --target static-module --include_path=$$OLDDIR -o generated_bundle_code.js $(benchmarks_protoc_inputs) $(benchmarks_protoc_inputs_benchmark_wrapper) $(benchmarks_protoc_inputs_proto2)
+	touch pbjs_middleman
+
+pbjs-benchmark: pbjs_middleman
+	@echo '#! /bin/bash' > pbjs-benchmark
+	@echo 'cd tmp/protobuf.js' >> pbjs-benchmark
+	@echo 'sed -i "s/protobufjs/.\/protobuf.js/g" generated_bundle_code.js' >> pbjs-benchmark
+	@echo 'env NODE_PATH=".:./node_modules:$$NODE_PATH" node protobufjs_benchmark.js $$@' >> pbjs-benchmark
+	@chmod +x pbjs-benchmark
+
+pbjs: pbjs-benchmark
+	./pbjs-benchmark $(all_data)
+
+############ protobuf.js RULE END #############
+
+############ JS RULE BEGIN #############
+
+js_preparation:
+	mkdir -p tmp/js
+	oldpwd=$$(pwd) && cd $(top_srcdir)/js && npm install && npm test
+	cd tmp/js && npm install benchmark
+	cp js/* tmp/js
+	touch js_preparation
+
+js_middleman: js_preparation
+	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --js_out=import_style=commonjs,binary:$$oldpwd/tmp/js $(benchmarks_protoc_inputs) $(benchmarks_protoc_inputs_benchmark_wrapper) $(benchmarks_protoc_inputs_proto2))
+	touch js_middleman
+
+js-benchmark: js_middleman
+	@echo '#! /bin/bash' > js-benchmark
+	@echo 'export TOP_JS_SRCDIR=$$(cd $(top_srcdir)/js && pwd)' >> js-benchmark
+	@echo 'cd tmp/js' >> js-benchmark
+	@echo 'env NODE_PATH="$$TOP_JS_SRCDIR:.:./node_modules:$$NODE_PATH" node --max-old-space-size=4096 js_benchmark.js $$@' >> js-benchmark
+	@chmod +x js-benchmark
+
+js: js-benchmark
+	./js-benchmark $(all_data)
+
+############ JS RULE END #############
 
 MAINTAINERCLEANFILES =                                                     \
 	Makefile.in
@@ -512,8 +639,19 @@ CLEANFILES =                                                               \
 	gogoslick_protoc_middleman                                               \
 	gogoslick                                                                \
 	gogo-benchmark                                                           \
-	gogo/cpp_no_group/cpp_benchmark.* 
-	
+	gogo/cpp_no_group/cpp_benchmark.*                                        \
+	proto3_proto_middleman                                                   \
+	generate_proto3_data                                                     \
+	php-benchmark                                                            \
+	php-c-benchmark                                                          \
+	proto3_middleman_php                                                     \
+	pbjs_preparation                                                         \
+	pbjs_middleman                                                           \
+	pbjs-benchmark                                                           \
+	js_preparation                                                           \
+	js_middleman                                                             \
+	js-benchmark
 
 clean-local:
 	-rm -rf tmp/*
+	

@@ -254,8 +254,7 @@ GenerateBuilderMembers(io::Printer* printer) const {
 
   bool support_field_presence = SupportFieldPresence(descriptor_->file());
 
-  printer->Print(variables_,
-    "private $type$ $name$_ = null;\n");
+  printer->Print(variables_, "private $type$ $name$_;\n");
 
   printer->Print(variables_,
       // If this builder is non-null, it is used and the other fields are
@@ -443,16 +442,18 @@ GenerateMergingCode(io::Printer* printer) const {
 void ImmutableMessageFieldGenerator::
 GenerateBuildingCode(io::Printer* printer) const {
   if (SupportFieldPresence(descriptor_->file())) {
+    printer->Print(variables_, "if ($get_has_field_bit_from_local$) {\n");
+    printer->Indent();
+    PrintNestedBuilderCondition(printer, "result.$name$_ = $name$_;\n",
+                                "result.$name$_ = $name$Builder_.build();\n");
+    printer->Outdent();
     printer->Print(variables_,
-        "if ($get_has_field_bit_from_local$) {\n"
-        "  $set_has_field_bit_to_local$;\n"
-        "}\n");
+                   "  $set_has_field_bit_to_local$;\n"
+                   "}\n");
+  } else {
+    PrintNestedBuilderCondition(printer, "result.$name$_ = $name$_;\n",
+                                "result.$name$_ = $name$Builder_.build();\n");
   }
-
-  PrintNestedBuilderCondition(printer,
-    "result.$name$_ = $name$_;\n",
-
-    "result.$name$_ = $name$Builder_.build();\n");
 }
 
 void ImmutableMessageFieldGenerator::
@@ -505,8 +506,8 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
 void ImmutableMessageFieldGenerator::
 GenerateEqualsCode(io::Printer* printer) const {
   printer->Print(variables_,
-    "result = result && get$capitalized_name$()\n"
-    "    .equals(other.get$capitalized_name$());\n");
+    "if (!get$capitalized_name$()\n"
+    "    .equals(other.get$capitalized_name$())) return false;\n");
 }
 
 void ImmutableMessageFieldGenerator::
@@ -1306,8 +1307,8 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
 void RepeatedImmutableMessageFieldGenerator::
 GenerateEqualsCode(io::Printer* printer) const {
   printer->Print(variables_,
-    "result = result && get$capitalized_name$List()\n"
-    "    .equals(other.get$capitalized_name$List());\n");
+    "if (!get$capitalized_name$List()\n"
+    "    .equals(other.get$capitalized_name$List())) return false;\n");
 }
 
 void RepeatedImmutableMessageFieldGenerator::

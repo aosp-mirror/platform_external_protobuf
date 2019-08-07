@@ -51,6 +51,7 @@ pkgconfig_DATA = protobuf.pc protobuf-lite.pc
 csharp_EXTRA_DIST=                                                           \
   csharp/.gitignore                                                          \
   csharp/CHANGES.txt                                                         \
+  csharp/Google.Protobuf.Tools.targets                                       \
   csharp/Google.Protobuf.Tools.nuspec                                        \
   csharp/README.md                                                           \
   csharp/build_packages.bat                                                  \
@@ -92,6 +93,7 @@ csharp_EXTRA_DIST=                                                           \
   csharp/src/Google.Protobuf.Test/DeprecatedMemberTest.cs                    \
   csharp/src/Google.Protobuf.Test/EqualityTester.cs                          \
   csharp/src/Google.Protobuf.Test/FieldCodecTest.cs                          \
+  csharp/src/Google.Protobuf.Test/FieldMaskTreeTest.cs                       \
   csharp/src/Google.Protobuf.Test/GeneratedMessageTest.cs                    \
   csharp/src/Google.Protobuf.Test/Google.Protobuf.Test.csproj                \
   csharp/src/Google.Protobuf.Test/IssuesTest.cs                              \
@@ -99,6 +101,7 @@ csharp_EXTRA_DIST=                                                           \
   csharp/src/Google.Protobuf.Test/JsonParserTest.cs                          \
   csharp/src/Google.Protobuf.Test/JsonTokenizerTest.cs                       \
   csharp/src/Google.Protobuf.Test/Reflection/CustomOptionsTest.cs            \
+  csharp/src/Google.Protobuf.Test/Reflection/DescriptorDeclarationTest.cs    \
   csharp/src/Google.Protobuf.Test/Reflection/DescriptorsTest.cs              \
   csharp/src/Google.Protobuf.Test/Reflection/FieldAccessTest.cs              \
   csharp/src/Google.Protobuf.Test/Reflection/TypeRegistryTest.cs             \
@@ -121,6 +124,7 @@ csharp_EXTRA_DIST=                                                           \
   csharp/src/Google.Protobuf.Test/WellKnownTypes/TimestampTest.cs            \
   csharp/src/Google.Protobuf.Test/WellKnownTypes/WrappersTest.cs             \
   csharp/src/Google.Protobuf.Test/UnknownFieldSetTest.cs                     \
+  csharp/src/Google.Protobuf.Test/testprotos.pb                              \
   csharp/src/Google.Protobuf.sln                                             \
   csharp/src/Google.Protobuf/ByteArray.cs                                    \
   csharp/src/Google.Protobuf/ByteString.cs                                   \
@@ -137,6 +141,7 @@ csharp_EXTRA_DIST=                                                           \
   csharp/src/Google.Protobuf/Compatibility/StreamExtensions.cs               \
   csharp/src/Google.Protobuf/Compatibility/TypeExtensions.cs                 \
   csharp/src/Google.Protobuf/FieldCodec.cs                                   \
+  csharp/src/Google.Protobuf/FieldMaskTree.cs                                \
   csharp/src/Google.Protobuf/FrameworkPortability.cs                         \
   csharp/src/Google.Protobuf/Google.Protobuf.csproj                          \
   csharp/src/Google.Protobuf/ICustomDiagnosticMessage.cs                     \
@@ -156,6 +161,7 @@ csharp_EXTRA_DIST=                                                           \
   csharp/src/Google.Protobuf/Reflection/CustomOptions.cs                     \
   csharp/src/Google.Protobuf/Reflection/Descriptor.cs                        \
   csharp/src/Google.Protobuf/Reflection/DescriptorBase.cs                    \
+  csharp/src/Google.Protobuf/Reflection/DescriptorDeclaration.cs             \
   csharp/src/Google.Protobuf/Reflection/DescriptorPool.cs                    \
   csharp/src/Google.Protobuf/Reflection/DescriptorUtil.cs                    \
   csharp/src/Google.Protobuf/Reflection/DescriptorValidationException.cs     \
@@ -175,7 +181,6 @@ csharp_EXTRA_DIST=                                                           \
   csharp/src/Google.Protobuf/Reflection/OneofDescriptor.cs                   \
   csharp/src/Google.Protobuf/Reflection/OriginalNameAttribute.cs             \
   csharp/src/Google.Protobuf/Reflection/PackageDescriptor.cs                 \
-  csharp/src/Google.Protobuf/Reflection/PartialClasses.cs                    \
   csharp/src/Google.Protobuf/Reflection/ReflectionUtil.cs                    \
   csharp/src/Google.Protobuf/Reflection/RepeatedFieldAccessor.cs             \
   csharp/src/Google.Protobuf/Reflection/ServiceDescriptor.cs                 \
@@ -204,6 +209,7 @@ csharp_EXTRA_DIST=                                                           \
 
 java_EXTRA_DIST=                                                                   \
   java/README.md                                                                   \
+  java/bom/pom.xml                                                                 \
   java/core/generate-sources-build.xml                                             \
   java/core/generate-test-sources-build.xml                                        \
   java/core/pom.xml                                                                \
@@ -467,6 +473,12 @@ objectivec_EXTRA_DIST=                                                       \
   objectivec/ProtocolBuffers_OSX.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings \
   objectivec/ProtocolBuffers_OSX.xcodeproj/xcshareddata/xcschemes/PerformanceTests.xcscheme \
   objectivec/ProtocolBuffers_OSX.xcodeproj/xcshareddata/xcschemes/ProtocolBuffers.xcscheme \
+  objectivec/ProtocolBuffers_tvOS.xcodeproj/project.pbxproj                  \
+  objectivec/ProtocolBuffers_tvOS.xcodeproj/project.xcworkspace/contents.xcworkspacedata \
+  objectivec/ProtocolBuffers_tvOS.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist \
+  objectivec/ProtocolBuffers_tvOS.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings \
+  objectivec/ProtocolBuffers_tvOS.xcodeproj/xcshareddata/xcschemes/PerformanceTests.xcscheme \
+  objectivec/ProtocolBuffers_tvOS.xcodeproj/xcshareddata/xcschemes/ProtocolBuffers.xcscheme \
   objectivec/README.md                                                       \
   objectivec/Tests/CocoaPods/OSXCocoaPodsTester/OSXCocoaPodsTester.xcodeproj/project.pbxproj \
   objectivec/Tests/CocoaPods/OSXCocoaPodsTester/OSXCocoaPodsTester.xcodeproj/project.xcworkspace/contents.xcworkspacedata \
@@ -552,6 +564,7 @@ objectivec_EXTRA_DIST=                                                       \
   objectivec/Tests/GPBUtilitiesTests.m                                       \
   objectivec/Tests/GPBWellKnownTypesTest.m                                   \
   objectivec/Tests/GPBWireFormatTests.m                                      \
+  objectivec/Tests/text_format_extensions_unittest_data.txt                   \
   objectivec/Tests/text_format_map_unittest_data.txt                          \
   objectivec/Tests/text_format_unittest_data.txt                              \
   objectivec/Tests/unittest_cycle.proto                                       \
@@ -565,6 +578,7 @@ objectivec_EXTRA_DIST=                                                       \
   objectivec/Tests/unittest_extension_chain_f.proto                           \
   objectivec/Tests/unittest_extension_chain_g.proto                           \
   objectivec/Tests/unittest_objc.proto                                        \
+  objectivec/Tests/unittest_objc_options.proto                                \
   objectivec/Tests/unittest_objc_startup.proto                                \
   objectivec/Tests/unittest_runtime_proto2.proto                              \
   objectivec/Tests/unittest_runtime_proto3.proto                              \
@@ -593,6 +607,7 @@ php_EXTRA_DIST=                                                       \
   php/ext/google/protobuf/utf8.h                                      \
   php/generate_descriptor_protos.sh                                   \
   php/phpunit.xml                                                     \
+  php/release.sh                                                      \
   php/src/GPBMetadata/Google/Protobuf/Any.php                         \
   php/src/GPBMetadata/Google/Protobuf/Api.php                         \
   php/src/GPBMetadata/Google/Protobuf/Duration.php                    \
@@ -688,6 +703,18 @@ php_EXTRA_DIST=                                                       \
   php/src/Google/Protobuf/Internal/SourceCodeInfo/Location.php        \
   php/src/Google/Protobuf/Internal/UninterpretedOption.php            \
   php/src/Google/Protobuf/Internal/UninterpretedOption/NamePart.php   \
+  php/src/Google/Protobuf/Internal/DescriptorProto_ExtensionRange.php \
+  php/src/Google/Protobuf/Internal/DescriptorProto_ReservedRange.php  \
+  php/src/Google/Protobuf/Internal/EnumDescriptorProto_EnumReservedRange.php \
+  php/src/Google/Protobuf/Internal/FieldDescriptorProto_Label.php     \
+  php/src/Google/Protobuf/Internal/FieldDescriptorProto_Type.php      \
+  php/src/Google/Protobuf/Internal/FieldOptions_CType.php             \
+  php/src/Google/Protobuf/Internal/FieldOptions_JSType.php            \
+  php/src/Google/Protobuf/Internal/FileOptions_OptimizeMode.php       \
+  php/src/Google/Protobuf/Internal/GeneratedCodeInfo_Annotation.php   \
+  php/src/Google/Protobuf/Internal/MethodOptions_IdempotencyLevel.php \
+  php/src/Google/Protobuf/Internal/SourceCodeInfo_Location.php        \
+  php/src/Google/Protobuf/Internal/UninterpretedOption_NamePart.php   \
   php/src/Google/Protobuf/ListValue.php                               \
   php/src/Google/Protobuf/Method.php                                  \
   php/src/Google/Protobuf/Mixin.php                                   \
@@ -708,6 +735,7 @@ php_EXTRA_DIST=                                                       \
   php/tests/autoload.php                                              \
   php/tests/bootstrap_phpunit.php                                     \
   php/tests/compatibility_test.sh                                     \
+  php/tests/compile_extension.sh                                      \
   php/tests/descriptors_test.php                                      \
   php/tests/encode_decode_test.php                                    \
   php/tests/gdb_test.sh                                               \
@@ -734,11 +762,13 @@ php_EXTRA_DIST=                                                       \
   php/tests/proto/test_reserved_message_upper.proto                   \
   php/tests/proto/test_service.proto                                  \
   php/tests/proto/test_service_namespace.proto                        \
+  php/tests/proto/test_wrapper_type_setters.proto                     \
   php/tests/test.sh                                                   \
   php/tests/test_base.php                                             \
   php/tests/test_util.php                                             \
   php/tests/undefined_test.php                                        \
-  php/tests/well_known_test.php
+  php/tests/well_known_test.php                                       \
+  php/tests/wrapper_type_setters_test.php
 
 python_EXTRA_DIST=                                                           \
   python/MANIFEST.in                                                         \
@@ -804,6 +834,7 @@ python_EXTRA_DIST=                                                           \
   python/google/protobuf/message.py                                          \
   python/google/protobuf/message_factory.py                                  \
   python/google/protobuf/python_protobuf.h                                   \
+  python/google/protobuf/proto_api.h                                         \
   python/google/protobuf/proto_builder.py                                    \
   python/google/protobuf/pyext/README                                        \
   python/google/protobuf/pyext/__init__.py                                   \
@@ -822,6 +853,10 @@ python_EXTRA_DIST=                                                           \
   python/google/protobuf/pyext/map_container.h                               \
   python/google/protobuf/pyext/message.cc                                    \
   python/google/protobuf/pyext/message.h                                     \
+  python/google/protobuf/pyext/field.cc                                      \
+  python/google/protobuf/pyext/field.h                                       \
+  python/google/protobuf/pyext/unknown_fields.cc                             \
+  python/google/protobuf/pyext/unknown_fields.h                              \
   python/google/protobuf/pyext/message_factory.cc                            \
   python/google/protobuf/pyext/message_factory.h                             \
   python/google/protobuf/pyext/message_module.cc                             \
@@ -899,16 +934,25 @@ ruby_EXTRA_DIST=                                                             \
   ruby/src/main/java/com/google/protobuf/jruby/Utils.java                    \
   ruby/src/main/java/google/ProtobufJavaService.java                         \
   ruby/src/main/sentinel.proto                                               \
+  ruby/tests/basic_proto2.rb                                                 \
+  ruby/tests/basic_test_proto2.proto                                         \
+  ruby/tests/basic_test.proto                                                \
   ruby/tests/basic.rb                                                        \
+  ruby/tests/common_tests.rb                                                 \
   ruby/tests/encode_decode_test.rb                                           \
   ruby/tests/gc_test.rb                                                      \
   ruby/tests/repeated_field_test.rb                                          \
   ruby/tests/stress.rb                                                       \
+  ruby/tests/generated_code_proto2_test.rb                                   \
+  ruby/tests/generated_code_proto2.proto                                     \
   ruby/tests/generated_code.proto                                            \
+  ruby/tests/test_import_proto2.proto                                        \
   ruby/tests/test_import.proto                                               \
+  ruby/tests/test_ruby_package_proto2.proto                                  \
   ruby/tests/test_ruby_package.proto                                         \
   ruby/tests/generated_code_test.rb                                          \
   ruby/tests/well_known_types_test.rb                                        \
+  ruby/tests/type_errors.rb                                                  \
   ruby/travis-test.sh
 
 js_EXTRA_DIST=                                                         \
@@ -933,6 +977,7 @@ js_EXTRA_DIST=                                                         \
   js/commonjs/import_test.js                                           \
   js/commonjs/jasmine.json                                             \
   js/commonjs/rewrite_tests_for_commonjs.js                            \
+  js/commonjs/strict_test.js                                           \
   js/commonjs/test6/test6.proto                                        \
   js/commonjs/test7/test7.proto                                        \
   js/compatibility_tests/v3.0.0/binary/arith_test.js                   \
@@ -1004,6 +1049,13 @@ js_EXTRA_DIST=                                                         \
   js/test4.proto                                                       \
   js/test5.proto                                                       \
   js/test8.proto                                                       \
+  js/test9.proto                                                       \
+  js/test10.proto                                                      \
+  js/test11.proto                                                      \
+  js/test12.proto                                                      \
+  js/test13.proto                                                      \
+  js/test14.proto                                                      \
+  js/test15.proto                                                      \
   js/test_bootstrap.js                                                 \
   js/testbinary.proto                                                  \
   js/testempty.proto
@@ -1022,6 +1074,7 @@ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
   WORKSPACE                              \
   cmake/CMakeLists.txt                   \
   cmake/README.md                        \
+  cmake/conformance.cmake                   \
   cmake/examples.cmake                   \
   cmake/extract_includes.bat.in          \
   cmake/install.cmake                    \
@@ -1036,6 +1089,8 @@ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
   cmake/protobuf.pc.cmake                \
   cmake/protoc.cmake                     \
   cmake/tests.cmake                      \
+  cmake/version.rc.in                    \
+  compiler_config_setting.bzl            \
   editors/README.txt                     \
   editors/proto.vim                      \
   editors/protobuf-mode.el               \
@@ -1047,14 +1102,18 @@ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
   examples/README.md                     \
   examples/WORKSPACE                     \
   examples/add_person.cc                 \
+  examples/add_person.dart               \
   examples/add_person.go                 \
   examples/add_person.py                 \
   examples/add_person_test.go            \
   examples/addressbook.proto             \
   examples/list_people.cc                \
+  examples/list_people.dart              \
   examples/list_people.go                \
   examples/list_people.py                \
   examples/list_people_test.go           \
+  examples/pubspec.yaml                  \
+  examples/third_party/zlib.BUILD        \
   protobuf.bzl                           \
   python/release/wheel/build_wheel_manylinux.sh  \
   python/release/wheel/Dockerfile                \

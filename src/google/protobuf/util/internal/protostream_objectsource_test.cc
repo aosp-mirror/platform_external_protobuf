@@ -33,7 +33,6 @@
 #include <memory>
 #include <sstream>
 
-#include <google/protobuf/stubs/casts.h>
 #include <google/protobuf/any.pb.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl_lite.h>
@@ -50,6 +49,7 @@
 #include <google/protobuf/util/internal/constants.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <gtest/gtest.h>
+#include <google/protobuf/stubs/casts.h>
 
 
 namespace google {
@@ -57,13 +57,6 @@ namespace protobuf {
 namespace util {
 namespace converter {
 
-using google::protobuf::Descriptor;
-using google::protobuf::DescriptorPool;
-using google::protobuf::FileDescriptorProto;
-using google::protobuf::Message;
-using google::protobuf::io::ArrayInputStream;
-using google::protobuf::io::CodedInputStream;
-using util::Status;
 using google::protobuf::testing::AnyM;
 using google::protobuf::testing::AnyOut;
 using google::protobuf::testing::Author;
@@ -82,7 +75,10 @@ using google::protobuf::testing::Primitive;
 using google::protobuf::testing::Proto3Message;
 using google::protobuf::testing::StructType;
 using google::protobuf::testing::TimestampDuration;
+using io::ArrayInputStream;
+using io::CodedInputStream;
 using ::testing::_;
+using util::Status;
 
 
 namespace {
@@ -100,6 +96,7 @@ class ProtostreamObjectSourceTest
         ow_(&mock_),
         use_lower_camel_for_enums_(false),
         use_ints_for_enums_(false),
+        use_preserve_proto_field_names_(false),
         add_trailing_zeros_(false),
         render_unknown_enum_values_(true) {
     helper_.ResetTypeInfo(Book::descriptor(), Proto3Message::descriptor());
@@ -123,6 +120,8 @@ class ProtostreamObjectSourceTest
         helper_.NewProtoSource(&in_stream, GetTypeUrl(descriptor)));
     if (use_lower_camel_for_enums_) os->set_use_lower_camel_for_enums(true);
     if (use_ints_for_enums_) os->set_use_ints_for_enums(true);
+    if (use_preserve_proto_field_names_)
+      os->set_preserve_proto_field_names(true);
     os->set_max_recursion_depth(64);
     return os->WriteTo(&mock_);
   }
@@ -130,13 +129,13 @@ class ProtostreamObjectSourceTest
   void PrepareExpectingObjectWriterForRepeatedPrimitive() {
     ow_.StartObject("")
         ->StartList("repFix32")
-        ->RenderUint32("", bit_cast<uint32>(3201))
-        ->RenderUint32("", bit_cast<uint32>(0))
-        ->RenderUint32("", bit_cast<uint32>(3202))
+        ->RenderUint32("", ::google::protobuf::bit_cast<uint32>(3201))
+        ->RenderUint32("", ::google::protobuf::bit_cast<uint32>(0))
+        ->RenderUint32("", ::google::protobuf::bit_cast<uint32>(3202))
         ->EndList()
         ->StartList("repU32")
-        ->RenderUint32("", bit_cast<uint32>(3203))
-        ->RenderUint32("", bit_cast<uint32>(0))
+        ->RenderUint32("", ::google::protobuf::bit_cast<uint32>(3203))
+        ->RenderUint32("", ::google::protobuf::bit_cast<uint32>(0))
         ->EndList()
         ->StartList("repI32")
         ->RenderInt32("", 0)
@@ -153,13 +152,13 @@ class ProtostreamObjectSourceTest
         ->RenderInt32("", 3208)
         ->EndList()
         ->StartList("repFix64")
-        ->RenderUint64("", bit_cast<uint64>(6401LL))
-        ->RenderUint64("", bit_cast<uint64>(0LL))
+        ->RenderUint64("", ::google::protobuf::bit_cast<uint64>(6401LL))
+        ->RenderUint64("", ::google::protobuf::bit_cast<uint64>(0LL))
         ->EndList()
         ->StartList("repU64")
-        ->RenderUint64("", bit_cast<uint64>(0LL))
-        ->RenderUint64("", bit_cast<uint64>(6402LL))
-        ->RenderUint64("", bit_cast<uint64>(6403LL))
+        ->RenderUint64("", ::google::protobuf::bit_cast<uint64>(0LL))
+        ->RenderUint64("", ::google::protobuf::bit_cast<uint64>(6402LL))
+        ->RenderUint64("", ::google::protobuf::bit_cast<uint64>(6403LL))
         ->EndList()
         ->StartList("repI64")
         ->RenderInt64("", 6404L)
@@ -272,6 +271,8 @@ class ProtostreamObjectSourceTest
 
   void UseIntsForEnums() { use_ints_for_enums_ = true; }
 
+  void UsePreserveProtoFieldNames() { use_preserve_proto_field_names_ = true; }
+
   void AddTrailingZeros() { add_trailing_zeros_ = true; }
 
   void SetRenderUnknownEnumValues(bool value) {
@@ -284,6 +285,7 @@ class ProtostreamObjectSourceTest
   ExpectingObjectWriter ow_;
   bool use_lower_camel_for_enums_;
   bool use_ints_for_enums_;
+  bool use_preserve_proto_field_names_;
   bool add_trailing_zeros_;
   bool render_unknown_enum_values_;
 };
@@ -318,13 +320,13 @@ TEST_P(ProtostreamObjectSourceTest, Primitives) {
   primitive.set_bool_(true);
 
   ow_.StartObject("")
-      ->RenderUint32("fix32", bit_cast<uint32>(3201))
-      ->RenderUint32("u32", bit_cast<uint32>(3202))
+      ->RenderUint32("fix32", ::google::protobuf::bit_cast<uint32>(3201))
+      ->RenderUint32("u32", ::google::protobuf::bit_cast<uint32>(3202))
       ->RenderInt32("i32", 3203)
       ->RenderInt32("sf32", 3204)
       ->RenderInt32("s32", 3205)
-      ->RenderUint64("fix64", bit_cast<uint64>(6401LL))
-      ->RenderUint64("u64", bit_cast<uint64>(6402LL))
+      ->RenderUint64("fix64", ::google::protobuf::bit_cast<uint64>(6401LL))
+      ->RenderUint64("u64", ::google::protobuf::bit_cast<uint64>(6402LL))
       ->RenderInt64("i64", 6403L)
       ->RenderInt64("sf64", 6404L)
       ->RenderInt64("s64", 6405L)
@@ -536,6 +538,16 @@ TEST_P(ProtostreamObjectSourceTest, UseIntsForEnumsTest) {
   DoTest(book, Book::descriptor());
 }
 
+TEST_P(ProtostreamObjectSourceTest, UsePreserveProtoFieldNames) {
+  Book book;
+  book.set_snake_field("foo");
+
+  UsePreserveProtoFieldNames();
+
+  ow_.StartObject("")->RenderString("snake_field", "foo")->EndObject();
+  DoTest(book, Book::descriptor());
+}
+
 TEST_P(ProtostreamObjectSourceTest,
        UnknownEnumAreDroppedWhenRenderUnknownEnumValuesIsUnset) {
   Proto3Message message;
@@ -584,7 +596,7 @@ TEST_P(ProtostreamObjectSourceTest, CyclicMessageDepthTest) {
   }
 
   Status status = ExecuteTest(cyclic, Cyclic::descriptor());
-  EXPECT_EQ(util::error::INVALID_ARGUMENT, status.error_code());
+  EXPECT_EQ(util::error::INVALID_ARGUMENT, status.code());
 }
 
 class ProtostreamObjectSourceMapsTest : public ProtostreamObjectSourceTest {
@@ -731,8 +743,8 @@ TEST_P(ProtostreamObjectSourceMapsTest, MissingKeysTest) {
 class ProtostreamObjectSourceAnysTest : public ProtostreamObjectSourceTest {
  protected:
   ProtostreamObjectSourceAnysTest() {
-    helper_.ResetTypeInfo(AnyOut::descriptor(),
-                          google::protobuf::Any::descriptor());
+    helper_.ResetTypeInfo({AnyOut::descriptor(), Book::descriptor(),
+                           google::protobuf::Any::descriptor()});
   }
 };
 
@@ -763,6 +775,69 @@ TEST_P(ProtostreamObjectSourceAnysTest, BasicAny) {
       ->RenderString("@type",
                      "type.googleapis.com/google.protobuf.testing.AnyM")
       ->RenderString("foo", "foovalue")
+      ->EndObject()
+      ->EndObject();
+
+  DoTest(out, AnyOut::descriptor());
+}
+
+TEST_P(ProtostreamObjectSourceAnysTest, LowerCamelEnumOutputSnakeCase) {
+  AnyOut out;
+  ::google::protobuf::Any* any = out.mutable_any();
+
+  Book book;
+  book.set_type(Book::arts_and_photography);
+  any->PackFrom(book);
+
+  UseLowerCamelForEnums();
+
+  ow_.StartObject("")
+      ->StartObject("any")
+      ->RenderString("@type",
+                     "type.googleapis.com/google.protobuf.testing.Book")
+      ->RenderString("type", "artsAndPhotography")
+      ->EndObject()
+      ->EndObject();
+
+  DoTest(out, AnyOut::descriptor());
+}
+
+TEST_P(ProtostreamObjectSourceAnysTest, UseIntsForEnumsTest) {
+  AnyOut out;
+  ::google::protobuf::Any* any = out.mutable_any();
+
+  Book book;
+  book.set_type(Book::ACTION_AND_ADVENTURE);
+  any->PackFrom(book);
+
+  UseIntsForEnums();
+
+  ow_.StartObject("")
+      ->StartObject("any")
+      ->RenderString("@type",
+                     "type.googleapis.com/google.protobuf.testing.Book")
+      ->RenderInt32("type", 3)
+      ->EndObject()
+      ->EndObject();
+
+  DoTest(out, AnyOut::descriptor());
+}
+
+TEST_P(ProtostreamObjectSourceAnysTest, UsePreserveProtoFieldNames) {
+  AnyOut out;
+  ::google::protobuf::Any* any = out.mutable_any();
+
+  Book book;
+  book.set_snake_field("foo");
+  any->PackFrom(book);
+
+  UsePreserveProtoFieldNames();
+
+  ow_.StartObject("")
+      ->StartObject("any")
+      ->RenderString("@type",
+                     "type.googleapis.com/google.protobuf.testing.Book")
+      ->RenderString("snake_field", "foo")
       ->EndObject()
       ->EndObject();
 
@@ -866,7 +941,7 @@ TEST_P(ProtostreamObjectSourceAnysTest, MissingTypeUrlError) {
   ow_.StartObject("");
 
   Status status = ExecuteTest(out, AnyOut::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.error_code());
+  EXPECT_EQ(util::error::INTERNAL, status.code());
 }
 
 TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeServiceError) {
@@ -882,7 +957,7 @@ TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeServiceError) {
   ow_.StartObject("");
 
   Status status = ExecuteTest(out, AnyOut::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.error_code());
+  EXPECT_EQ(util::error::INTERNAL, status.code());
 }
 
 TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeError) {
@@ -898,7 +973,7 @@ TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeError) {
   ow_.StartObject("");
 
   Status status = ExecuteTest(out, AnyOut::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.error_code());
+  EXPECT_EQ(util::error::INTERNAL, status.code());
 }
 
 class ProtostreamObjectSourceStructTest : public ProtostreamObjectSourceTest {
@@ -1031,7 +1106,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidTimestampBelowMinTest) {
   ow_.StartObject("");
 
   Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.error_code());
+  EXPECT_EQ(util::error::INTERNAL, status.code());
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, InvalidTimestampAboveMaxTest) {
@@ -1042,7 +1117,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidTimestampAboveMaxTest) {
   ow_.StartObject("");
 
   Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.error_code());
+  EXPECT_EQ(util::error::INTERNAL, status.code());
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationBelowMinTest) {
@@ -1053,7 +1128,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationBelowMinTest) {
   ow_.StartObject("");
 
   Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.error_code());
+  EXPECT_EQ(util::error::INTERNAL, status.code());
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationAboveMaxTest) {
@@ -1064,7 +1139,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationAboveMaxTest) {
   ow_.StartObject("");
 
   Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.error_code());
+  EXPECT_EQ(util::error::INTERNAL, status.code());
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, TimestampDurationDefaultValue) {

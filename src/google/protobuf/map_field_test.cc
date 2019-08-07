@@ -30,22 +30,23 @@
 
 #include <map>
 #include <memory>
+#include <unordered_map>
 
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/arena_test_util.h>
+#include <google/protobuf/map_test_util.h>
+#include <google/protobuf/map_unittest.pb.h>
+#include <google/protobuf/unittest.pb.h>
 #include <google/protobuf/arena.h>
 #include <google/protobuf/map.h>
-#include <google/protobuf/arena_test_util.h>
-#include <google/protobuf/map_unittest.pb.h>
-#include <google/protobuf/map_test_util.h>
-#include <google/protobuf/unittest.pb.h>
 #include <google/protobuf/map_field_inl.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/repeated_field.h>
 #include <google/protobuf/wire_format_lite_inl.h>
 #include <gtest/gtest.h>
-namespace google {
 
+namespace google {
 namespace protobuf {
 
 namespace internal {
@@ -93,8 +94,11 @@ class MapFieldBaseStub : public MapFieldBase {
     return false;
   }
   int size() const { return 0; }
+  void Clear() override {}
   void MapBegin(MapIterator* map_iter) const {}
   void MapEnd(MapIterator* map_iter) const {}
+  void MergeFrom(const MapFieldBase& other) override {}
+  void Swap(MapFieldBase* other) {}
   void InitializeIterator(MapIterator* map_iter) const {}
   void DeleteIterator(MapIterator* map_iter) const {}
   void CopyIterator(MapIterator* this_iterator,
@@ -292,7 +296,11 @@ class MapFieldStateTest
     if (is_repeated_null) {
       EXPECT_TRUE(repeated_field == NULL);
     } else {
-      EXPECT_EQ(repeated_size, repeated_field->size());
+      if (repeated_field == nullptr) {
+        EXPECT_EQ(repeated_size, 0);
+      } else {
+        EXPECT_EQ(repeated_size, repeated_field->size());
+      }
     }
   }
 
@@ -439,11 +447,7 @@ TEST_P(MapFieldStateTest, SwapRepeatedDirty) {
 TEST_P(MapFieldStateTest, Clear) {
   map_field_->Clear();
 
-  if (state_ != MAP_DIRTY) {
-    Expect(map_field_.get(), MAP_DIRTY, 0, 1, false);
-  } else {
-    Expect(map_field_.get(), MAP_DIRTY, 0, 0, true);
-  }
+  Expect(map_field_.get(), MAP_DIRTY, 0, 0, false);
 }
 
 TEST_P(MapFieldStateTest, SpaceUsedExcludingSelf) {

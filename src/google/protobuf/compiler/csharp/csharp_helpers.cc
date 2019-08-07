@@ -36,6 +36,7 @@
 #include <google/protobuf/stubs/hash.h>
 #include <limits>
 #include <vector>
+#include <sstream>
 
 #include <google/protobuf/compiler/csharp/csharp_helpers.h>
 #include <google/protobuf/compiler/csharp/csharp_names.h>
@@ -169,7 +170,7 @@ std::string UnderscoresToCamelCase(const std::string& input,
     }
   }
   // Add a trailing "_" if the name should be altered.
-  if (input[input.size() - 1] == '#') {
+  if (input.size() > 0 && input[input.size() - 1] == '#') {
     result += '_';
   }
   return result;
@@ -275,6 +276,19 @@ std::string GetEnumValueName(const std::string& enum_name, const std::string& en
     result = "_" + result;
   }
   return result;
+}
+
+uint GetGroupEndTag(const Descriptor* descriptor) {
+  const Descriptor* containing_type = descriptor->containing_type();
+  if (containing_type == NULL) {
+    return 0;
+  }
+  const FieldDescriptor* field = containing_type->FindFieldByName(descriptor->name());
+  if (field != NULL && field->type() == FieldDescriptor::Type::TYPE_GROUP) {
+    return internal::WireFormatLite::MakeTag(field->number(), internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED);
+  } else {
+    return 0;
+  }
 }
 
 std::string ToCSharpName(const std::string& name, const FileDescriptor* file) {
@@ -452,52 +466,86 @@ std::string FileDescriptorToBase64(const FileDescriptor* descriptor) {
 }
 
 FieldGeneratorBase* CreateFieldGenerator(const FieldDescriptor* descriptor,
-                                         int fieldOrdinal,
+                                         int presenceIndex,
                                          const Options* options) {
   switch (descriptor->type()) {
     case FieldDescriptor::TYPE_GROUP:
     case FieldDescriptor::TYPE_MESSAGE:
       if (descriptor->is_repeated()) {
         if (descriptor->is_map()) {
-          return new MapFieldGenerator(descriptor, fieldOrdinal, options);
+          return new MapFieldGenerator(descriptor, presenceIndex, options);
         } else {
-          return new RepeatedMessageFieldGenerator(descriptor, fieldOrdinal, options);
+          return new RepeatedMessageFieldGenerator(descriptor, presenceIndex, options);
         }
       } else {
         if (IsWrapperType(descriptor)) {
           if (descriptor->containing_oneof()) {
-            return new WrapperOneofFieldGenerator(descriptor, fieldOrdinal, options);
+            return new WrapperOneofFieldGenerator(descriptor, presenceIndex, options);
           } else {
-            return new WrapperFieldGenerator(descriptor, fieldOrdinal, options);
+            return new WrapperFieldGenerator(descriptor, presenceIndex, options);
           }
         } else {
           if (descriptor->containing_oneof()) {
-            return new MessageOneofFieldGenerator(descriptor, fieldOrdinal, options);
+            return new MessageOneofFieldGenerator(descriptor, presenceIndex, options);
           } else {
-            return new MessageFieldGenerator(descriptor, fieldOrdinal, options);
+            return new MessageFieldGenerator(descriptor, presenceIndex, options);
           }
         }
       }
     case FieldDescriptor::TYPE_ENUM:
       if (descriptor->is_repeated()) {
-        return new RepeatedEnumFieldGenerator(descriptor, fieldOrdinal, options);
+        return new RepeatedEnumFieldGenerator(descriptor, presenceIndex, options);
       } else {
         if (descriptor->containing_oneof()) {
-          return new EnumOneofFieldGenerator(descriptor, fieldOrdinal, options);
+          return new EnumOneofFieldGenerator(descriptor, presenceIndex, options);
         } else {
-          return new EnumFieldGenerator(descriptor, fieldOrdinal, options);
+          return new EnumFieldGenerator(descriptor, presenceIndex, options);
         }
       }
     default:
       if (descriptor->is_repeated()) {
-        return new RepeatedPrimitiveFieldGenerator(descriptor, fieldOrdinal, options);
+        return new RepeatedPrimitiveFieldGenerator(descriptor, presenceIndex, options);
       } else {
         if (descriptor->containing_oneof()) {
-          return new PrimitiveOneofFieldGenerator(descriptor, fieldOrdinal, options);
+          return new PrimitiveOneofFieldGenerator(descriptor, presenceIndex, options);
         } else {
-          return new PrimitiveFieldGenerator(descriptor, fieldOrdinal, options);
+          return new PrimitiveFieldGenerator(descriptor, presenceIndex, options);
         }
       }
+  }
+}
+
+bool IsNullable(const FieldDescriptor* descriptor) {
+  if (descriptor->is_repeated()) {
+    return true;
+  }
+
+  switch (descriptor->type()) {
+    case FieldDescriptor::TYPE_ENUM:
+    case FieldDescriptor::TYPE_DOUBLE:
+    case FieldDescriptor::TYPE_FLOAT:
+    case FieldDescriptor::TYPE_INT64:
+    case FieldDescriptor::TYPE_UINT64:
+    case FieldDescriptor::TYPE_INT32:
+    case FieldDescriptor::TYPE_FIXED64:
+    case FieldDescriptor::TYPE_FIXED32:
+    case FieldDescriptor::TYPE_BOOL:
+    case FieldDescriptor::TYPE_UINT32:
+    case FieldDescriptor::TYPE_SFIXED32:
+    case FieldDescriptor::TYPE_SFIXED64:
+    case FieldDescriptor::TYPE_SINT32:
+    case FieldDescriptor::TYPE_SINT64:
+      return false;
+
+    case FieldDescriptor::TYPE_MESSAGE:
+    case FieldDescriptor::TYPE_GROUP:
+    case FieldDescriptor::TYPE_STRING:
+    case FieldDescriptor::TYPE_BYTES:
+      return true;
+
+    default:
+      GOOGLE_LOG(FATAL) << "Unknown field type.";
+      return true;
   }
 }
 

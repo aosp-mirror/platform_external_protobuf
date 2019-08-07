@@ -99,6 +99,10 @@ void GenerateMessageConstructorDocComment(io::Printer* printer,
                                           int is_descriptor);
 void GenerateFieldDocComment(io::Printer* printer, const FieldDescriptor* field,
                              int is_descriptor, int function_type);
+void GenerateWrapperFieldGetterDocComment(io::Printer* printer,
+                                          const FieldDescriptor* field);
+void GenerateWrapperFieldSetterDocComment(io::Printer* printer,
+                                          const FieldDescriptor* field);
 void GenerateEnumDocComment(io::Printer* printer, const EnumDescriptor* enum_,
                             int is_descriptor);
 void GenerateEnumValueDocComment(io::Printer* printer,
@@ -674,6 +678,21 @@ void GenerateFieldAccessor(const FieldDescriptor* field, bool is_descriptor,
         field->name());
   }
 
+  // For wrapper types, generate an additional getXXXValue getter
+  if (!field->is_map() &&
+      !field->is_repeated() &&
+      field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE &&
+      IsWrapperType(field)) {
+    GenerateWrapperFieldGetterDocComment(printer, field);
+    printer->Print(
+        "public function get^camel_name^Value()\n"
+        "{\n"
+        "    $wrapper = $this->get^camel_name^();\n"
+        "    return is_null($wrapper) ? null : $wrapper->getValue();\n"
+        "}\n\n",
+        "camel_name", UnderscoresToCamelCase(field->name(), true));
+  }
+
   // Generate setter.
   GenerateFieldDocComment(printer, field, is_descriptor, kFieldSetter);
   printer->Print(
@@ -771,6 +790,22 @@ void GenerateFieldAccessor(const FieldDescriptor* field, bool is_descriptor,
 
   printer->Print(
       "}\n\n");
+
+  // For wrapper types, generate an additional setXXXValue getter
+  if (!field->is_map() &&
+      !field->is_repeated() &&
+      field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE &&
+      IsWrapperType(field)) {
+    GenerateWrapperFieldSetterDocComment(printer, field);
+    printer->Print(
+        "public function set^camel_name^Value($var)\n"
+        "{\n"
+        "    $wrappedVar = is_null($var) ? null : new \\^wrapper_type^(['value' => $var]);\n"
+        "    return $this->set^camel_name^($wrappedVar);\n"
+        "}\n\n",
+        "camel_name", UnderscoresToCamelCase(field->name(), true),
+        "wrapper_type", LegacyFullClassName(field->message_type(), is_descriptor));
+  }
 
   // Generate has method for proto2 only.
   if (is_descriptor) {
@@ -975,7 +1010,7 @@ void GenerateAddFileToPool(const FileDescriptor* file, bool is_descriptor,
 
     Outdent(printer);
     printer->Print(
-        "));\n\n");
+        "), true);\n\n");
   }
   printer->Print(
       "static::$is_initialized = true;\n");
@@ -1109,13 +1144,17 @@ void GenerateEnumFile(const FileDescriptor* file, const EnumDescriptor* en,
     printer.Print(
         "namespace ^name^;\n\n",
         "name", fullname.substr(0, lastindex));
+
+    // We only need this 'use' statement if the enum has a namespace.
+    // Otherwise, we get a warning that the use statement has no effect.
+    printer.Print("use UnexpectedValueException;\n\n");
   }
+
+  GenerateEnumDocComment(&printer, en, is_descriptor);
 
   if (lastindex != string::npos) {
     fullname = fullname.substr(lastindex + 1);
   }
-
-  GenerateEnumDocComment(&printer, en, is_descriptor);
 
   printer.Print(
       "class ^name^\n"
@@ -1130,6 +1169,53 @@ void GenerateEnumFile(const FileDescriptor* file, const EnumDescriptor* en,
                   "name", ConstantNamePrefix(value->name()) + value->name(),
                   "number", IntToString(value->number()));
   }
+
+  printer.Print("\nprivate static $valueToName = [\n");
+  Indent(&printer);
+  for (int i = 0; i < en->value_count(); i++) {
+    const EnumValueDescriptor* value = en->value(i);
+    printer.Print("self::^name^ => '^name^',\n",
+                  "name", ConstantNamePrefix(value->name()) + value->name());
+  }
+  Outdent(&printer);
+  printer.Print("];\n");
+
+  printer.Print(
+      "\npublic static function name($value)\n"
+      "{\n");
+  Indent(&printer);
+  printer.Print("if (!isset(self::$valueToName[$value])) {\n");
+  Indent(&printer);
+  printer.Print("throw new UnexpectedValueException(sprintf(\n");
+  Indent(&printer);
+  Indent(&printer);
+  printer.Print("'Enum %s has no name defined for value %s', __CLASS__, $value));\n");
+  Outdent(&printer);
+  Outdent(&printer);
+  Outdent(&printer);
+  printer.Print("}\n"
+                "return self::$valueToName[$value];\n");
+  Outdent(&printer);
+  printer.Print("}\n\n");
+
+  printer.Print(
+      "\npublic static function value($name)\n"
+      "{\n");
+  Indent(&printer);
+  printer.Print("$const = __CLASS__ . '::' . strtoupper($name);\n"
+                "if (!defined($const)) {\n");
+  Indent(&printer);
+  printer.Print("throw new UnexpectedValueException(sprintf(\n");
+  Indent(&printer);
+  Indent(&printer);
+  printer.Print("'Enum %s has no value defined for name %s', __CLASS__, $name));\n");
+  Outdent(&printer);
+  Outdent(&printer);
+  Outdent(&printer);
+  printer.Print("}\n"
+                "return constant($const);\n");
+  Outdent(&printer);
+  printer.Print("}\n");
 
   Outdent(&printer);
   printer.Print("}\n\n");
@@ -1494,6 +1580,41 @@ void GenerateFieldDocComment(io::Printer* printer, const FieldDescriptor* field,
     printer->Print(" * @return ^php_type^\n",
       "php_type", PhpGetterTypeName(field, is_descriptor));
   }
+  printer->Print(" */\n");
+}
+
+void GenerateWrapperFieldGetterDocComment(io::Printer* printer, const FieldDescriptor* field) {
+  // Generate a doc comment for the special getXXXValue methods that are
+  // generated for wrapper types.
+  const FieldDescriptor* primitiveField = field->message_type()->FindFieldByName("value");
+  printer->Print("/**\n");
+  printer->Print(
+      " * Returns the unboxed value from <code>get^camel_name^()</code>\n\n",
+      "camel_name", UnderscoresToCamelCase(field->name(), true));
+  GenerateDocCommentBody(printer, field);
+  printer->Print(
+    " * Generated from protobuf field <code>^def^</code>\n",
+    "def", EscapePhpdoc(FirstLineOf(field->DebugString())));
+  printer->Print(" * @return ^php_type^|null\n",
+        "php_type", PhpGetterTypeName(primitiveField, false));
+  printer->Print(" */\n");
+}
+
+void GenerateWrapperFieldSetterDocComment(io::Printer* printer, const FieldDescriptor* field) {
+  // Generate a doc comment for the special setXXXValue methods that are
+  // generated for wrapper types.
+  const FieldDescriptor* primitiveField = field->message_type()->FindFieldByName("value");
+  printer->Print("/**\n");
+  printer->Print(
+      " * Sets the field by wrapping a primitive type in a ^message_name^ object.\n\n",
+      "message_name", LegacyFullClassName(field->message_type(), false));
+  GenerateDocCommentBody(printer, field);
+  printer->Print(
+    " * Generated from protobuf field <code>^def^</code>\n",
+    "def", EscapePhpdoc(FirstLineOf(field->DebugString())));
+  printer->Print(" * @param ^php_type^|null $var\n",
+        "php_type", PhpSetterTypeName(primitiveField, false));
+  printer->Print(" * @return $this\n");
   printer->Print(" */\n");
 }
 

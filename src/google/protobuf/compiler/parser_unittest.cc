@@ -39,6 +39,7 @@
 
 #include <google/protobuf/compiler/parser.h>
 
+#include <google/protobuf/test_util2.h>
 #include <google/protobuf/unittest.pb.h>
 #include <google/protobuf/unittest_custom_options.pb.h>
 #include <google/protobuf/io/tokenizer.h>
@@ -1692,7 +1693,7 @@ TEST_F(ParserValidationErrorTest, PackageNameError) {
   // Now try to define it as a package.
   ExpectHasValidationErrors(
     "package foo.bar;",
-    "0:8: \"foo\" is already defined (as something other than a package) "
+    "0:0: \"foo\" is already defined (as something other than a package) "
       "in file \"bar.proto\".\n");
 }
 
@@ -1746,7 +1747,8 @@ TEST_F(ParserValidationErrorTest, FieldDefaultValueError) {
 TEST_F(ParserValidationErrorTest, FileOptionNameError) {
   ExpectHasValidationErrors(
     "option foo = 5;",
-    "0:7: Option \"foo\" unknown.\n");
+    "0:7: Option \"foo\" unknown. Ensure that your proto definition file "
+    "imports the proto which defines the option.\n");
 }
 
 TEST_F(ParserValidationErrorTest, FileOptionValueError) {
@@ -1761,7 +1763,8 @@ TEST_F(ParserValidationErrorTest, FieldOptionNameError) {
     "message Foo {\n"
     "  optional bool bar = 1 [foo=1];\n"
     "}\n",
-    "1:25: Option \"foo\" unknown.\n");
+    "1:25: Option \"foo\" unknown. Ensure that your proto definition file "
+    "imports the proto which defines the option.\n");
 }
 
 TEST_F(ParserValidationErrorTest, FieldOptionValueError) {
@@ -1866,7 +1869,7 @@ TEST_F(ParserValidationErrorTest, ResovledUndefinedOptionError) {
 
   // base2.proto:
   //   package baz
-  //   import google/protobuf/descriptor.proto
+  //   import net/proto2/proto/descriptor.proto
   //   message Bar { optional int32 foo = 1; }
   //   extend FileOptions { optional Bar bar = 7672757; }
   FileDescriptorProto other_file;
@@ -1992,7 +1995,8 @@ TEST_F(ParseDescriptorDebugTest, TestAllDescriptorTypes) {
   // We now have a FileDescriptorProto, but to compare with the expected we
   // need to link to a FileDecriptor, then output back to a proto. We'll
   // also need to give it the same name as the original.
-  parsed.set_name("google/protobuf/unittest.proto");
+  parsed.set_name(
+      TestUtil::MaybeTranslatePath("net/proto2/internal/unittest.proto"));
   // We need the imported dependency before we can build our parsed proto
   const FileDescriptor* public_import =
       protobuf_unittest_import::PublicImportMessage::descriptor()->file();
@@ -2551,16 +2555,22 @@ class SourceInfoTest : public ParserTest {
 TEST_F(SourceInfoTest, BasicFileDecls) {
   EXPECT_TRUE(Parse(
       "$a$syntax = \"proto2\";$i$\n"
-      "package $b$foo.bar$c$;\n"
-      "import $d$\"baz.proto\"$e$;\n"
-      "import $f$\"qux.proto\"$g$;$h$\n"
+      "$b$package foo.bar;$c$\n"
+      "$d$import \"baz.proto\";$e$\n"
+      "$f$import\"qux.proto\";$h$\n"
+      "$j$import $k$public$l$ \"bar.proto\";$m$\n"
+      "$n$import $o$weak$p$ \"bar.proto\";$q$\n"
       "\n"
       "// comment ignored\n"));
 
-  EXPECT_TRUE(HasSpan('a', 'h', file_));
+  EXPECT_TRUE(HasSpan('a', 'q', file_));
   EXPECT_TRUE(HasSpan('b', 'c', file_, "package"));
   EXPECT_TRUE(HasSpan('d', 'e', file_, "dependency", 0));
-  EXPECT_TRUE(HasSpan('f', 'g', file_, "dependency", 1));
+  EXPECT_TRUE(HasSpan('f', 'h', file_, "dependency", 1));
+  EXPECT_TRUE(HasSpan('j', 'm', file_, "dependency", 2));
+  EXPECT_TRUE(HasSpan('k', 'l', file_, "public_dependency", 0));
+  EXPECT_TRUE(HasSpan('n', 'q', file_, "dependency", 3));
+  EXPECT_TRUE(HasSpan('o', 'p', file_, "weak_dependency", 0));
   EXPECT_TRUE(HasSpan('a', 'i', file_, "syntax"));
 }
 
@@ -2722,6 +2732,33 @@ TEST_F(SourceInfoTest, ExtensionRanges) {
   EXPECT_TRUE(HasSpan('j', 'm', range3));
   EXPECT_TRUE(HasSpan('j', 'k', range3, "start"));
   EXPECT_TRUE(HasSpan('l', 'm', range3, "end"));
+
+  // Ignore these.
+  EXPECT_TRUE(HasSpan(file_));
+  EXPECT_TRUE(HasSpan(file_.message_type(0)));
+  EXPECT_TRUE(HasSpan(file_.message_type(0), "name"));
+}
+
+TEST_F(SourceInfoTest, ReservedRanges) {
+  EXPECT_TRUE(
+      Parse("message Message {\n"
+            "  $a$reserved $b$1$c$ to $d$4$e$, $f$6$g$;$h$\n"
+            "}\n"));
+
+  const DescriptorProto::ReservedRange& range1 =
+      file_.message_type(0).reserved_range(0);
+  const DescriptorProto::ReservedRange& range2 =
+      file_.message_type(0).reserved_range(1);
+
+  EXPECT_TRUE(HasSpan('a', 'h', file_.message_type(0), "reserved_range"));
+
+  EXPECT_TRUE(HasSpan('b', 'e', range1));
+  EXPECT_TRUE(HasSpan('b', 'c', range1, "start"));
+  EXPECT_TRUE(HasSpan('d', 'e', range1, "end"));
+
+  EXPECT_TRUE(HasSpan('f', 'g', range2));
+  EXPECT_TRUE(HasSpan('f', 'g', range2, "start"));
+  EXPECT_TRUE(HasSpan('f', 'g', range2, "end"));
 
   // Ignore these.
   EXPECT_TRUE(HasSpan(file_));
@@ -3297,7 +3334,7 @@ TEST_F(SourceInfoTest, DocCommentsTopLevel) {
       "// detached after empty before package\n"
       "\n"
       "// package leading\n"
-      "package $c$foo$d$;\n"
+      "$c$package foo;$d$\n"
       "// package trailing\n"
       "\n"
       "// ignored detach\n"

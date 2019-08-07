@@ -16,14 +16,14 @@ internal_build_cpp() {
   git submodule update --init --recursive
 
   ./autogen.sh
-  ./configure CXXFLAGS="-fPIC"  # -fPIC is needed for python cpp test.
-                                # See python/setup.py for more details
-  make -j2
+  ./configure CXXFLAGS="-fPIC -std=c++11"  # -fPIC is needed for python cpp test.
+                                           # See python/setup.py for more details
+  make -j4
 }
 
 build_cpp() {
   internal_build_cpp
-  make check -j2 || (cat src/test-suite.log; false)
+  make check -j4 || (cat src/test-suite.log; false)
   cd conformance && make test_cpp && cd ..
 
   # The benchmark code depends on cmake, so test if it is installed before
@@ -38,7 +38,20 @@ build_cpp() {
   fi
 }
 
+build_cpp_tcmalloc() {
+  internal_build_cpp
+  ./configure LIBS=-ltcmalloc && make clean && make \
+      PTHREAD_CFLAGS='-pthread -DGOOGLE_PROTOBUF_HEAP_CHECK_DRACONIAN' \
+      check
+  cd src
+  PPROF_PATH=/usr/bin/google-pprof HEAPCHECK=draconian ./protobuf-test
+}
+
 build_cpp_distcheck() {
+  grep -q -- "-Og" src/Makefile.am &&
+    echo "The -Og flag is incompatible with Clang versions older than 4.0." &&
+    exit 1
+
   # Initialize any submodules.
   git submodule update --init --recursive
   ./autogen.sh
@@ -56,10 +69,10 @@ build_cpp_distcheck() {
   # Check if every file exists in the dist tar file.
   FILES_MISSING=""
   for FILE in $(<../dist.lst); do
-    if ! file $FILE &>/dev/null; then
+    [ -f "$FILE" ] || {
       echo "$FILE is not found!"
       FILES_MISSING="$FILE $FILES_MISSING"
-    fi
+    }
   done
   cd ..
   if [ ! -z "$FILES_MISSING" ]; then
@@ -68,7 +81,7 @@ build_cpp_distcheck() {
   fi
 
   # Do the regular dist-check for C++.
-  make distcheck -j2
+  make distcheck -j4
 }
 
 build_csharp() {
@@ -105,9 +118,9 @@ build_golang() {
   export PATH="`pwd`/src:$PATH"
 
   export GOPATH="$HOME/gocode"
-  mkdir -p "$GOPATH/src/github.com/google"
-  rm -f "$GOPATH/src/github.com/google/protobuf"
-  ln -s "`pwd`" "$GOPATH/src/github.com/google/protobuf"
+  mkdir -p "$GOPATH/src/github.com/protocolbuffers"
+  rm -f "$GOPATH/src/github.com/protocolbuffers/protobuf"
+  ln -s "`pwd`" "$GOPATH/src/github.com/protocolbuffers/protobuf"
   export PATH="$GOPATH/bin:$PATH"
   go get github.com/golang/protobuf/protoc-gen-go
 
@@ -128,7 +141,7 @@ use_java() {
   esac
 
   MAVEN_LOCAL_REPOSITORY=/var/maven_local_repository
-  MVN="$MVN -e -X --offline -Dmaven.repo.local=$MAVEN_LOCAL_REPOSITORY"
+  MVN="$MVN -e -X -Dhttps.protocols=TLSv1.2 -Dmaven.repo.local=$MAVEN_LOCAL_REPOSITORY"
 
   which java
   java -version
@@ -180,11 +193,8 @@ build_objectivec_ios() {
   # Reused the build script that takes care of configuring and ensuring things
   # are up to date.  The OS X test runs the objc conformance test, so skip it
   # here.
-  # Note: travis has xctool installed, and we've looked at using it in the past
-  # but it has ended up proving unreliable (bugs), an they are removing build
-  # support in favor of xcbuild (or just xcodebuild).
   objectivec/DevTools/full_mac_build.sh \
-      --core-only --skip-xcode-osx --skip-objc-conformance "$@"
+      --core-only --skip-xcode-osx --skip-xcode-tvos --skip-objc-conformance "$@"
 }
 
 build_objectivec_ios_debug() {
@@ -199,12 +209,28 @@ build_objectivec_osx() {
   # Reused the build script that takes care of configuring and ensuring things
   # are up to date.
   objectivec/DevTools/full_mac_build.sh \
-      --core-only --skip-xcode-ios
+      --core-only --skip-xcode-ios --skip-xcode-tvos
+}
+
+build_objectivec_tvos() {
+  # Reused the build script that takes care of configuring and ensuring things
+  # are up to date.  The OS X test runs the objc conformance test, so skip it
+  # here.
+  objectivec/DevTools/full_mac_build.sh \
+      --core-only --skip-xcode-ios --skip-xcode-osx --skip-objc-conformance "$@"
+}
+
+build_objectivec_tvos_debug() {
+  build_objectivec_tvos --skip-xcode-release
+}
+
+build_objectivec_tvos_release() {
+  build_objectivec_tvos --skip-xcode-debug
 }
 
 build_objectivec_cocoapods_integration() {
   # Update pod to the latest version.
-  gem install cocoapods --no-ri --no-rdoc
+  gem install cocoapods --no_document
   objectivec/Tests/CocoaPods/run_tests.sh
 }
 
@@ -218,6 +244,38 @@ build_python() {
   fi
   tox -e $envlist
   cd ..
+}
+
+build_python_version() {
+  internal_build_cpp
+  cd python
+  envlist=$1
+  tox -e $envlist
+  cd ..
+}
+
+build_python27() {
+  build_python_version py27-python
+}
+
+build_python33() {
+  build_python_version py33-python
+}
+
+build_python34() {
+  build_python_version py34-python
+}
+
+build_python35() {
+  build_python_version py35-python
+}
+
+build_python36() {
+  build_python_version py36-python
+}
+
+build_python37() {
+  build_python_version py37-python
 }
 
 build_python_cpp() {
@@ -234,6 +292,40 @@ build_python_cpp() {
   cd ..
 }
 
+build_python_cpp_version() {
+  internal_build_cpp
+  export LD_LIBRARY_PATH=../src/.libs # for Linux
+  export DYLD_LIBRARY_PATH=../src/.libs # for OS X
+  cd python
+  envlist=$1
+  tox -e $envlist
+  cd ..
+}
+
+build_python27_cpp() {
+  build_python_cpp_version py27-cpp
+}
+
+build_python33_cpp() {
+  build_python_cpp_version py33-cpp
+}
+
+build_python34_cpp() {
+  build_python_cpp_version py34-cpp
+}
+
+build_python35_cpp() {
+  build_python_cpp_version py35-cpp
+}
+
+build_python36_cpp() {
+  build_python_cpp_version py36-cpp
+}
+
+build_python37_cpp() {
+  build_python_cpp_version py37-cpp
+}
+
 build_python_compatibility() {
   internal_build_cpp
   # Use the unit-tests extraced from 2.5.0 to test the compatibilty.
@@ -244,17 +336,9 @@ build_python_compatibility() {
   ./test.sh 3.0.0-beta-1
 }
 
-build_ruby21() {
-  internal_build_cpp  # For conformance tests.
-  cd ruby && bash travis-test.sh ruby-2.1 && cd ..
-}
-build_ruby22() {
-  internal_build_cpp  # For conformance tests.
-  cd ruby && bash travis-test.sh ruby-2.2 && cd ..
-}
 build_ruby23() {
   internal_build_cpp  # For conformance tests.
-  cd ruby && bash travis-test.sh ruby-2.3 && cd ..
+  cd ruby && bash travis-test.sh ruby-2.3.8 && cd ..
 }
 build_ruby24() {
   internal_build_cpp  # For conformance tests.
@@ -262,14 +346,11 @@ build_ruby24() {
 }
 build_ruby25() {
   internal_build_cpp  # For conformance tests.
-  cd ruby && bash travis-test.sh ruby-2.5.0 && cd ..
+  cd ruby && bash travis-test.sh ruby-2.5.1 && cd ..
 }
-build_ruby_all() {
-  build_ruby21
-  build_ruby22
-  build_ruby23
-  build_ruby24
-  build_ruby25
+build_ruby26() {
+  internal_build_cpp  # For conformance tests.
+  cd ruby && bash travis-test.sh ruby-2.6.0 && cd ..
 }
 
 build_javascript() {
@@ -285,6 +366,7 @@ generate_php_test_proto() {
   rm -rf generated
   mkdir generated
   ../../src/protoc --php_out=generated         \
+    -I../../src -I.                            \
     proto/empty/echo.proto                     \
     proto/test.proto                           \
     proto/test_include.proto                   \
@@ -300,6 +382,7 @@ generate_php_test_proto() {
     proto/test_reserved_message_upper.proto    \
     proto/test_service.proto                   \
     proto/test_service_namespace.proto         \
+    proto/test_wrapper_type_setters.proto      \
     proto/test_descriptors.proto
   pushd ../../src
   ./protoc --php_out=../php/tests/generated -I../php/tests -I. \
@@ -310,34 +393,25 @@ generate_php_test_proto() {
 
 use_php() {
   VERSION=$1
-  PHP=`which php`
-  PHP_CONFIG=`which php-config`
-  PHPIZE=`which phpize`
-  ln -sfn "/usr/local/php-${VERSION}/bin/php" $PHP
-  ln -sfn "/usr/local/php-${VERSION}/bin/php-config" $PHP_CONFIG
-  ln -sfn "/usr/local/php-${VERSION}/bin/phpize" $PHPIZE
+  export PATH=/usr/local/php-${VERSION}/bin:$PATH
+  export CPLUS_INCLUDE_PATH=/usr/local/php-${VERSION}/include/php/main:/usr/local/php-${VERSION}/include/php/:$CPLUS_INCLUDE_PATH
+  export C_INCLUDE_PATH=/usr/local/php-${VERSION}/include/php/main:/usr/local/php-${VERSION}/include/php/:$C_INCLUDE_PATH
   generate_php_test_proto
 }
 
 use_php_zts() {
   VERSION=$1
-  PHP=`which php`
-  PHP_CONFIG=`which php-config`
-  PHPIZE=`which phpize`
-  ln -sfn "/usr/local/php-${VERSION}-zts/bin/php" $PHP
-  ln -sfn "/usr/local/php-${VERSION}-zts/bin/php-config" $PHP_CONFIG
-  ln -sfn "/usr/local/php-${VERSION}-zts/bin/phpize" $PHPIZE
+  export PATH=/usr/local/php-${VERSION}-zts/bin:$PATH
+  export CPLUS_INCLUDE_PATH=/usr/local/php-${VERSION}-zts/include/php/main:/usr/local/php-${VERSION}-zts/include/php/:$CPLUS_INCLUDE_PATH
+  export C_INCLUDE_PATH=/usr/local/php-${VERSION}-zts/include/php/main:/usr/local/php-${VERSION}-zts/include/php/:$C_INCLUDE_PATH
   generate_php_test_proto
 }
 
 use_php_bc() {
   VERSION=$1
-  PHP=`which php`
-  PHP_CONFIG=`which php-config`
-  PHPIZE=`which phpize`
-  ln -sfn "/usr/local/php-${VERSION}-bc/bin/php" $PHP
-  ln -sfn "/usr/local/php-${VERSION}-bc/bin/php-config" $PHP_CONFIG
-  ln -sfn "/usr/local/php-${VERSION}-bc/bin/phpize" $PHPIZE
+  export PATH=/usr/local/php-${VERSION}-bc/bin:$PATH
+  export CPLUS_INCLUDE_PATH=/usr/local/php-${VERSION}-bc/include/php/main:/usr/local/php-${VERSION}-bc/include/php/:$CPLUS_INCLUDE_PATH
+  export C_INCLUDE_PATH=/usr/local/php-${VERSION}-bc/include/php/main:/usr/local/php-${VERSION}-bc/include/php/:$C_INCLUDE_PATH
   generate_php_test_proto
 }
 
@@ -346,9 +420,8 @@ build_php5.5() {
 
   pushd php
   rm -rf vendor
-  cp -r /usr/local/vendor-5.5 vendor
-  wget https://phar.phpunit.de/phpunit-4.8.0.phar -O /usr/bin/phpunit
-  phpunit
+  composer update
+  ./vendor/bin/phpunit
   popd
   pushd conformance
   make test_php
@@ -357,7 +430,6 @@ build_php5.5() {
 
 build_php5.5_c() {
   use_php 5.5
-  wget https://phar.phpunit.de/phpunit-4.8.0.phar -O /usr/bin/phpunit
   pushd php/tests
   /bin/bash ./test.sh 5.5
   popd
@@ -367,9 +439,18 @@ build_php5.5_c() {
   # popd
 }
 
+build_php5.5_mixed() {
+  use_php 5.5
+  pushd php
+  rm -rf vendor
+  composer update
+  /bin/bash ./tests/compile_extension.sh ./ext/google/protobuf
+  php -dextension=./ext/google/protobuf/modules/protobuf.so ./vendor/bin/phpunit
+  popd
+}
+
 build_php5.5_zts_c() {
   use_php_zts 5.5
-  wget https://phar.phpunit.de/phpunit-4.8.0.phar -O /usr/bin/phpunit
   cd php/tests && /bin/bash ./test.sh 5.5-zts && cd ../..
   # TODO(teboring): Add it back
   # pushd conformance
@@ -381,9 +462,8 @@ build_php5.6() {
   use_php 5.6
   pushd php
   rm -rf vendor
-  cp -r /usr/local/vendor-5.6 vendor
-  wget https://phar.phpunit.de/phpunit-5.7.0.phar -O /usr/bin/phpunit
-  phpunit
+  composer update
+  ./vendor/bin/phpunit
   popd
   pushd conformance
   make test_php
@@ -392,7 +472,6 @@ build_php5.6() {
 
 build_php5.6_c() {
   use_php 5.6
-  wget https://phar.phpunit.de/phpunit-5.7.0.phar -O /usr/bin/phpunit
   cd php/tests && /bin/bash ./test.sh 5.6 && cd ../..
   # TODO(teboring): Add it back
   # pushd conformance
@@ -400,9 +479,18 @@ build_php5.6_c() {
   # popd
 }
 
+build_php5.6_mixed() {
+  use_php 5.6
+  pushd php
+  rm -rf vendor
+  composer update
+  /bin/bash ./tests/compile_extension.sh ./ext/google/protobuf
+  php -dextension=./ext/google/protobuf/modules/protobuf.so ./vendor/bin/phpunit
+  popd
+}
+
 build_php5.6_zts_c() {
   use_php_zts 5.6
-  wget https://phar.phpunit.de/phpunit-5.7.0.phar -O /usr/bin/phpunit
   cd php/tests && /bin/bash ./test.sh 5.6-zts && cd ../..
   # TODO(teboring): Add it back
   # pushd conformance
@@ -418,7 +506,7 @@ build_php5.6_mac() {
   export PATH="$PHP_FOLDER/bin:$PATH"
 
   # Install phpunit
-  curl https://phar.phpunit.de/phpunit-5.6.10.phar -L -o phpunit.phar
+  curl https://phar.phpunit.de/phpunit-5.6.8.phar -L -o phpunit.phar
   chmod +x phpunit.phar
   sudo mv phpunit.phar /usr/local/bin/phpunit
 
@@ -439,9 +527,8 @@ build_php7.0() {
   use_php 7.0
   pushd php
   rm -rf vendor
-  cp -r /usr/local/vendor-7.0 vendor
-  wget https://phar.phpunit.de/phpunit-5.6.0.phar -O /usr/bin/phpunit
-  phpunit
+  composer update
+  ./vendor/bin/phpunit
   popd
   pushd conformance
   make test_php
@@ -450,7 +537,6 @@ build_php7.0() {
 
 build_php7.0_c() {
   use_php 7.0
-  wget https://phar.phpunit.de/phpunit-5.6.0.phar -O /usr/bin/phpunit
   cd php/tests && /bin/bash ./test.sh 7.0 && cd ../..
   # TODO(teboring): Add it back
   # pushd conformance
@@ -458,9 +544,18 @@ build_php7.0_c() {
   # popd
 }
 
+build_php7.0_mixed() {
+  use_php 7.0
+  pushd php
+  rm -rf vendor
+  composer update
+  /bin/bash ./tests/compile_extension.sh ./ext/google/protobuf
+  php -dextension=./ext/google/protobuf/modules/protobuf.so ./vendor/bin/phpunit
+  popd
+}
+
 build_php7.0_zts_c() {
   use_php_zts 7.0
-  wget https://phar.phpunit.de/phpunit-5.6.0.phar -O /usr/bin/phpunit
   cd php/tests && /bin/bash ./test.sh 7.0-zts && cd ../..
   # TODO(teboring): Add it back.
   # pushd conformance
@@ -502,28 +597,38 @@ build_php7.1() {
   use_php 7.1
   pushd php
   rm -rf vendor
-  cp -r /usr/local/vendor-7.1 vendor
-  wget https://phar.phpunit.de/phpunit-5.6.0.phar -O /usr/bin/phpunit
-  phpunit
+  composer update
+  ./vendor/bin/phpunit
   popd
   pushd conformance
-  # TODO(teboring): Add it back
-  # make test_php
+  make test_php
   popd
 }
 
 build_php7.1_c() {
+  ENABLE_CONFORMANCE_TEST=$1
   use_php 7.1
-  wget https://phar.phpunit.de/phpunit-5.6.0.phar -O /usr/bin/phpunit
   cd php/tests && /bin/bash ./test.sh 7.1 && cd ../..
-  pushd conformance
-  # make test_php_c
+  if [ "$ENABLE_CONFORMANCE_TEST" = "true" ]
+  then
+    pushd conformance
+    make test_php_c
+    popd
+  fi
+}
+
+build_php7.1_mixed() {
+  use_php 7.1
+  pushd php
+  rm -rf vendor
+  composer update
+  /bin/bash ./tests/compile_extension.sh ./ext/google/protobuf
+  php -dextension=./ext/google/protobuf/modules/protobuf.so ./vendor/bin/phpunit
   popd
 }
 
 build_php7.1_zts_c() {
   use_php_zts 7.1
-  wget https://phar.phpunit.de/phpunit-5.6.0.phar -O /usr/bin/phpunit
   cd php/tests && /bin/bash ./test.sh 7.1-zts && cd ../..
   pushd conformance
   # make test_php_c
@@ -538,7 +643,11 @@ build_php_all_32() {
   build_php5.5_c
   build_php5.6_c
   build_php7.0_c
-  build_php7.1_c
+  build_php7.1_c $1
+  build_php5.5_mixed
+  build_php5.6_mixed
+  build_php7.0_mixed
+  build_php7.1_mixed
   build_php5.5_zts_c
   build_php5.6_zts_c
   build_php7.0_zts_c
@@ -546,8 +655,13 @@ build_php_all_32() {
 }
 
 build_php_all() {
-  build_php_all_32
+  build_php_all_32 true
   build_php_compatibility
+}
+
+build_benchmark() {
+  use_php 7.2
+  cd kokoro/linux/benchmark && ./run.sh
 }
 
 # -------- main --------
@@ -564,12 +678,17 @@ Usage: $0 { cpp |
             objectivec_ios_debug |
             objectivec_ios_release |
             objectivec_osx |
+            objectivec_tvos |
+            objectivec_tvos_debug |
+            objectivec_tvos_release |
             objectivec_cocoapods_integration |
             python |
             python_cpp |
             python_compatibility |
-            ruby21 |
-            ruby22 |
+            ruby23 |
+            ruby24 |
+            ruby25 |
+            ruby26 |
             jruby |
             ruby_all |
             php5.5   |
@@ -581,7 +700,8 @@ Usage: $0 { cpp |
             php_compatibility |
             php7.1   |
             php7.1_c |
-            php_all)
+            php_all |
+            benchmark)
 "
   exit 1
 fi

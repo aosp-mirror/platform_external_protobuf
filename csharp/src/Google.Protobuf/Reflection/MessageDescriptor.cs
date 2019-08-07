@@ -72,23 +72,21 @@ namespace Google.Protobuf.Reflection
             ClrType = generatedCodeInfo?.ClrType;
             ContainingType = parent;
 
-            // Note use of generatedCodeInfo. rather than generatedCodeInfo?. here... we don't expect
-            // to see any nested oneofs, types or enums in "not actually generated" code... we do
-            // expect fields though (for map entry messages).
+            // If generatedCodeInfo is null, we just won't generate an accessor for any fields.
             Oneofs = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.OneofDecl,
                 (oneof, index) =>
-                new OneofDescriptor(oneof, file, this, index, generatedCodeInfo.OneofNames[index]));
+                new OneofDescriptor(oneof, file, this, index, generatedCodeInfo?.OneofNames[index]));
 
             NestedTypes = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.NestedType,
                 (type, index) =>
-                new MessageDescriptor(type, file, this, index, generatedCodeInfo.NestedTypes[index]));
+                new MessageDescriptor(type, file, this, index, generatedCodeInfo?.NestedTypes[index]));
 
             EnumTypes = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.EnumType,
                 (type, index) =>
-                new EnumDescriptor(type, file, this, index, generatedCodeInfo.NestedEnums[index]));
+                new EnumDescriptor(type, file, this, index, generatedCodeInfo?.NestedEnums[index]));
 
             fieldsInDeclarationOrder = DescriptorUtil.ConvertAndMakeReadOnly(
                 proto.Field,
@@ -116,6 +114,21 @@ namespace Google.Protobuf.Reflection
         /// The brief name of the descriptor's target.
         /// </summary>
         public override string Name => Proto.Name;
+
+        internal override IReadOnlyList<DescriptorBase> GetNestedDescriptorListForField(int fieldNumber)
+        {
+            switch (fieldNumber)
+            {
+                case DescriptorProto.FieldFieldNumber:
+                    return (IReadOnlyList<DescriptorBase>) fieldsInDeclarationOrder;
+                case DescriptorProto.NestedTypeFieldNumber:
+                    return (IReadOnlyList<DescriptorBase>) NestedTypes;
+                case DescriptorProto.EnumTypeFieldNumber:
+                    return (IReadOnlyList<DescriptorBase>) EnumTypes;
+                default:
+                    return null;
+            }
+        }
 
         internal DescriptorProto Proto { get; }
 

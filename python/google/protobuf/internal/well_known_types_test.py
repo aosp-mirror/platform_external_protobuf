@@ -35,7 +35,7 @@
 __author__ = 'jieluo@google.com (Jie Luo)'
 
 import collections
-from datetime import datetime
+import datetime
 
 try:
   import unittest2 as unittest  #PY26
@@ -47,6 +47,7 @@ from google.protobuf import duration_pb2
 from google.protobuf import field_mask_pb2
 from google.protobuf import struct_pb2
 from google.protobuf import timestamp_pb2
+from google.protobuf import map_unittest_pb2
 from google.protobuf import unittest_pb2
 from google.protobuf.internal import any_test_pb2
 from google.protobuf.internal import test_util
@@ -240,13 +241,33 @@ class TimeUtilTest(TimeUtilTestBase):
 
   def testDatetimeConverison(self):
     message = timestamp_pb2.Timestamp()
-    dt = datetime(1970, 1, 1)
+    dt = datetime.datetime(1970, 1, 1)
     message.FromDatetime(dt)
     self.assertEqual(dt, message.ToDatetime())
 
     message.FromMilliseconds(1999)
-    self.assertEqual(datetime(1970, 1, 1, 0, 0, 1, 999000),
+    self.assertEqual(datetime.datetime(1970, 1, 1, 0, 0, 1, 999000),
                      message.ToDatetime())
+
+  def testDatetimeConversionWithTimezone(self):
+    class TZ(datetime.tzinfo):
+
+      def utcoffset(self, _):
+        return datetime.timedelta(hours=1)
+
+      def dst(self, _):
+        return datetime.timedelta(0)
+
+      def tzname(self, _):
+        return 'UTC+1'
+
+    message1 = timestamp_pb2.Timestamp()
+    dt = datetime.datetime(1970, 1, 1, 1, tzinfo=TZ())
+    message1.FromDatetime(dt)
+    message2 = timestamp_pb2.Timestamp()
+    dt = datetime.datetime(1970, 1, 1, 0)
+    message2.FromDatetime(dt)
+    self.assertEqual(message1, message2)
 
   def testTimedeltaConversion(self):
     message = duration_pb2.Duration()
@@ -506,7 +527,7 @@ class FieldMaskTest(unittest.TestCase):
     out_mask.Intersect(mask1, mask2)
     self.assertEqual('foo.bar.baz', out_mask.ToJsonString())
 
-  def testMergeMessage(self):
+  def testMergeMessageWithoutMapFields(self):
     # Test merge one field.
     src = unittest_pb2.TestAllTypes()
     test_util.SetAllFields(src)
@@ -614,6 +635,29 @@ class FieldMaskTest(unittest.TestCase):
     mask.MergeMessage(new_msg, dst)
     self.assertTrue(dst.HasField('foo_message'))
     self.assertFalse(dst.HasField('foo_lazy_message'))
+
+  def testMergeMessageWithMapField(self):
+    empty_map = map_unittest_pb2.TestRecursiveMapMessage()
+    src_level_2 = map_unittest_pb2.TestRecursiveMapMessage()
+    src_level_2.a['src level 2'].CopyFrom(empty_map)
+    src = map_unittest_pb2.TestRecursiveMapMessage()
+    src.a['common key'].CopyFrom(src_level_2)
+    src.a['src level 1'].CopyFrom(src_level_2)
+
+    dst_level_2 = map_unittest_pb2.TestRecursiveMapMessage()
+    dst_level_2.a['dst level 2'].CopyFrom(empty_map)
+    dst = map_unittest_pb2.TestRecursiveMapMessage()
+    dst.a['common key'].CopyFrom(dst_level_2)
+    dst.a['dst level 1'].CopyFrom(empty_map)
+
+    mask = field_mask_pb2.FieldMask()
+    mask.FromJsonString('a')
+    mask.MergeMessage(src, dst)
+
+    # map from dst is replaced with map from src.
+    self.assertEqual(dst.a['common key'], src_level_2)
+    self.assertEqual(dst.a['src level 1'], src_level_2)
+    self.assertEqual(dst.a['dst level 1'], empty_map)
 
   def testMergeErrors(self):
     src = unittest_pb2.TestAllTypes()
@@ -878,6 +922,17 @@ class AnyTest(unittest.TestCase):
     else:
       raise AttributeError('%s should not have Pack method.' %
                            msg_descriptor.full_name)
+
+  def testUnpackWithNoSlashInTypeUrl(self):
+    msg = any_test_pb2.TestAny()
+    all_types = unittest_pb2.TestAllTypes()
+    all_descriptor = all_types.DESCRIPTOR
+    msg.value.Pack(all_types)
+    # Reset type_url to part of type_url after '/'
+    msg.value.type_url = msg.value.TypeName()
+    self.assertFalse(msg.value.Is(all_descriptor))
+    unpacked_message = unittest_pb2.TestAllTypes()
+    self.assertFalse(msg.value.Unpack(unpacked_message))
 
   def testMessageName(self):
     # Creates and sets message.
