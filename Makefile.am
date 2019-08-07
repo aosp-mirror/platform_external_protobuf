@@ -1036,7 +1036,6 @@ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
   cmake/protobuf.pc.cmake                \
   cmake/protoc.cmake                     \
   cmake/tests.cmake                      \
-  cmake/version.rc.in                    \
   editors/README.txt                     \
   editors/proto.vim                      \
   editors/protobuf-mode.el               \
