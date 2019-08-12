@@ -784,3 +784,30 @@ cc_binary_host {
     ],
     stl: "libc++_static",
 }
+
+// Java nano generator plugin
+// =======================================================
+cc_binary_host {
+    name: "protoc-gen-javanano",
+    defaults: ["protobuf-cflags-defaults"],
+    srcs: [
+        "src/google/protobuf/compiler/javanano/javanano_enum.cc",
+        "src/google/protobuf/compiler/javanano/javanano_enum_field.cc",
+        "src/google/protobuf/compiler/javanano/javanano_extension.cc",
+        "src/google/protobuf/compiler/javanano/javanano_field.cc",
+        "src/google/protobuf/compiler/javanano/javanano_file.cc",
+        "src/google/protobuf/compiler/javanano/javanano_generator.cc",
+        "src/google/protobuf/compiler/javanano/javanano_helpers.cc",
+        "src/google/protobuf/compiler/javanano/javanano_main.cc",
+        "src/google/protobuf/compiler/javanano/javanano_map_field.cc",
+        "src/google/protobuf/compiler/javanano/javanano_message.cc",
+        "src/google/protobuf/compiler/javanano/javanano_message_field.cc",
+        "src/google/protobuf/compiler/javanano/javanano_primitive_field.cc",
+    ],
+    local_include_dirs: ["src"],
+    static_libs: [
+        "libprotoc",
+        "libz",
+    ],
+    stl: "libc++_static",
+}
