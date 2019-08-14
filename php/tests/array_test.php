@@ -5,9 +5,9 @@ require_once('test_util.php');
 use Google\Protobuf\Internal\RepeatedField;
 use Google\Protobuf\Internal\GPBType;
 use Foo\TestMessage;
-use Foo\TestMessage_Sub;
+use Foo\TestMessage\Sub;
 
-class RepeatedFieldTest extends PHPUnit_Framework_TestCase
+class RepeatedFieldTest extends \PHPUnit\Framework\TestCase
 {
 
     #########################################################
@@ -456,10 +456,10 @@ class RepeatedFieldTest extends PHPUnit_Framework_TestCase
 
     public function testMessage()
     {
-        $arr = new RepeatedField(GPBType::MESSAGE, TestMessage_Sub::class);
+        $arr = new RepeatedField(GPBType::MESSAGE, Sub::class);
 
         // Test append.
-        $sub_m = new TestMessage_Sub();
+        $sub_m = new Sub();
         $sub_m->setA(1);
         $arr[] = $sub_m;
         $this->assertSame(1, $arr[0]->getA());
@@ -467,15 +467,15 @@ class RepeatedFieldTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(1, count($arr));
 
         // Test set.
-        $sub_m = new TestMessage_Sub();
+        $sub_m = new Sub();
         $sub_m->setA(2);
         $arr[0] = $sub_m;
         $this->assertSame(2, $arr[0]->getA());
 
         // Test foreach.
-        $arr = new RepeatedField(GPBType::MESSAGE, TestMessage_Sub::class);
+        $arr = new RepeatedField(GPBType::MESSAGE, Sub::class);
         for ($i = 0; $i < 3; $i++) {
-          $arr[] = new TestMessage_Sub();
+          $arr[] = new Sub();
           $arr[$i]->setA($i);
         }
         $i = 0;
@@ -527,6 +527,45 @@ class RepeatedFieldTest extends PHPUnit_Framework_TestCase
         $this->assertSame(0, $arr[0]);
         $this->assertSame(1, $arr[1]);
         $this->assertSame(3, $arr[2]);
+    }
+
+    #########################################################
+    # Test reference in array
+    #########################################################
+
+    public function testArrayElementIsReferenceInSetters()
+    {
+        // Bool elements
+        $values = [true];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setRepeatedBool($values);
+
+        // Int32 elements
+        $values = [1];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setRepeatedInt32($values);
+
+        // Double elements
+        $values = [1.0];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setRepeatedDouble($values);
+
+        // String elements
+        $values = ['a'];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setRepeatedString($values);
+
+        // Message elements
+        $m = new TestMessage();
+        $subs = [1, 2];
+        foreach ($subs as &$sub) {
+            $sub = new Sub(['a' => $sub]);
+        }
+        $m->setRepeatedMessage($subs);
     }
 
     #########################################################
