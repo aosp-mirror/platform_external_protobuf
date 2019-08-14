@@ -49,17 +49,6 @@ namespace protobuf {
 namespace compiler {
 namespace java {
 
-namespace {
-bool EnumHasCustomOptions(const EnumDescriptor* descriptor) {
-  if (descriptor->options().unknown_fields().field_count() > 0) return true;
-  for (int i = 0; i < descriptor->value_count(); ++i) {
-    const EnumValueDescriptor* value = descriptor->value(i);
-    if (value->options().unknown_fields().field_count() > 0) return true;
-  }
-  return false;
-}
-}  // namespace
-
 EnumGenerator::EnumGenerator(const EnumDescriptor* descriptor,
                              bool immutable_api,
                              Context* context)
@@ -86,10 +75,12 @@ EnumGenerator::~EnumGenerator() {}
 
 void EnumGenerator::Generate(io::Printer* printer) {
   WriteEnumDocComment(printer, descriptor_);
+  MaybePrintGeneratedAnnotation(context_, printer, descriptor_, immutable_api_);
   printer->Print(
-    "public enum $classname$\n"
-    "    implements com.google.protobuf.ProtocolMessageEnum {\n",
-    "classname", descriptor_->name());
+      "public enum $classname$\n"
+      "    implements com.google.protobuf.ProtocolMessageEnum {\n",
+      "classname", descriptor_->name());
+  printer->Annotate("classname", descriptor_);
   printer->Indent();
 
   bool ordinal_is_index = true;
@@ -103,7 +94,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
   }
 
   for (int i = 0; i < canonical_values_.size(); i++) {
-    map<string, string> vars;
+    std::map<string, string> vars;
     vars["name"] = canonical_values_[i]->name();
     vars["index"] = SimpleItoa(canonical_values_[i]->index());
     vars["number"] = SimpleItoa(canonical_values_[i]->number());
@@ -118,14 +109,16 @@ void EnumGenerator::Generate(io::Printer* printer) {
       printer->Print(vars,
         "$name$($index$, $number$),\n");
     }
+    printer->Annotate("name", canonical_values_[i]);
   }
 
   if (SupportUnknownEnumValue(descriptor_->file())) {
     if (ordinal_is_index) {
-      printer->Print("UNRECOGNIZED(-1),\n");
+      printer->Print("${$UNRECOGNIZED$}$(-1),\n", "{", "", "}", "");
     } else {
-      printer->Print("UNRECOGNIZED(-1, -1),\n");
+      printer->Print("${$UNRECOGNIZED$}$(-1, -1),\n", "{", "", "}", "");
     }
+    printer->Annotate("{", "}", descriptor_);
   }
 
   printer->Print(
@@ -135,22 +128,26 @@ void EnumGenerator::Generate(io::Printer* printer) {
   // -----------------------------------------------------------------
 
   for (int i = 0; i < aliases_.size(); i++) {
-    map<string, string> vars;
+    std::map<string, string> vars;
     vars["classname"] = descriptor_->name();
     vars["name"] = aliases_[i].value->name();
     vars["canonical_name"] = aliases_[i].canonical_value->name();
     WriteEnumValueDocComment(printer, aliases_[i].value);
     printer->Print(vars,
       "public static final $classname$ $name$ = $canonical_name$;\n");
+    printer->Annotate("name", aliases_[i].value);
   }
 
   for (int i = 0; i < descriptor_->value_count(); i++) {
-    map<string, string> vars;
+    std::map<string, string> vars;
     vars["name"] = descriptor_->value(i)->name();
     vars["number"] = SimpleItoa(descriptor_->value(i)->number());
+    vars["{"] = "";
+    vars["}"] = "";
     WriteEnumValueDocComment(printer, descriptor_->value(i));
     printer->Print(vars,
-      "public static final int $name$_VALUE = $number$;\n");
+      "public static final int ${$$name$_VALUE$}$ = $number$;\n");
+    printer->Annotate("{", "}", descriptor_->value(i));
   }
   printer->Print("\n");
 
@@ -241,49 +238,14 @@ void EnumGenerator::Generate(io::Printer* printer) {
     //   at module init time because it wouldn't work with descriptor.proto, but
     //   we can cache the value the first time getDescriptor() is called.
     if (descriptor_->containing_type() == NULL) {
-      if (!MultipleJavaFiles(descriptor_->file(), immutable_api_)) {
-        printer->Print(
-          "  return $file$.getDescriptor().getEnumTypes().get($index$);\n",
-          "file", name_resolver_->GetClassName(descriptor_->file(),
-                                               immutable_api_),
-          "index", SimpleItoa(descriptor_->index()));
-      } else {
-        printer->Indent();
-        if (EnumHasCustomOptions(descriptor_)) {
-          // We need to load the immutable classes in order to parse custom
-          // options. However, since file level enums (no outer class) are
-          // shared by immutable code and mutable code, the immutable classes
-          // may not exist. So we try to use Java reflection to retrieve the
-          // descriptor from immutable classes.
-          printer->Print(
-            "try {\n"
-            "  java.lang.Class immutableFileClass =\n"
-            "      java.lang.Class.forName(\"$immutable_file_class_name$\");\n"
-            "  @java.lang.SuppressWarnings(\"unchecked\")\n"
-            "  java.lang.reflect.Method m =\n"
-            "      immutableFileClass.getMethod(\"getDescriptor\");\n"
-            "  com.google.protobuf.Descriptors.FileDescriptor file =\n"
-            "      (com.google.protobuf.Descriptors.FileDescriptor)\n"
-            "          m.invoke(immutableFileClass);\n"
-            "  return file.getEnumTypes().get($index$);\n"
-            "} catch (java.lang.Exception e) {\n"
-            // Immutable classes cannot be found. Proceed as if custom options
-            // don't exist.
-            "}\n",
-            "immutable_file_class_name",
-            name_resolver_->GetImmutableClassName(descriptor_->file()),
-            "index", SimpleItoa(descriptor_->index()));
-        }
-        printer->Print(
-          "return $immutable_package$.$descriptor_class$.$descriptor$\n"
-          "    .getEnumTypes().get($index$);\n",
-          "immutable_package", FileJavaPackage(descriptor_->file(), true),
-          "descriptor_class",
-          name_resolver_->GetDescriptorClassName(descriptor_->file()),
-          "descriptor", "getDescriptor()",
-          "index", SimpleItoa(descriptor_->index()));
-        printer->Outdent();
-      }
+      // The class generated for the File fully populates the descriptor with
+      // extensions in both the mutable and immutable cases. (In the mutable api
+      // this is accomplished by attempting to load the immutable outer class).
+      printer->Print(
+        "  return $file$.getDescriptor().getEnumTypes().get($index$);\n",
+        "file", name_resolver_->GetClassName(descriptor_->file(),
+                                             immutable_api_),
+        "index", SimpleItoa(descriptor_->index()));
     } else {
       printer->Print(
           "  return $parent$.$descriptor$.getEnumTypes().get($index$);\n",
