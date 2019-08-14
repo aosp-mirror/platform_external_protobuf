@@ -47,6 +47,12 @@ public final class WireFormat {
   // Do not allow instantiation.
   private WireFormat() {}
 
+  static final int FIXED32_SIZE = 4;
+  static final int FIXED64_SIZE = 8;
+  static final int MAX_VARINT32_SIZE = 5;
+  static final int MAX_VARINT64_SIZE = 10;
+  static final int MAX_VARINT_SIZE = 10;
+
   public static final int WIRETYPE_VARINT           = 0;
   public static final int WIRETYPE_FIXED64          = 1;
   public static final int WIRETYPE_LENGTH_DELIMITED = 2;
