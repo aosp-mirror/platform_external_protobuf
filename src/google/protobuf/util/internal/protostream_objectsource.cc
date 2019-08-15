@@ -120,6 +120,7 @@ ProtoStreamObjectSource::ProtoStreamObjectSource(
       own_typeinfo_(true),
       type_(type),
       use_lower_camel_for_enums_(false),
+      preserve_proto_field_names_(false),
       recursion_depth_(0),
       max_recursion_depth_(kDefaultMaxRecursionDepth) {
   GOOGLE_LOG_IF(DFATAL, stream == NULL) << "Input stream is NULL.";
@@ -133,6 +134,7 @@ ProtoStreamObjectSource::ProtoStreamObjectSource(
       own_typeinfo_(false),
       type_(type),
       use_lower_camel_for_enums_(false),
+      preserve_proto_field_names_(false),
       recursion_depth_(0),
       max_recursion_depth_(kDefaultMaxRecursionDepth) {
   GOOGLE_LOG_IF(DFATAL, stream == NULL) << "Input stream is NULL.";
@@ -193,7 +195,11 @@ Status ProtoStreamObjectSource::WriteMessage(const google::protobuf::Type& type,
       last_tag = tag;
       field = FindAndVerifyField(type, tag);
       if (field != NULL) {
-        field_name = field->json_name();
+        if (preserve_proto_field_names_) {
+          field_name = field->name();
+        } else {
+          field_name = field->json_name();
+        }
       }
     }
     if (field == NULL) {
@@ -628,6 +634,8 @@ Status ProtoStreamObjectSource::RenderAny(const ProtoStreamObjectSource* os,
   // using a nested ProtoStreamObjectSource using our nested type information.
   ProtoStreamObjectSource nested_os(&in_stream, os->typeinfo_, *nested_type);
 
+  nested_os.set_use_lower_camel_for_enums(os->use_lower_camel_for_enums_);
+  nested_os.set_preserve_proto_field_names(os->preserve_proto_field_names_);
   // We manually call start and end object here so we can inject the @type.
   ow->StartObject(field_name);
   ow->RenderString("@type", type_url);
