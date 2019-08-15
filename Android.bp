@@ -223,7 +223,7 @@ cc_library_static {
 
 // C++ full library for the platform and host
 // =======================================================
-cc_library_shared {
+cc_library {
     name: "libprotobuf-cpp-full",
     defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
@@ -236,6 +236,12 @@ cc_library_shared {
     target: {
         android: {
             shared_libs: ["liblog"],
+            static: {
+                enabled: false,
+            },
+        },
+        windows: {
+            enabled: true,
         },
     },
 }
