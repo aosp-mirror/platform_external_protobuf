@@ -263,8 +263,10 @@ cc_library_shared {
 
 // Compiler library for the host
 // =======================================================
-cc_library_host_shared {
+cc_library {
     name: "libprotoc",
+    host_supported: true,
+    device_supported: false,
     defaults: ["libprotobuf-cpp-full-defaults"],
 
     srcs: [
@@ -386,15 +388,6 @@ cc_binary_host {
         "src/google/protobuf/compiler/java/java_shared_code_generator.cc",
         "src/google/protobuf/compiler/java/java_string_field.cc",
         "src/google/protobuf/compiler/java/java_string_field_lite.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_enum.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_enum_field.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_field.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_file.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_generator.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_helpers.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_message.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_message_field.cc",
-        "src/google/protobuf/compiler/javamicro/javamicro_primitive_field.cc",
         "src/google/protobuf/compiler/javanano/javanano_enum.cc",
         "src/google/protobuf/compiler/javanano/javanano_enum_field.cc",
         "src/google/protobuf/compiler/javanano/javanano_extension.cc",
@@ -761,4 +754,31 @@ android_test {
     dex_preopt: {
         enabled: false,
     },
+}
+
+// Java micro generator plugin
+// =======================================================
+cc_binary_host {
+    name: "protoc-gen-javamicro",
+    defaults: ["protobuf-cflags-defaults"],
+    srcs: [
+        "src/google/protobuf/compiler/javamicro/javamicro_enum.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_enum_field.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_field.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_file.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_generator.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_helpers.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_main.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_message.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_message_field.cc",
+        "src/google/protobuf/compiler/javamicro/javamicro_primitive_field.cc",
+    ],
+    local_include_dirs: ["src"],
+    static_libs: [
+        "libprotoc",
+        "libz",
+    ],
+    stl: "libc++_static",
+
+    cflags: IGNORED_WARNINGS,
 }
