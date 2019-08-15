@@ -34,7 +34,6 @@
 #include <google/protobuf/compiler/cpp/cpp_generator.h>
 #include <google/protobuf/compiler/python/python_generator.h>
 #include <google/protobuf/compiler/java/java_generator.h>
-#include <google/protobuf/compiler/javamicro/javamicro_generator.h>
 #include <google/protobuf/compiler/javanano/javanano_generator.h>
 #include <google/protobuf/compiler/ruby/ruby_generator.h>
 #include <google/protobuf/compiler/csharp/csharp_generator.h>
@@ -66,11 +65,6 @@ int main(int argc, char* argv[]) {
   google::protobuf::compiler::javanano::JavaNanoGenerator javanano_generator;
   cli.RegisterGenerator("--javanano_out", &javanano_generator,
                         "Generate Java Nano source file.");
-
-  // Java Micro
-  google::protobuf::compiler::javamicro::JavaMicroGenerator javamicro_generator;
-  cli.RegisterGenerator("--javamicro_out", &javamicro_generator,
-                        "Generate Java Micro source file.");
 
   // Ruby
   google::protobuf::compiler::ruby::Generator rb_generator;
