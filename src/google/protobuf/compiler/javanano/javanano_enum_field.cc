@@ -52,7 +52,7 @@ namespace {
 // TODO(kenton):  Factor out a "SetCommonFieldVariables()" to get rid of
 //   repeat code between this and the other field types.
 void SetEnumVariables(const Params& params,
-    const FieldDescriptor* descriptor, map<string, string>* variables) {
+    const FieldDescriptor* descriptor, std::map<string, string>* variables) {
   (*variables)["name"] =
     RenameJavaKeywords(UnderscoresToCamelCase(descriptor));
   (*variables)["capitalized_name"] =
@@ -83,7 +83,7 @@ void SetEnumVariables(const Params& params,
 }
 
 void LoadEnumValues(const Params& params,
-    const EnumDescriptor* enum_descriptor, vector<string>* canonical_values) {
+    const EnumDescriptor* enum_descriptor, std::vector<string>* canonical_values) {
   string enum_class_name = ClassName(params, enum_descriptor);
   for (int i = 0; i < enum_descriptor->value_count(); i++) {
     const EnumValueDescriptor* value = enum_descriptor->value(i);
@@ -97,7 +97,7 @@ void LoadEnumValues(const Params& params,
 }
 
 void PrintCaseLabels(
-    io::Printer* printer, const vector<string>& canonical_values) {
+    io::Printer* printer, const std::vector<string>& canonical_values) {
   for (int i = 0; i < canonical_values.size(); i++) {
     printer->Print(
       "  case $value$:\n",
@@ -144,9 +144,6 @@ GenerateClearCode(io::Printer* printer) const {
 
 void EnumFieldGenerator::
 GenerateMergingCode(io::Printer* printer) const {
-  if (params_.store_unknown_fields()) {
-    printer->Print("int initialPos = input.getPosition();\n");
-  }
   printer->Print(variables_,
     "int value = input.readInt32();\n"
     "switch (value) {\n");
@@ -158,20 +155,11 @@ GenerateMergingCode(io::Printer* printer) const {
       "    has$capitalized_name$ = true;\n");
   }
   printer->Print(
-    "    break;\n");
-  if (params_.store_unknown_fields()) {
-    // If storing unknown fields, store invalid values there.
-    // This is consistent with full protobuf, but note that if a client writes
-    // a new value to this field, both will be serialized on the wire, and
-    // other clients which are aware of unknown fields will see the previous
-    // value, not the new one.
-    printer->Print(
-      "  default:\n"
-      "    input.rewindToPosition(initialPos);\n"
-      "    storeUnknownField(input, tag);\n"
-      "    break;\n");
-  }
-  printer->Print("}\n");
+    "    break;\n"
+    "}\n");
+  // No default case: in case of invalid value from the wire, preserve old
+  // field value. Also we are not storing the invalid value into the unknown
+  // fields, because there is no way to get the value out.
 }
 
 void EnumFieldGenerator::
@@ -312,9 +300,6 @@ GenerateClearCode(io::Printer* printer) const {
 
 void AccessorEnumFieldGenerator::
 GenerateMergingCode(io::Printer* printer) const {
-  if (params_.store_unknown_fields()) {
-    printer->Print("int initialPos = input.getPosition();\n");
-  }
   printer->Print(variables_,
     "int value = input.readInt32();\n"
     "switch (value) {\n");
@@ -322,20 +307,11 @@ GenerateMergingCode(io::Printer* printer) const {
   printer->Print(variables_,
     "    $name$_ = value;\n"
     "    $set_has$;\n"
-    "    break;\n");
-  if (params_.store_unknown_fields()) {
-    // If storing unknown fields, store invalid values there.
-    // This is consistent with full protobuf, but note that if a client writes
-    // a new value to this field, both will be serialized on the wire, and
-    // other clients which are aware of unknown fields will see the previous
-    // value, not the new one.
-    printer->Print(
-      "  default:\n"
-      "    input.rewindToPosition(initialPos);\n"
-      "    storeUnknownField(input, tag);\n"
-      "    break;\n");
-  }
-  printer->Print("}\n");
+    "    break;\n"
+    "}\n");
+  // No default case: in case of invalid value from the wire, preserve old
+  // field value. Also we are not storing the invalid value into the unknown
+  // fields, because there is no way to get the value out.
 }
 
 void AccessorEnumFieldGenerator::
@@ -405,11 +381,7 @@ GenerateMergingCode(io::Printer* printer) const {
     "for (int i = 0; i < length; i++) {\n"
     "  if (i != 0) { // tag for first value already consumed.\n"
     "    input.readTag();\n"
-    "  }\n");
-  if (params_.store_unknown_fields()) {
-    printer->Print("  int initialPos = input.getPosition();\n");
-  }
-  printer->Print(
+    "  }\n"
     "  int value = input.readInt32();\n"
     "  switch (value) {\n");
   printer->Indent();
@@ -417,19 +389,7 @@ GenerateMergingCode(io::Printer* printer) const {
   printer->Outdent();
   printer->Print(variables_,
     "      validValues[validCount++] = value;\n"
-    "      break;\n");
-  if (params_.store_unknown_fields()) {
-    // If storing unknown fields, store invalid values there.
-    // This is consistent with full protobuf. Note that this can lead to very
-    // strange behaviors if a value is serialized and reread, e.g. changes in
-    // value ordering.
-    printer->Print(
-      "    default:\n"
-      "      input.rewindToPosition(initialPos);\n"
-      "      storeUnknownField(input, tag);\n"
-      "      break;\n");
-  }
-  printer->Print(variables_,
+    "      break;\n"
     "  }\n"
     "}\n"
     "if (validCount != 0) {\n"
@@ -472,11 +432,7 @@ GenerateMergingCodeFromPacked(io::Printer* printer) const {
     "  if (i != 0) {\n"
     "    java.lang.System.arraycopy(this.$name$, 0, newArray, 0, i);\n"
     "  }\n"
-    "  while (input.getBytesUntilLimit() > 0) {\n");
-  if (params_.store_unknown_fields()) {
-    printer->Print("    int initialPos = input.getPosition();\n");
-  }
-  printer->Print(variables_,
+    "  while (input.getBytesUntilLimit() > 0) {\n"
     "    int value = input.readInt32();\n"
     "    switch (value) {\n");
   printer->Indent();
@@ -486,19 +442,7 @@ GenerateMergingCodeFromPacked(io::Printer* printer) const {
   printer->Outdent();
   printer->Print(variables_,
     "        newArray[i++] = value;\n"
-    "        break;\n");
-  if (params_.store_unknown_fields()) {
-    // If storing unknown fields, store invalid values there.
-    // This is consistent with full protobuf. Note that this can lead to very
-    // strange behaviors if a value is serialized and reread, e.g. changes in
-    // value ordering.
-    printer->Print(variables_,
-      "      default:\n"
-      "        input.rewindToPosition(initialPos);\n"
-      "        storeUnknownField(input, $non_packed_tag$);\n"
-      "        break;\n");
-  }
-  printer->Print(variables_,
+    "        break;\n"
     "    }\n"
     "  }\n"
     "  this.$name$ = newArray;\n"

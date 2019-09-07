@@ -49,9 +49,9 @@ FieldGenerator::~FieldGenerator() {}
 FieldGeneratorMap::FieldGeneratorMap(const Descriptor* descriptor, const Params &params)
   : descriptor_(descriptor),
     field_generators_(
-      new scoped_ptr<FieldGenerator>[descriptor->field_count()]),
+      new std::unique_ptr<FieldGenerator>[descriptor->field_count()]),
     extension_generators_(
-      new scoped_ptr<FieldGenerator>[descriptor->extension_count()]) {
+      new std::unique_ptr<FieldGenerator>[descriptor->extension_count()]) {
 
   // Construct all the FieldGenerators.
   for (int i = 0; i < descriptor->field_count(); i++) {

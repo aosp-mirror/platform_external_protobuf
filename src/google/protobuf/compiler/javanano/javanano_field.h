@@ -103,7 +103,7 @@ class FieldGeneratorMap {
 
  private:
   const Descriptor* descriptor_;
-  scoped_array<scoped_ptr<FieldGenerator> > field_generators_;
+  std::unique_ptr<std::unique_ptr<FieldGenerator>[]> field_generators_;
   int total_bits_;
   bool saved_defaults_needed_;
 
@@ -114,12 +114,12 @@ class FieldGeneratorMap {
 };
 
 void SetCommonOneofVariables(const FieldDescriptor* descriptor,
-                             map<string, string>* variables);
+                             std::map<string, string>* variables);
 void GenerateOneofFieldEquals(const FieldDescriptor* descriptor,
-                              const map<string, string>& variables,
+                              const std::map<string, string>& variables,
                               io::Printer* printer);
 void GenerateOneofFieldHashCode(const FieldDescriptor* descriptor,
-                                const map<string, string>& variables,
+                                const std::map<string, string>& variables,
                                 io::Printer* printer);
 
 }  // namespace javanano

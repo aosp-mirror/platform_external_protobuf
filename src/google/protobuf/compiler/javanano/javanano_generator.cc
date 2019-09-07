@@ -94,7 +94,7 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
                              const string& parameter,
                              GeneratorContext* output_directory,
                              string* error) const {
-  vector<pair<string, string> > options;
+  std::vector<std::pair<string, string> > options;
 
   ParseGeneratorParameter(parameter, &options);
 
@@ -116,24 +116,24 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
     if (option_name == "output_list_file") {
       output_list_file = option_value;
     } else if (option_name == "java_package") {
-        vector<string> parts;
-        SplitStringUsing(option_value, "|", &parts);
-        if (parts.size() != 2) {
-          *error = "Bad java_package, expecting filename|PackageName found '"
-            + option_value + "'";
-          return false;
-        }
-        params.set_java_package(parts[0], parts[1]);
+      std::vector<string> parts;
+      SplitStringUsing(option_value, "|", &parts);
+      if (parts.size() != 2) {
+        *error = "Bad java_package, expecting filename|PackageName found '"
+          + option_value + "'";
+        return false;
+      }
+      params.set_java_package(parts[0], parts[1]);
     } else if (option_name == "java_outer_classname") {
-        vector<string> parts;
-        SplitStringUsing(option_value, "|", &parts);
-        if (parts.size() != 2) {
-          *error = "Bad java_outer_classname, "
-                   "expecting filename|ClassName found '"
-                   + option_value + "'";
-          return false;
-        }
-        params.set_java_outer_classname(parts[0], parts[1]);
+      std::vector<string> parts;
+      SplitStringUsing(option_value, "|", &parts);
+      if (parts.size() != 2) {
+        *error = "Bad java_outer_classname, "
+                 "expecting filename|ClassName found '"
+                 + option_value + "'";
+        return false;
+      }
+      params.set_java_outer_classname(parts[0], parts[1]);
     } else if (option_name == "store_unknown_fields") {
       params.set_store_unknown_fields(option_value == "true");
     } else if (option_name == "java_multiple_files") {
@@ -163,8 +163,6 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
       params.set_generate_intdefs(option_value == "true");
     } else if (option_name == "generate_clear") {
       params.set_generate_clear(option_value == "true");
-    } else if (option_name == "bytes_offset_length") {
-      params.set_bytes_offset_length(option_value == "true");
     } else {
       *error = "Ignore unknown javanano generator option: " + option_name;
     }
@@ -182,14 +180,6 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
     return false;
   }
 
-  // Theoretically possible, but not implemented.
-  if (params.bytes_offset_length()
-      && (params.optional_field_accessors() || params.generate_equals())) {
-    error->assign("bytes_offset_length=true cannot be used in conjunction"
-        " with optional_field_style=accessors or generate_equals=true");
-    return false;
-  }
-
   // -----------------------------------------------------------------
 
   FileGenerator file_generator(file, params);
@@ -201,7 +191,7 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
     StringReplace(file_generator.java_package(), ".", "/", true);
   if (!package_dir.empty()) package_dir += "/";
 
-  vector<string> all_files;
+  std::vector<string> all_files;
 
   if (IsOuterClassNeeded(params, file)) {
     string java_filename = package_dir;
@@ -210,7 +200,7 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
     all_files.push_back(java_filename);
 
     // Generate main java file.
-    scoped_ptr<io::ZeroCopyOutputStream> output(
+    std::unique_ptr<io::ZeroCopyOutputStream> output(
       output_directory->Open(java_filename));
     io::Printer printer(output.get(), '$');
     file_generator.Generate(&printer);
@@ -223,7 +213,7 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
   if (!output_list_file.empty()) {
     // Generate output list.  This is just a simple text file placed in a
     // deterministic location which lists the .java files being generated.
-    scoped_ptr<io::ZeroCopyOutputStream> srclist_raw_output(
+    std::unique_ptr<io::ZeroCopyOutputStream> srclist_raw_output(
       output_directory->Open(output_list_file));
     io::Printer srclist_printer(srclist_raw_output.get(), '$');
     for (int i = 0; i < all_files.size(); i++) {
