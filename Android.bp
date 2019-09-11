@@ -88,8 +88,6 @@ cc_library_static {
     name: "libprotobuf-cpp-lite-ndk",
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
-    cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
-
     sdk_version: "9",
 
     stl: "c++_static",
@@ -108,8 +106,6 @@ cc_library {
     double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
-    cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
-
     target: {
         windows: {
             enabled: true,
@@ -123,7 +119,6 @@ cc_library_static {
     name: "libprotobuf-cpp-lite_static",
     host_supported: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
-    cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
 }
 
 // C++ lite library + rtti (libc++ flavored for the platform and host)
@@ -209,8 +204,6 @@ cc_library_static {
     name: "libprotobuf-cpp-full-ndk",
     defaults: ["libprotobuf-cpp-full-defaults"],
 
-    cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
-
     sdk_version: "9",
 
     stl: "c++_static",
@@ -226,8 +219,6 @@ cc_library {
     vndk: {
         enabled: true,
     },
-
-    cflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
     target: {
         android: {
             static: {
