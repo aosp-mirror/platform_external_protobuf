@@ -93,8 +93,8 @@ namespace Google.Protobuf
         private uint nextTag = 0;
         private bool hasNextTag = false;
 
-        internal const int DefaultRecursionLimit = 64;
-        internal const int DefaultSizeLimit = 64 << 20; // 64MB
+        internal const int DefaultRecursionLimit = 100;
+        internal const int DefaultSizeLimit = Int32.MaxValue;
         internal const int BufferSize = 4096;
 
         /// <summary>
@@ -248,7 +248,7 @@ namespace Google.Protobuf
         /// <remarks>
         /// This limit is applied when reading from the underlying stream, as a sanity check. It is
         /// not applied when reading from a byte array data source without an underlying stream.
-        /// The default value is 64MB.
+        /// The default value is Int32.MaxValue.
         /// </remarks>
         /// <value>
         /// The size limit.
@@ -260,12 +260,22 @@ namespace Google.Protobuf
         /// to avoid maliciously-recursive data.
         /// </summary>
         /// <remarks>
-        /// The default limit is 64.
+        /// The default limit is 100.
         /// </remarks>
         /// <value>
         /// The recursion limit for this stream.
         /// </value>
         public int RecursionLimit { get { return recursionLimit; } }
+
+        /// <summary>
+        /// Internal-only property; when set to true, unknown fields will be discarded while parsing.
+        /// </summary>
+        internal bool DiscardUnknownFields { get; set; }
+
+        /// <summary>
+        /// Internal-only property; provides extension identifiers to compatible messages while parsing.
+        /// </summary>
+        internal ExtensionRegistry ExtensionRegistry { get; set; }
 
         /// <summary>
         /// Disposes of this instance, potentially closing any underlying stream.
@@ -368,7 +378,7 @@ namespace Google.Protobuf
                 if (IsAtEnd)
                 {
                     lastTag = 0;
-                    return 0; // This is the only case in which we return 0.
+                    return 0;
                 }
 
                 lastTag = ReadRawVarint32();
@@ -377,6 +387,10 @@ namespace Google.Protobuf
             {
                 // If we actually read a tag with a field of 0, that's not a valid tag.
                 throw InvalidProtocolBufferException.InvalidTag();
+            }
+            if (ReachedLimit)
+            {
+                return 0;
             }
             return lastTag;
         }
@@ -551,7 +565,7 @@ namespace Google.Protobuf
             {
                 return "";
             }
-            if (length <= bufferSize - bufferPos)
+            if (length <= bufferSize - bufferPos && length > 0)
             {
                 // Fast path:  We already have the bytes in a contiguous buffer, so
                 //   just copy directly from it.
@@ -565,7 +579,7 @@ namespace Google.Protobuf
 
         /// <summary>
         /// Reads an embedded message field value from the stream.
-        /// </summary>   
+        /// </summary>
         public void ReadMessage(IMessage builder)
         {
             int length = ReadLength();
@@ -584,6 +598,20 @@ namespace Google.Protobuf
             }
             --recursionDepth;
             PopLimit(oldLimit);
+        }
+
+        /// <summary>
+        /// Reads an embedded group field from the stream.
+        /// </summary>
+        public void ReadGroup(IMessage builder)
+        {
+            if (recursionDepth >= recursionLimit)
+            {
+                throw InvalidProtocolBufferException.RecursionLimitExceeded();
+            }
+            ++recursionDepth;
+            builder.MergeFrom(this);
+            --recursionDepth;
         }
 
         /// <summary>
@@ -1053,7 +1081,7 @@ namespace Google.Protobuf
                 RecomputeBufferSizeAfterLimit();
                 int totalBytesRead =
                     totalBytesRetired + bufferSize + bufferSizeAfterLimit;
-                if (totalBytesRead > sizeLimit || totalBytesRead < 0)
+                if (totalBytesRead < 0 || totalBytesRead > sizeLimit)
                 {
                     throw InvalidProtocolBufferException.SizeLimitExceeded();
                 }

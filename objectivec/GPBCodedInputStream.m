@@ -46,9 +46,9 @@ NSString *const GPBCodedInputStreamErrorDomain =
     GPBNSStringifySymbol(GPBCodedInputStreamErrorDomain);
 
 // Matching:
-// https://github.com/google/protobuf/blob/master/java/core/src/main/java/com/google/protobuf/CodedInputStream.java#L62
+// https://github.com/protocolbuffers/protobuf/blob/master/java/core/src/main/java/com/google/protobuf/CodedInputStream.java#L62
 //  private static final int DEFAULT_RECURSION_LIMIT = 100;
-// https://github.com/google/protobuf/blob/master/src/google/protobuf/io/coded_stream.cc#L86
+// https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/io/coded_stream.cc#L86
 //  int CodedInputStream::default_recursion_limit_ = 100;
 static const NSUInteger kDefaultRecursionLimit = 100;
 
@@ -63,9 +63,9 @@ static void RaiseException(NSInteger code, NSString *reason) {
 
   NSDictionary *exceptionInfo =
       @{ GPBCodedInputStreamUnderlyingErrorKey: error };
-  [[[NSException alloc] initWithName:GPBCodedInputStreamException
-                              reason:reason
-                            userInfo:exceptionInfo] raise];
+  [[NSException exceptionWithName:GPBCodedInputStreamException
+                           reason:reason
+                         userInfo:exceptionInfo] raise];
 }
 
 static void CheckRecursionLimit(GPBCodedInputStreamState *state) {
@@ -110,7 +110,7 @@ static int64_t ReadRawVarint64(GPBCodedInputStreamState *state) {
   int64_t result = 0;
   while (shift < 64) {
     int8_t b = ReadRawByte(state);
-    result |= (int64_t)(b & 0x7F) << shift;
+    result |= (int64_t)((uint64_t)(b & 0x7F) << shift);
     if ((b & 0x80) == 0) {
       return result;
     }
