@@ -50,6 +50,10 @@ public class InvalidProtocolBufferException extends IOException {
     super(e.getMessage(), e);
   }
 
+  public InvalidProtocolBufferException(final String description, IOException e) {
+    super(description, e);
+  }
+
   /**
    * Attaches an unfinished message to the exception to support best-effort
    * parsing in {@code Parser} interface.
@@ -107,9 +111,21 @@ public class InvalidProtocolBufferException extends IOException {
       "Protocol message end-group tag did not match expected tag.");
   }
 
-  static InvalidProtocolBufferException invalidWireType() {
-    return new InvalidProtocolBufferException(
+  static InvalidWireTypeException invalidWireType() {
+    return new InvalidWireTypeException(
       "Protocol message tag had invalid wire type.");
+  }
+
+  /**
+   * Exception indicating that and unexpected wire type was encountered for a field.
+   */
+  @ExperimentalApi
+  public static class InvalidWireTypeException extends InvalidProtocolBufferException {
+    private static final long serialVersionUID = 3283890091615336259L;
+
+    public InvalidWireTypeException(String description) {
+      super(description);
+    }
   }
 
   static InvalidProtocolBufferException recursionLimitExceeded() {
