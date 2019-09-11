@@ -616,7 +616,9 @@ inline PROTOBUF_MUST_USE_RESULT const char* InlineGreedyStringParserUTF8Verify(
   auto p = InlineGreedyStringParser(s, ptr, ctx);
 #ifndef NDEBUG
   VerifyUTF8(*s, field_name);
-#endif  // !NDEBUG
+#else
+  (void)field_name;
+#endif
   return p;
 }
 
