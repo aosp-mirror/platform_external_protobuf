@@ -150,7 +150,7 @@ class PROTOBUF_EXPORT GeneratedExtensionFinder : public ExtensionFinder {
  public:
   GeneratedExtensionFinder(const MessageLite* containing_type)
       : containing_type_(containing_type) {}
-  virtual ~GeneratedExtensionFinder() {}
+  ~GeneratedExtensionFinder() override {}
 
   // Returns true and fills in *output if found, otherwise returns false.
   bool Find(int number, ExtensionInfo* output) override;
