@@ -121,17 +121,6 @@ cc_library_static {
     defaults: ["libprotobuf-cpp-lite-defaults"],
 }
 
-// C++ lite library + rtti (libc++ flavored for the platform and host)
-// =======================================================
-cc_library_shared {
-    name: "libprotobuf-cpp-lite-rtti",
-    host_supported: true,
-    vendor_available: true,
-    defaults: ["libprotobuf-cpp-lite-defaults"],
-
-    rtti: true,
-}
-
 // C++ full library
 // =======================================================
 cc_defaults {
@@ -227,21 +216,6 @@ cc_library {
         },
         windows: {
             enabled: true,
-        },
-    },
-}
-
-// C++ full library + rtti for the platform and host
-// =======================================================
-cc_library_shared {
-    name: "libprotobuf-cpp-full-rtti",
-    defaults: ["libprotobuf-cpp-full-defaults"],
-    vendor_available: true,
-
-    rtti: true,
-    target: {
-        android: {
-            shared_libs: ["liblog"],
         },
     },
 }
