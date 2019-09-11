@@ -79,6 +79,10 @@ cc_defaults {
         android: {
             shared_libs: ["liblog"],
         },
+        vendor: {
+            // This suffix must be updated when a new version is imported.
+            suffix: "-3.9.1",
+        },
     },
 }
 
@@ -373,6 +377,20 @@ cc_binary_host {
     ],
 
     rtti: true,
+}
+
+cc_test {
+    name: "libprotobuf_vendor_suffix_test",
+    vendor: true,
+    srcs: ["vendor_suffix_test.cpp"],
+    shared_libs: [
+        "libprotobuf-cpp-lite",
+        "libprotobuf-cpp-full",
+    ],
+    static_libs: ["libbase"],
+    stl: "libc++",
+    test_suites: ["general-tests"],
+    test_config: "vendor_suffix_test.config",
 }
 
 java_defaults {
