@@ -294,6 +294,13 @@
 // headers.
 #define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 3009000
 
+// ANDROID: autotdetect RTTI.  Managing RTTI through command line -D
+// parameters is hard across modules, just autodetect it.
+#undef GOOGLE_PROTOBUF_NO_RTTI
+#if !__has_feature(cxx_rtti)
+#define GOOGLE_PROTOBUF_NO_RTTI 1
+#endif
+
 #if defined(GOOGLE_PROTOBUF_NO_RTTI) && GOOGLE_PROTOBUF_NO_RTTI
 #define PROTOBUF_RTTI 0
 #else
