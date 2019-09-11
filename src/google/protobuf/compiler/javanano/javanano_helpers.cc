@@ -33,12 +33,12 @@
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
 #include <limits>
+#include <unordered_set>
 #include <vector>
 
 #include <google/protobuf/compiler/javanano/javanano_helpers.h>
 #include <google/protobuf/compiler/javanano/javanano_params.h>
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/stubs/hash.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
 
@@ -54,7 +54,7 @@ const char kThinSeparator[] =
 
 class RenameKeywords {
  private:
-  hash_set<string> java_keywords_set_;
+  std::unordered_set<string> java_keywords_set_;
 
  public:
   RenameKeywords() {
