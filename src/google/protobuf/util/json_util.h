@@ -53,12 +53,9 @@ struct JsonOptions {
   // set to 0 will be omitted. Set this flag to true will override the default
   // behavior and print primitive fields regardless of their values.
   bool always_print_primitive_fields;
-  // Whether to preserve proto field names
-  bool preserve_proto_field_names;
 
   JsonOptions() : add_whitespace(false),
-                  always_print_primitive_fields(false),
-                  preserve_proto_field_names(false) {
+                  always_print_primitive_fields(false) {
   }
 };
 
