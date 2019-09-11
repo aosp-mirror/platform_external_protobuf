@@ -1,10 +1,10 @@
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* the name of <hash_set> */
+/* the name of <hash_map> */
 #define HASH_MAP_CLASS unordered_map
 
-/* the location of <hash_map> */
+/* the location of <unordered_map> or <hash_map> */
 #define HASH_MAP_H <unordered_map>
 
 /* the namespace of hash_map/hash_set */
@@ -13,8 +13,11 @@
 /* the name of <hash_set> */
 #define HASH_SET_CLASS unordered_set
 
-/* the location of <hash_set> */
+/* the location of <unordered_set> or <hash_set> */
 #define HASH_SET_H <unordered_set>
+
+/* define if the compiler supports basic C++11 syntax */
+#define HAVE_CXX11 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -25,26 +28,11 @@
 /* Define to 1 if you have the `ftruncate' function. */
 #define HAVE_FTRUNCATE 1
 
-#if defined(ANDROID)
-/*
- * TODO: Figure out how to use stlport unordered_map and set.
- * For some reason they don't work when I try to point the
- * HASH_MAP_H and HASH_SET_H to the stlport files, I get
- * compile timer errors.
- */
-
-/* define if the compiler has hash_map */
-#undef HAVE_HASH_MAP
-
-/* define if the compiler has hash_set */
-#undef HAVE_HASH_SET
-#else
 /* define if the compiler has hash_map */
 #define HAVE_HASH_MAP 1
 
 /* define if the compiler has hash_set */
 #define HAVE_HASH_SET 1
-#endif
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
@@ -63,6 +51,9 @@
 
 /* Define if you have POSIX threads libraries and header files. */
 #define HAVE_PTHREAD 1
+
+/* Have PTHREAD_PRIO_INHERIT. */
+#define HAVE_PTHREAD_PRIO_INHERIT 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
@@ -97,8 +88,7 @@
 /* Enable classes using zlib compression. */
 #define HAVE_ZLIB 1
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #define LT_OBJDIR ".libs/"
 
 /* Name of package */
@@ -111,13 +101,16 @@
 #define PACKAGE_NAME "Protocol Buffers"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Protocol Buffers 2.3.0"
+#define PACKAGE_STRING "Protocol Buffers 3.9.1"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "protobuf"
 
+/* Define to the home page for this package. */
+#define PACKAGE_URL ""
+
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.3.0"
+#define PACKAGE_VERSION "3.9.1"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
@@ -126,20 +119,30 @@
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
-/* Version number of package */
-#define VERSION "2.3.0"
-
-/* Define to 1 if on AIX 3.
-   System headers sometimes define this.
-   We just want to avoid a redefinition error message.  */
+/* Enable extensions on AIX 3, Interix.  */
 #ifndef _ALL_SOURCE
-/* # undef _ALL_SOURCE */
+# define _ALL_SOURCE 1
 #endif
-
 /* Enable GNU extensions on systems that have them.  */
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE 1
 #endif
+/* Enable threading extensions on Solaris.  */
+#ifndef _POSIX_PTHREAD_SEMANTICS
+# define _POSIX_PTHREAD_SEMANTICS 1
+#endif
+/* Enable extensions on HP NonStop.  */
+#ifndef _TANDEM_SOURCE
+# define _TANDEM_SOURCE 1
+#endif
+/* Enable general extensions on Solaris.  */
+#ifndef __EXTENSIONS__
+# define __EXTENSIONS__ 1
+#endif
+
+
+/* Version number of package */
+#define VERSION "3.9.1"
 
 /* Define to 1 if on MINIX. */
 /* #undef _MINIX */
@@ -150,14 +153,3 @@
 
 /* Define to 1 if you need to in order for `stat' and other things to work. */
 /* #undef _POSIX_SOURCE */
-
-/* Enable extensions on Solaris.  */
-#ifndef __EXTENSIONS__
-# define __EXTENSIONS__ 1
-#endif
-#ifndef _POSIX_PTHREAD_SEMANTICS
-# define _POSIX_PTHREAD_SEMANTICS 1
-#endif
-#ifndef _TANDEM_SOURCE
-# define _TANDEM_SOURCE 1
-#endif
