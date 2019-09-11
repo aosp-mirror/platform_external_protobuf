@@ -100,8 +100,7 @@ class ProtostreamObjectSourceTest
       : helper_(GetParam()),
         mock_(),
         ow_(&mock_),
-        use_lower_camel_for_enums_(false),
-        use_preserve_proto_field_names_(false) {
+        use_lower_camel_for_enums_(false) {
     helper_.ResetTypeInfo(Book::descriptor());
   }
 
@@ -122,7 +121,6 @@ class ProtostreamObjectSourceTest
     google::protobuf::scoped_ptr<ProtoStreamObjectSource> os(
         helper_.NewProtoSource(&in_stream, GetTypeUrl(descriptor)));
     if (use_lower_camel_for_enums_) os->set_use_lower_camel_for_enums(true);
-    if (use_preserve_proto_field_names_) os->set_preserve_proto_field_names(true);
     os->set_max_recursion_depth(64);
     return os->WriteTo(&mock_);
   }
@@ -270,14 +268,11 @@ class ProtostreamObjectSourceTest
 
   void UseLowerCamelForEnums() { use_lower_camel_for_enums_ = true; }
 
-  void UsePreserveProtoFieldNames() { use_preserve_proto_field_names_ = true; }
-
   testing::TypeInfoTestHelper helper_;
 
   ::testing::NiceMock<MockObjectWriter> mock_;
   ExpectingObjectWriter ow_;
   bool use_lower_camel_for_enums_;
-  bool use_preserve_proto_field_names_;
 };
 
 INSTANTIATE_TEST_CASE_P(DifferentTypeInfoSourceTest,
@@ -498,16 +493,6 @@ TEST_P(ProtostreamObjectSourceTest, EnumCaseIsUnchangedByDefault) {
   DoTest(book, Book::descriptor());
 }
 
-TEST_P(ProtostreamObjectSourceTest, UsePreserveProtoFieldNames) {
-  Book book;
-  book.set_snake_field("foo");
-
-  UsePreserveProtoFieldNames();
-
-  ow_.StartObject("")->RenderString("snake_field", "foo")->EndObject();
-  DoTest(book, Book::descriptor());
-}
-
 TEST_P(ProtostreamObjectSourceTest, CyclicMessageDepthTest) {
   Cyclic cyclic;
   cyclic.set_m_int(123);
@@ -711,48 +696,6 @@ TEST_P(ProtostreamObjectSourceAnysTest, BasicAny) {
       ->RenderString("@type",
                      "type.googleapis.com/google.protobuf.testing.anys.AnyM")
       ->RenderString("foo", "foovalue")
-      ->EndObject()
-      ->EndObject();
-
-  DoTest(out, AnyOut::descriptor());
-}
-
-TEST_P(ProtostreamObjectSourceAnysTest, LowerCamelEnumOutputSnakeCase) {
-  AnyOut out;
-  ::google::protobuf::Any* any = out.mutable_any();
-
-  Book book;
-  book.set_type(Book::arts_and_photography);
-  any->PackFrom(book);
-
-  UseLowerCamelForEnums();
-
-  ow_.StartObject("")
-      ->StartObject("any")
-      ->RenderString("@type",
-                     "type.googleapis.com/proto_util_converter.testing.Book")
-      ->RenderString("type", "artsAndPhotography")
-      ->EndObject()
-      ->EndObject();
-
-  DoTest(out, AnyOut::descriptor());
-}
-
-TEST_P(ProtostreamObjectSourceAnysTest, UsePreserveProtoFieldNames) {
-  AnyOut out;
-  ::google::protobuf::Any* any = out.mutable_any();
-
-  Book book;
-  book.set_snake_field("foo");
-  any->PackFrom(book);
-
-  UsePreserveProtoFieldNames();
-
-  ow_.StartObject("")
-      ->StartObject("any")
-      ->RenderString("@type",
-                     "type.googleapis.com/proto_util_converter.testing.Book")
-      ->RenderString("snake_field", "foo")
       ->EndObject()
       ->EndObject();
 

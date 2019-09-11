@@ -64,7 +64,6 @@ DefaultValueObjectWriter::DefaultValueObjectWriter(
       type_(type),
       current_(NULL),
       root_(NULL),
-      preserve_proto_field_names_(false),
       field_scrub_callback_(NULL),
       ow_(ow) {}
 
@@ -190,7 +189,6 @@ DefaultValueObjectWriter::Node::Node(const string& name,
                                      NodeKind kind, const DataPiece& data,
                                      bool is_placeholder,
                                      const vector<string>& path,
-                                     bool preserve_proto_field_names,
                                      FieldScrubCallBack* field_scrub_callback)
     : name_(name),
       type_(type),
@@ -199,7 +197,6 @@ DefaultValueObjectWriter::Node::Node(const string& name,
       data_(data),
       is_placeholder_(is_placeholder),
       path_(path),
-      preserve_proto_field_names_(preserve_proto_field_names),
       field_scrub_callback_(field_scrub_callback) {}
 
 DefaultValueObjectWriter::Node* DefaultValueObjectWriter::Node::FindChild(
@@ -369,7 +366,7 @@ void DefaultValueObjectWriter::Node::PopulateChildren(
         field.json_name(), field_type, kind,
         kind == PRIMITIVE ? CreateDefaultDataPieceForField(field, typeinfo)
                           : DataPiece::NullData(),
-        true, path, preserve_proto_field_names_, field_scrub_callback_));
+        true, path, field_scrub_callback_));
     new_children.push_back(child.release());
   }
   // Adds all leftover nodes in children_ to the beginning of new_child.
@@ -465,8 +462,7 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::StartObject(
   if (current_ == NULL) {
     vector<string> path;
     root_.reset(new Node(name.ToString(), &type_, OBJECT, DataPiece::NullData(),
-                         false, path, preserve_proto_field_names_,
-                         field_scrub_callback_.get()));
+                         false, path, field_scrub_callback_.get()));
     root_->PopulateChildren(typeinfo_);
     current_ = root_.get();
     return this;
@@ -482,7 +478,6 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::StartObject(
                               : NULL),
         OBJECT, DataPiece::NullData(), false,
         child == NULL ? current_->path() : child->path(),
-        preserve_proto_field_names_,
         field_scrub_callback_.get()));
     child = node.get();
     current_->AddChild(node.release());
@@ -514,8 +509,7 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::StartList(
   if (current_ == NULL) {
     vector<string> path;
     root_.reset(new Node(name.ToString(), &type_, LIST, DataPiece::NullData(),
-                         false, path, preserve_proto_field_names_,
-                         field_scrub_callback_.get()));
+                         false, path, field_scrub_callback_.get()));
     current_ = root_.get();
     return this;
   }
@@ -525,7 +519,6 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::StartList(
     google::protobuf::scoped_ptr<Node> node(
         new Node(name.ToString(), NULL, LIST, DataPiece::NullData(), false,
                  child == NULL ? current_->path() : child->path(),
-                 preserve_proto_field_names_,
                  field_scrub_callback_.get()));
     child = node.get();
     current_->AddChild(node.release());
@@ -584,7 +577,6 @@ void DefaultValueObjectWriter::RenderDataPiece(StringPiece name,
     google::protobuf::scoped_ptr<Node> node(
         new Node(name.ToString(), NULL, PRIMITIVE, data, false,
                  child == NULL ? current_->path() : child->path(),
-                 preserve_proto_field_names_,
                  field_scrub_callback_.get()));
     child = node.get();
     current_->AddChild(node.release());
