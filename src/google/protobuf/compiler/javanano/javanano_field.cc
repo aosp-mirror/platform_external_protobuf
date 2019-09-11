@@ -76,7 +76,7 @@ FieldGeneratorMap::FieldGeneratorMap(
     const Descriptor* descriptor, const Params &params)
   : descriptor_(descriptor),
     field_generators_(
-      new scoped_ptr<FieldGenerator>[descriptor->field_count()]) {
+      new std::unique_ptr<FieldGenerator>[descriptor->field_count()]) {
 
   int next_has_bit_index = 0;
   bool saved_defaults_needed = false;
@@ -151,7 +151,7 @@ const FieldGenerator& FieldGeneratorMap::get(
 }
 
 void SetCommonOneofVariables(const FieldDescriptor* descriptor,
-                             map<string, string>* variables) {
+                             std::map<string, string>* variables) {
   (*variables)["oneof_name"] =
       UnderscoresToCamelCase(descriptor->containing_oneof());
   (*variables)["oneof_capitalized_name"] =
@@ -169,7 +169,7 @@ void SetCommonOneofVariables(const FieldDescriptor* descriptor,
 }
 
 void GenerateOneofFieldEquals(const FieldDescriptor* descriptor,
-                              const map<string, string>& variables,
+                              const std::map<string, string>& variables,
                               io::Printer* printer) {
   if (GetJavaType(descriptor) == JAVATYPE_BYTES) {
     printer->Print(variables,
@@ -190,7 +190,7 @@ void GenerateOneofFieldEquals(const FieldDescriptor* descriptor,
 }
 
 void GenerateOneofFieldHashCode(const FieldDescriptor* descriptor,
-                                const map<string, string>& variables,
+                                const std::map<string, string>& variables,
                                 io::Printer* printer) {
   if (GetJavaType(descriptor) == JAVATYPE_BYTES) {
     printer->Print(variables,
