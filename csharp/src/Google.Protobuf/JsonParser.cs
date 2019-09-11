@@ -264,11 +264,12 @@ namespace Google.Protobuf
                     return;
                 }
                 tokenizer.PushBack(token);
-                if (token.Type == JsonToken.TokenType.Null)
+                object value = ParseSingleValue(field, tokenizer);
+                if (value == null)
                 {
                     throw new InvalidProtocolBufferException("Repeated field elements cannot be null");
                 }
-                list.Add(ParseSingleValue(field, tokenizer));
+                list.Add(value);
             }
         }
 
@@ -673,7 +674,7 @@ namespace Google.Protobuf
             if (value != Math.Floor(value))
             {
                 throw new InvalidProtocolBufferException($"Value not an integer: {value}");
-            }            
+            }
         }
 
         private static object ParseSingleStringValue(FieldDescriptor field, string text)
@@ -918,7 +919,7 @@ namespace Google.Protobuf
                 messagePaths.Add(ToSnakeCase(path));
             }
         }
-        
+
         // Ported from src/google/protobuf/util/internal/utility.cc
         private static string ToSnakeCase(string text)
         {

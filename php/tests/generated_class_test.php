@@ -8,14 +8,20 @@ require_once('test_util.php');
 use Google\Protobuf\Internal\RepeatedField;
 use Google\Protobuf\Internal\MapField;
 use Google\Protobuf\Internal\GPBType;
+use Bar\TestLegacyMessage;
+use Bar\TestLegacyMessage_NestedEnum;
+use Bar\TestLegacyMessage_NestedMessage;
 use Foo\TestEnum;
 use Foo\TestIncludeNamespaceMessage;
 use Foo\TestIncludePrefixMessage;
 use Foo\TestMessage;
+use Foo\TestMessage\Sub;
 use Foo\TestMessage_Sub;
+use Foo\TestMessage\NestedEnum;
 use Foo\TestReverseFieldOrder;
 use Foo\testLowerCaseMessage;
 use Foo\testLowerCaseEnum;
+use PBEmpty\PBEcho\TestEmptyPackage;
 use Php\Test\TestNamespace;
 
 class GeneratedClassTest extends TestBase
@@ -226,12 +232,53 @@ class GeneratedClassTest extends TestBase
         // Set string.
         $m->setOptionalEnum("1");
         $this->assertEquals(TestEnum::ONE, $m->getOptionalEnum());
+
+        // Test Enum methods
+        $this->assertEquals('ONE', TestEnum::name(1));
+        $this->assertEquals(1, TestEnum::value('ONE'));
+    }
+
+    /**
+     * @expectedException UnexpectedValueException
+     * @expectedExceptionMessage Enum Foo\TestEnum has no name defined for value -1
+     */
+    public function testInvalidEnumValueThrowsException()
+    {
+        TestEnum::name(-1);
+    }
+
+    /**
+     * @expectedException UnexpectedValueException
+     * @expectedExceptionMessage Enum Foo\TestEnum has no value defined for name DOES_NOT_EXIST
+     */
+    public function testInvalidEnumNameThrowsException()
+    {
+        TestEnum::value('DOES_NOT_EXIST');
     }
 
     public function testNestedEnum()
     {
         $m = new TestMessage();
+        $m->setOptionalNestedEnum(NestedEnum::ZERO);
+        $this->assertTrue(true);
+    }
+
+    public function testLegacyNestedEnum()
+    {
+        $m = new TestMessage();
         $m->setOptionalNestedEnum(\Foo\TestMessage_NestedEnum::ZERO);
+        $this->assertTrue(true);
+    }
+
+    public function testLegacyTypehintWithNestedEnums()
+    {
+        $this->legacyEnum(new TestLegacyMessage\NestedEnum);
+    }
+
+    private function legacyEnum(TestLegacyMessage_NestedEnum $enum)
+    {
+        // If we made it here without a PHP Fatal error, the typehint worked
+        $this->assertTrue(true);
     }
 
     #########################################################
@@ -360,6 +407,7 @@ class GeneratedClassTest extends TestBase
           $m = new TestMessage();
           $hex = hex2bin("ff");
           $m->setOptionalBytes($hex);
+          $this->assertTrue(true);
       }
 
     #########################################################
@@ -367,6 +415,20 @@ class GeneratedClassTest extends TestBase
     #########################################################
 
     public function testMessageField()
+    {
+        $m = new TestMessage();
+
+        $sub_m = new Sub();
+        $sub_m->setA(1);
+        $m->setOptionalMessage($sub_m);
+        $this->assertSame(1, $m->getOptionalMessage()->getA());
+
+        $null = null;
+        $m->setOptionalMessage($null);
+        $this->assertNull($m->getOptionalMessage());
+    }
+
+    public function testLegacyMessageField()
     {
         $m = new TestMessage();
 
@@ -378,6 +440,17 @@ class GeneratedClassTest extends TestBase
         $null = null;
         $m->setOptionalMessage($null);
         $this->assertNull($m->getOptionalMessage());
+    }
+
+    public function testLegacyTypehintWithNestedMessages()
+    {
+        $this->legacyMessage(new TestLegacyMessage\NestedMessage);
+    }
+
+    private function legacyMessage(TestLegacyMessage_NestedMessage $sub)
+    {
+        // If we made it here without a PHP Fatal error, the typehint worked
+        $this->assertTrue(true);
     }
 
     #########################################################
@@ -474,7 +547,7 @@ class GeneratedClassTest extends TestBase
         $this->assertSame(NULL, $m->getOneofMessage());
         $this->assertSame("oneof_string", $m->getMyOneof());
 
-        $sub_m = new TestMessage_Sub();
+        $sub_m = new Sub();
         $sub_m->setA(1);
         $m->setOneofMessage($sub_m);
         $this->assertSame(0, $m->getOneofInt32());
@@ -513,7 +586,7 @@ class GeneratedClassTest extends TestBase
 
         // Singular
         $n->setOptionalInt32(100);
-        $sub1 = new TestMessage_Sub();
+        $sub1 = new Sub();
         $sub1->setA(101);
 
         $b = $sub1->getB();
@@ -531,7 +604,7 @@ class GeneratedClassTest extends TestBase
         $repeatedString[] = 'abc';
         $n->setRepeatedString($repeatedString);
 
-        $sub2 = new TestMessage_Sub();
+        $sub2 = new Sub();
         $sub2->setA(201);
         $repeatedMessage = $n->getRepeatedMessage();
         $repeatedMessage[] = $sub2;
@@ -548,9 +621,9 @@ class GeneratedClassTest extends TestBase
         $n->setMapStringString($mapStringString);
 
         $mapInt32Message = $n->getMapInt32Message();
-        $mapInt32Message[1] = new TestMessage_Sub();
+        $mapInt32Message[1] = new Sub();
         $mapInt32Message[1]->setA(302);
-        $mapInt32Message[2] = new TestMessage_Sub();
+        $mapInt32Message[2] = new Sub();
         $mapInt32Message[2]->setA(303);
         $n->setMapInt32Message($mapInt32Message);
 
@@ -607,7 +680,7 @@ class GeneratedClassTest extends TestBase
         $m->mergeFrom($n);
         $this->assertSame(1, $m->getOneofInt32());
 
-        $sub = new TestMessage_Sub();
+        $sub = new Sub();
         $n->setOneofMessage($sub);
         $n->getOneofMessage()->setA(400);
         $m->mergeFrom($n);
@@ -630,14 +703,17 @@ class GeneratedClassTest extends TestBase
     public function testMessageWithoutNamespace()
     {
         $m = new TestMessage();
-        $sub = new NoNameSpaceMessage();
-        $m->setOptionalNoNamespaceMessage($sub);
+        $n = new NoNameSpaceMessage();
+        $m->setOptionalNoNamespaceMessage($n);
         $repeatedNoNamespaceMessage = $m->getRepeatedNoNamespaceMessage();
         $repeatedNoNamespaceMessage[] = new NoNameSpaceMessage();
         $m->setRepeatedNoNamespaceMessage($repeatedNoNamespaceMessage);
 
-        $n = new NoNamespaceMessage();
-        $n->setB(NoNamespaceMessage_NestedEnum::ZERO);
+        // test nested messages
+        $sub = new NoNamespaceMessage\NestedMessage();
+        $n->setNestedMessage($sub);
+
+        $this->assertTrue(true);
     }
 
     public function testEnumWithoutNamespace()
@@ -647,38 +723,95 @@ class GeneratedClassTest extends TestBase
         $repeatedNoNamespaceEnum = $m->getRepeatedNoNamespaceEnum();
         $repeatedNoNamespaceEnum[] = NoNameSpaceEnum::VALUE_A;
         $m->setRepeatedNoNamespaceEnum($repeatedNoNamespaceEnum);
-    }
-
-    #########################################################
-    # Test message with given prefix.
-    #########################################################
-
-    public function testPrefixMessage()
-    {
-        $m = new TestIncludePrefixMessage();
-        $n = new PrefixTestPrefix();
-        $n->setA(1);
-        $m->setPrefixMessage($n);
-        $this->assertSame(1, $m->getPrefixMessage()->getA());
+        $this->assertTrue(true);
     }
 
     #########################################################
     # Test message with given namespace.
     #########################################################
 
-    public function testNamespaceMessage()
+    public function testNestedMessagesAndEnums()
     {
-        $m = new TestIncludeNamespaceMessage();
+        $m = new TestMessage();
+        $n = new TestMessage\Sub();
+        $m->setOptionalMessage($n);
+        $m->setOptionalNestedEnum(TestMessage\NestedEnum::ZERO);
+        $this->assertSame($n, $m->getOptionalMessage());
+        $this->assertSame(TestMessage\NestedEnum::ZERO, $m->getOptionalNestedEnum());
+    }
 
-        $n = new TestNamespace();
+    public function testMessagesAndEnumsWithPrefix()
+    {
+        // Test message prefix
+        $m = new TestIncludePrefixMessage();
+        $n = new PrefixTestPrefix();
         $n->setA(1);
-        $m->setNamespaceMessage($n);
-        $this->assertSame(1, $m->getNamespaceMessage()->getA());
+        $m->setPrefixMessage($n);
+        $this->assertSame(1, $m->getPrefixMessage()->getA());
 
-        $n = new TestEmptyNamespace();
-        $n->setA(1);
-        $m->setEmptyNamespaceMessage($n);
-        $this->assertSame(1, $m->getEmptyNamespaceMessage()->getA());
+        // Test nested message prefix
+        $o = new PrefixTestPrefix();
+        $p = new PrefixTestPrefix\PrefixNestedMessage();
+        $o->setNestedMessage($p);
+        $o->setNestedEnum(PrefixTestPrefix\PrefixNestedEnum::ZERO);
+        $this->assertSame($p, $o->getNestedMessage());
+        $this->assertSame(PrefixTestPrefix\PrefixNestedEnum::ZERO, $o->getNestedEnum());
+    }
+
+    public function testMessagesAndEnumsWithPhpNamespace()
+    {
+        $m = new TestNamespace();
+        $n = new TestNamespace\NestedMessage();
+        $m->setNestedMessage($n);
+        $m->setNestedEnum(TestNamespace\NestedEnum::ZERO);
+        $this->assertSame($n, $m->getNestedMessage());
+        $this->assertSame(TestNamespace\NestedEnum::ZERO, $m->getNestedEnum());
+    }
+
+    public function testMesssagesAndEnumsWithEmptyPhpNamespace()
+    {
+        $m = new TestEmptyNamespace();
+        $n = new TestEmptyNamespace\NestedMessage();
+        $m->setNestedMessage($n);
+        $m->setNestedEnum(TestEmptyNamespace\NestedEnum::ZERO);
+        $this->assertSame($n, $m->getNestedMessage());
+        $this->assertSame(TestEmptyNamespace\NestedEnum::ZERO, $m->getNestedEnum());
+    }
+
+    public function testMessagesAndEnumsWithNoNamespace()
+    {
+        $m = new NoNamespaceMessage();
+        $n = new NoNamespaceMessage\NestedMessage();
+        $m->setNestedMessage($n);
+        $m->setNestedEnum(NoNamespaceMessage\NestedEnum::ZERO);
+        $this->assertSame($n, $m->getNestedMessage());
+        $this->assertSame(NoNamespaceMessage\NestedEnum::ZERO, $m->getNestedEnum());
+    }
+
+    public function testReservedWordsInPackageName()
+    {
+        $m = new TestEmptyPackage();
+        $n = new TestEmptyPackage\NestedMessage();
+        $m->setNestedMessage($n);
+        $m->setNestedEnum(TestEmptyPackage\NestedEnum::ZERO);
+        $this->assertSame($n, $m->getNestedMessage());
+        $this->assertSame(TestEmptyPackage\NestedEnum::ZERO, $m->getNestedEnum());
+    }
+
+    public function testReservedWordsInNamespace()
+    {
+        $m = new TestNamespace();
+        $n = new TestNamespace\PBEmpty();
+        $o = new TestNamespace\PBEmpty\NestedMessage();
+        $n->setNestedMessage($o);
+        $n->setNestedEnum(TestNamespace\PBEmpty\NestedEnum::ZERO);
+        $m->setReservedName($n);
+        $this->assertSame($n, $m->getReservedName());
+        $this->assertSame($o, $n->getNestedMessage());
+        $this->assertSame(
+            TestNamespace\PBEmpty\NestedEnum::ZERO,
+            $n->getNestedEnum()
+        );
     }
 
     #########################################################
@@ -687,7 +820,7 @@ class GeneratedClassTest extends TestBase
 
     public function testPrefixForReservedWords()
     {
-        $m = new \Foo\TestMessage_Empty();
+        $m = new \Foo\TestMessage\PBEmpty();
         $m = new \Foo\PBEmpty();
         $m = new \PrefixEmpty();
         $m = new \Foo\PBARRAY();
@@ -1135,6 +1268,8 @@ class GeneratedClassTest extends TestBase
         $m = \Upper_enum_value\NotAllowed::NULL;
         $m = \Upper_enum_value\NotAllowed::VOID;
         $m = \Upper_enum_value\NotAllowed::ITERABLE;
+
+        $this->assertTrue(true);
     }
 
     #########################################################
@@ -1170,5 +1305,205 @@ class GeneratedClassTest extends TestBase
     {
         $m = new testLowerCaseMessage();
         $n = testLowerCaseEnum::VALUE;
+        $this->assertTrue(true);
+    }
+
+    #########################################################
+    # Test Array Constructor.
+    #########################################################
+
+    public function testArrayConstructor()
+    {
+        $m = new TestMessage([
+            'optional_int32' => -42,
+            'optional_int64' => -43,
+            'optional_uint32' => 42,
+            'optional_uint64' => 43,
+            'optional_sint32' => -44,
+            'optional_sint64' => -45,
+            'optional_fixed32' => 46,
+            'optional_fixed64' => 47,
+            'optional_sfixed32' => -46,
+            'optional_sfixed64' => -47,
+            'optional_float' => 1.5,
+            'optional_double' => 1.6,
+            'optional_bool' => true,
+            'optional_string' => 'a',
+            'optional_bytes' => 'bbbb',
+            'optional_enum' => TestEnum::ONE,
+            'optional_message' => new Sub([
+                'a' => 33
+            ]),
+            'repeated_int32' => [-42, -52],
+            'repeated_int64' => [-43, -53],
+            'repeated_uint32' => [42, 52],
+            'repeated_uint64' => [43, 53],
+            'repeated_sint32' => [-44, -54],
+            'repeated_sint64' => [-45, -55],
+            'repeated_fixed32' => [46, 56],
+            'repeated_fixed64' => [47, 57],
+            'repeated_sfixed32' => [-46, -56],
+            'repeated_sfixed64' => [-47, -57],
+            'repeated_float' => [1.5, 2.5],
+            'repeated_double' => [1.6, 2.6],
+            'repeated_bool' => [true, false],
+            'repeated_string' => ['a', 'c'],
+            'repeated_bytes' => ['bbbb', 'dddd'],
+            'repeated_enum' => [TestEnum::ZERO, TestEnum::ONE],
+            'repeated_message' => [new Sub(['a' => 34]),
+                                   new Sub(['a' => 35])],
+            'map_int32_int32' => [-62 => -62],
+            'map_int64_int64' => [-63 => -63],
+            'map_uint32_uint32' => [62 => 62],
+            'map_uint64_uint64' => [63 => 63],
+            'map_sint32_sint32' => [-64 => -64],
+            'map_sint64_sint64' => [-65 => -65],
+            'map_fixed32_fixed32' => [66 => 66],
+            'map_fixed64_fixed64' => [67 => 67],
+            'map_sfixed32_sfixed32' => [-68 => -68],
+            'map_sfixed64_sfixed64' => [-69 => -69],
+            'map_int32_float' => [1 => 3.5],
+            'map_int32_double' => [1 => 3.6],
+            'map_bool_bool' => [true => true],
+            'map_string_string' => ['e' => 'e'],
+            'map_int32_bytes' => [1 => 'ffff'],
+            'map_int32_enum' => [1 => TestEnum::ONE],
+            'map_int32_message' => [1 => new Sub(['a' => 36])],
+        ]);
+
+        TestUtil::assertTestMessage($m);
+        $this->assertTrue(true);
+    }
+
+    public function testReferenceInArrayConstructor()
+    {
+        $keys = [[
+                    'optional_bool' => true,
+                    'repeated_bool' => [true],
+                    'map_bool_bool' => [true => true],
+                    'optional_double' => 1.0,
+                    'repeated_double' => [1.0],
+                    'map_int32_double' => [1 => 1.0],
+                    'optional_int32' => 1,
+                    'repeated_int32' => [1],
+                    'map_int32_int32' => [1 => 1],
+                    'optional_string' => 'a',
+                    'repeated_string' => ['a'],
+                    'map_string_string' => ['a' => 'a'],
+                    'optional_message' => ['a' => 1],
+                    'repeated_message' => [['a' => 1]],
+                    'map_int32_message' => [1 => ['a' => 1]],
+                ]];
+
+        foreach ($keys as &$key) {
+            foreach ($key as $id => &$value) {
+                if ($id === 'repeated_bool') {
+                    foreach ($value as &$element) {
+                    }
+                }
+                if ($id === 'map_bool_bool') {
+                    foreach ($value as $mapKey => &$element) {
+                    }
+                }
+                if ($id === 'repeated_double') {
+                    foreach ($value as &$element) {
+                    }
+                }
+                if ($id === 'map_int32_double') {
+                    foreach ($value as $mapKey => &$element) {
+                    }
+                }
+                if ($id === 'repeated_int32') {
+                    foreach ($value as &$element) {
+                    }
+                }
+                if ($id === 'map_int32_int32') {
+                    foreach ($value as $mapKey => &$element) {
+                    }
+                }
+                if ($id === 'repeated_string') {
+                    foreach ($value as &$element) {
+                    }
+                }
+                if ($id === 'map_string_string') {
+                    foreach ($value as $mapKey => &$element) {
+                    }
+                }
+                if ($id === 'optional_message') {
+                    $value = new Sub($value);
+                }
+                if ($id === 'repeated_message') {
+                    foreach ($value as &$element) {
+                        $element = new Sub($element);
+                    }
+                }
+                if ($id === 'map_int32_message') {
+                    foreach ($value as $mapKey => &$element) {
+                        $element = new Sub($element);
+                    }
+                }
+            }
+            $key = new TestMessage($key);
+        }
+    }
+
+    public function testOneofMessageInArrayConstructor()
+    {
+        $m = new TestMessage([
+            'oneof_message' => new Sub(),
+        ]);
+        $this->assertSame('oneof_message', $m->getMyOneof());
+        $this->assertNotNull($m->getOneofMessage());
+    }
+
+    public function testOneofStringInArrayConstructor()
+    {
+        $m = new TestMessage([
+            'oneof_string' => 'abc',
+        ]);
+    }
+
+    #########################################################
+    # Test message equals.
+    #########################################################
+
+    public function testMessageEquals()
+    {
+        $m = new TestMessage();
+        TestUtil::setTestMessage($m);
+        $n = new TestMessage();
+        TestUtil::setTestMessage($n);
+        $this->assertEquals($m, $n);
+    }
+
+    #########################################################
+    # Test reference of value
+    #########################################################
+
+    public function testValueIsReference()
+    {
+        // Bool element
+        $values = [true];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setOptionalBool($values[0]);
+
+        // Int32 element
+        $values = [1];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setOptionalInt32($values[0]);
+
+        // Double element
+        $values = [1.0];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setOptionalDouble($values[0]);
+
+        // String element
+        $values = ['a'];
+        array_walk($values, function (&$value) {});
+        $m = new TestMessage();
+        $m->setOptionalString($values[0]);
     }
 }

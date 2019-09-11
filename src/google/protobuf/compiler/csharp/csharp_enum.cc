@@ -31,7 +31,6 @@
 #include <sstream>
 
 #include <google/protobuf/compiler/code_generator.h>
-#include <google/protobuf/compiler/plugin.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/io/printer.h>
@@ -42,8 +41,6 @@
 #include <google/protobuf/compiler/csharp/csharp_enum.h>
 #include <google/protobuf/compiler/csharp/csharp_helpers.h>
 #include <google/protobuf/compiler/csharp/csharp_options.h>
-
-using google::protobuf::internal::scoped_ptr;
 
 namespace google {
 namespace protobuf {
@@ -82,12 +79,12 @@ void EnumGenerator::Generate(io::Printer* printer) {
           printer->Print("[pbr::OriginalName(\"$original_name$\", PreferredAlias = false)] $name$ = $number$,\n",
              "original_name", original_name,
              "name", name,
-             "number", SimpleItoa(number));
+             "number", StrCat(number));
       } else {
           printer->Print("[pbr::OriginalName(\"$original_name$\")] $name$ = $number$,\n",
              "original_name", original_name,
              "name", name,
-             "number", SimpleItoa(number));
+             "number", StrCat(number));
       }
   }
   printer->Outdent();

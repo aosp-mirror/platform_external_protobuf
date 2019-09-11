@@ -3,8 +3,9 @@
 require_once('test_base.php');
 require_once('test_util.php');
 
+use Foo\TestEnum;
 use Foo\TestMessage;
-use Foo\TestMessage_Sub;
+use Foo\TestMessage\Sub;
 use Foo\TestPackedMessage;
 use Google\Protobuf\Internal\CodedInputStream;
 use Google\Protobuf\Internal\FileDescriptorSet;
@@ -13,8 +14,18 @@ use Google\Protobuf\Internal\GPBType;
 use Google\Protobuf\Internal\GPBWire;
 use Google\Protobuf\Internal\CodedOutputStream;
 
+/**
+ * Please note, this test is only intended to be run without the protobuf C
+ * extension.
+ */
 class ImplementationTest extends TestBase
 {
+    public function setUp()
+    {
+        if (extension_loaded('protobuf')) {
+            $this->markTestSkipped();
+        }
+    }
 
     public function testReadInt32()
     {
@@ -504,7 +515,7 @@ class ImplementationTest extends TestBase
     {
         $m = new TestMessage();
         TestUtil::setTestMessage($m);
-        $this->assertSame(506, $m->byteSize());
+        $this->assertSame(518, $m->byteSize());
     }
 
     public function testPackedByteSize()
@@ -512,5 +523,76 @@ class ImplementationTest extends TestBase
         $m = new TestPackedMessage();
         TestUtil::setTestPackedMessage($m);
         $this->assertSame(166, $m->byteSize());
+    }
+
+    /**
+     * @expectedException UnexpectedValueException
+     * @expectedExceptionMessage Invalid message property: optionalInt32
+     */
+    public function testArrayConstructorJsonCaseThrowsException()
+    {
+        $m = new TestMessage([
+            'optionalInt32' => -42,
+        ]);
+    }
+
+    /**
+     * @expectedException Exception
+     * @expectedExceptionMessage Expect Foo\TestMessage_Sub.
+     */
+    public function testArraysForMessagesThrowsException()
+    {
+        $m = new TestMessage([
+            'optional_message' => [
+                'a' => 33
+            ]
+        ]);
+    }
+
+    public function testArrayConstructorWithNullValues()
+    {
+        $requestData = [
+            'optional_bool' => null,
+            'optional_string' => null,
+            'optional_bytes' => null,
+            'optional_message' => null,
+        ];
+
+        $m = new TestMessage($requestData);
+
+        $this->assertSame(false, $m->getOptionalBool());
+        $this->assertSame('', $m->getOptionalString());
+        $this->assertSame('', $m->getOptionalBytes());
+        $this->assertSame(null, $m->getOptionalMessage());
+    }
+
+    /**
+     * @dataProvider provideArrayConstructorWithNullValuesThrowsException
+     * @expectedException Exception
+     */
+    public function testArrayConstructorWithNullValuesThrowsException($requestData)
+    {
+        $m = new TestMessage($requestData);
+    }
+
+    public function provideArrayConstructorWithNullValuesThrowsException()
+    {
+        return [
+            [['optional_int32' => null]],
+            [['optional_int64' => null]],
+            [['optional_uint32' => null]],
+            [['optional_uint64' => null]],
+            [['optional_sint32' => null]],
+            [['optional_sint64' => null]],
+            [['optional_fixed32' => null]],
+            [['optional_fixed64' => null]],
+            [['optional_sfixed32' => null]],
+            [['optional_sfixed64' => null]],
+            [['optional_float' => null]],
+            [['optional_double' => null]],
+            [['optional_enum' => null]],
+            [['repeated_int32' => null]],
+            [['map_int32_int32' => null]],
+        ];
     }
 }
