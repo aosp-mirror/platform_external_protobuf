@@ -51,6 +51,9 @@ goog.provide('jspb.ScalarFieldType');
 goog.provide('jspb.WriterFunction');
 
 
+goog.forwardDeclare('jspb.BinaryMessage');
+goog.forwardDeclare('jspb.BinaryReader');
+goog.forwardDeclare('jspb.BinaryWriter');
 goog.forwardDeclare('jspb.Message');
 goog.forwardDeclare('jsproto.BinaryExtension');
 
@@ -141,8 +144,8 @@ jspb.ReaderFunction;
 
 /**
  * A writer function serializes a message to a BinaryWriter.
- * @typedef {!function(!jspb.Message, !jspb.BinaryWriter):void |
- *           !function(!jspb.ConstBinaryMessage, !jspb.BinaryWriter):void}
+ * @typedef {function((!jspb.Message|!jspb.ConstBinaryMessage),
+ *                    !jspb.BinaryWriter):void}
  */
 jspb.WriterFunction;
 
