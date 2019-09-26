@@ -44,8 +44,13 @@ MSVC_COPTS = [
     "/wd4996", # The compiler encountered a deprecated declaration.
 ]
 
-COPTS = select({
-    ":msvc" : MSVC_COPTS,
+COPTS = [
+    "-Wno-c++98-compat",
+    "-Wno-c++98-compat-pedantic",
+    "-Wno-reserved-id-macro",
+    "-Wno-sign-conversion",
+] + select({
+    ":msvc": MSVC_COPTS,
     "//conditions:default": [
         "-DHAVE_PTHREAD",
         "-DHAVE_ZLIB",
@@ -53,9 +58,13 @@ COPTS = select({
         "-Woverloaded-virtual",
         "-Wno-sign-compare",
         "-Wno-unused-function",
+        "-Wno-zero-as-null-pointer-constant",
         # Prevents ISO C++ const string assignment warnings for pyext sources.
         "-Wno-write-strings",
     ],
+}) + select({
+    ":android": ["-std=c++11"],
+    "//conditions:default": [],
 })
 
 load(":compiler_config_setting.bzl", "create_compiler_config_setting")
