@@ -44,21 +44,14 @@ MSVC_COPTS = [
     "/wd4996", # The compiler encountered a deprecated declaration.
 ]
 
-COPTS = [
-    "-Wno-c++98-compat",
-    "-Wno-c++98-compat-pedantic",
-    "-Wno-reserved-id-macro",
-    "-Wno-sign-conversion",
-] + select({
+COPTS = select({
     ":msvc": MSVC_COPTS,
     "//conditions:default": [
         "-DHAVE_PTHREAD",
         "-DHAVE_ZLIB",
-        "-Wall",
         "-Woverloaded-virtual",
         "-Wno-sign-compare",
         "-Wno-unused-function",
-        "-Wno-zero-as-null-pointer-constant",
         # Prevents ISO C++ const string assignment warnings for pyext sources.
         "-Wno-write-strings",
     ],
