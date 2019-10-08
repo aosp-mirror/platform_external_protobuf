@@ -182,7 +182,7 @@ bool IsFastStringHandling(const FieldDescriptor* descriptor,
 }
 
 void SetPrimitiveVariables(const FieldDescriptor* descriptor, const Params params,
-                           map<string, string>* variables) {
+                           std::map<string, string>* variables) {
   (*variables)["name"] =
     UnderscoresToCamelCase(descriptor);
   (*variables)["capitalized_name"] =

@@ -59,7 +59,7 @@ bool UsesExtensions(const Message& message) {
   // We conservatively assume that unknown fields are extensions.
   if (reflection->GetUnknownFields(message).field_count() > 0) return true;
 
-  vector<const FieldDescriptor*> fields;
+  std::vector<const FieldDescriptor*> fields;
   reflection->ListFields(message, &fields);
 
   for (int i = 0; i < fields.size(); i++) {
@@ -120,12 +120,12 @@ bool FileGenerator::Validate(string* error) {
   if (!params_.has_java_outer_classname(file_->name())
       && file_->message_type_count() == 1
       && file_->enum_type_count() == 0 && file_->extension_count() == 0) {
-    cout << "INFO: " << file_->name() << ":" << endl;
-    cout << "Javanano generator has changed to align with java generator. "
+    std::cerr << "INFO: " << file_->name() << ":" << std::endl;
+    std::cerr << "Javanano generator has changed to align with java generator. "
         "An outer class will be created for this file and the single message "
         "in the file will become a nested class. Use java_multiple_files to "
         "skip generating the outer class, or set an explicit "
-        "java_outer_classname to suppress this message." << endl;
+        "java_outer_classname to suppress this message." << std::endl;
   }
 
   // Check that no class name matches the file's class name.  This is a common
@@ -216,12 +216,12 @@ static void GenerateSibling(const string& package_dir,
                             const string& java_package,
                             const DescriptorClass* descriptor,
                             GeneratorContext* output_directory,
-                            vector<string>* file_list,
+                            std::vector<string>* file_list,
                             const Params& params) {
   string filename = package_dir + descriptor->name() + ".java";
   file_list->push_back(filename);
 
-  scoped_ptr<io::ZeroCopyOutputStream> output(
+  std::unique_ptr<io::ZeroCopyOutputStream> output(
     output_directory->Open(filename));
   io::Printer printer(output.get(), '$');
 
@@ -239,7 +239,7 @@ static void GenerateSibling(const string& package_dir,
 
 void FileGenerator::GenerateSiblings(const string& package_dir,
                                      GeneratorContext* output_directory,
-                                     vector<string>* file_list) {
+                                     std::vector<string>* file_list) {
   if (params_.java_multiple_files(file_->name())) {
     for (int i = 0; i < file_->message_type_count(); i++) {
       GenerateSibling<MessageGenerator>(package_dir, java_package_,
