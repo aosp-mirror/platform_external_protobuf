@@ -76,7 +76,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
                              const string& parameter,
                              OutputDirectory* output_directory,
                              string* error) const {
-  vector<pair<string, string> > options;
+  std::vector<std::pair<string, string> > options;
 
 //  GOOGLE_LOG(INFO) << "wink: JavaMicroGenerator::Generate INFO";
 //  GOOGLE_LOG(WARNING) << "wink: JavaMicroGenerator::Generate WARNING";
@@ -113,7 +113,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
         return false;
       }
     } else if (options[i].first == "java_package") {
-        vector<string> parts;
+        std::vector<string> parts;
         SplitStringUsing(options[i].second, "|", &parts);
         if (parts.size() != 2) {
           *error = "Bad java_package, expecting filename|PackageName found '"
@@ -122,7 +122,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
         }
         params.set_java_package(parts[0], parts[1]);
     } else if (options[i].first == "java_outer_classname") {
-        vector<string> parts;
+        std::vector<string> parts;
         SplitStringUsing(options[i].second, "|", &parts);
         if (parts.size() != 2) {
           *error = "Bad java_outer_classname, "
@@ -171,7 +171,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
     StringReplace(file_generator.java_package(), ".", "/", true);
   if (!package_dir.empty()) package_dir += "/";
 
-  vector<string> all_files;
+  std::vector<string> all_files;
 
   if (IsOuterClassNeeded(params, file)) {
     string java_filename = package_dir;
@@ -180,7 +180,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
     all_files.push_back(java_filename);
 
     // Generate main java file.
-    scoped_ptr<io::ZeroCopyOutputStream> output(
+    std::unique_ptr<io::ZeroCopyOutputStream> output(
       output_directory->Open(java_filename));
     io::Printer printer(output.get(), '$');
     file_generator.Generate(&printer);
@@ -193,7 +193,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
   if (!output_list_file.empty()) {
     // Generate output list.  This is just a simple text file placed in a
     // deterministic location which lists the .java files being generated.
-    scoped_ptr<io::ZeroCopyOutputStream> srclist_raw_output(
+    std::unique_ptr<io::ZeroCopyOutputStream> srclist_raw_output(
       output_directory->Open(output_list_file));
     io::Printer srclist_printer(srclist_raw_output.get(), '$');
     for (int i = 0; i < all_files.size(); i++) {

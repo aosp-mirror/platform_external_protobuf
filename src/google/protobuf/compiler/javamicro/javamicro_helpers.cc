@@ -287,10 +287,10 @@ string DefaultValue(const Params& params, const FieldDescriptor* field) {
       return SimpleItoa(static_cast<int64>(field->default_value_uint64())) +
              "L";
     case FieldDescriptor::CPPTYPE_DOUBLE: {
-     double value = field->default_value_double();
-      if (value == numeric_limits<double>::infinity()) {
+      double value = field->default_value_double();
+      if (value == std::numeric_limits<double>::infinity()) {
         return "Double.POSITIVE_INFINITY";
-      } else if (value == -numeric_limits<double>::infinity()) {
+      } else if (value == -std::numeric_limits<double>::infinity()) {
         return "Double.NEGATIVE_INFINITY";
       } else if (value != value) {
         return "Double.NaN";
@@ -300,9 +300,9 @@ string DefaultValue(const Params& params, const FieldDescriptor* field) {
     }
     case FieldDescriptor::CPPTYPE_FLOAT: {
       float value = field->default_value_float();
-      if (value == numeric_limits<float>::infinity()) {
+      if (value == std::numeric_limits<float>::infinity()) {
         return "Float.POSITIVE_INFINITY";
-      } else if (value == -numeric_limits<float>::infinity()) {
+      } else if (value == -std::numeric_limits<float>::infinity()) {
         return "Float.NEGATIVE_INFINITY";
       } else if (value != value) {
         return "Float.NaN";

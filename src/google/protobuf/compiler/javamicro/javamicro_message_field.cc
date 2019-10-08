@@ -51,7 +51,7 @@ namespace {
 // TODO(kenton):  Factor out a "SetCommonFieldVariables()" to get rid of
 //   repeat code between this and the other field types.
 void SetMessageVariables(const Params& params,
-    const FieldDescriptor* descriptor, map<string, string>* variables) {
+    const FieldDescriptor* descriptor, std::map<string, string>* variables) {
   (*variables)["name"] =
     UnderscoresToCamelCase(descriptor);
   (*variables)["capitalized_name"] =
