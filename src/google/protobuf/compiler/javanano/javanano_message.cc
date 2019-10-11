@@ -69,7 +69,7 @@ const FieldDescriptor** SortFieldsByNumber(const Descriptor* descriptor) {
   for (int i = 0; i < descriptor->field_count(); i++) {
     fields[i] = descriptor->field(i);
   }
-  sort(fields, fields + descriptor->field_count(),
+  std::sort(fields, fields + descriptor->field_count(),
        FieldOrderingByNumber());
   return fields;
 }
@@ -182,7 +182,7 @@ void MessageGenerator::Generate(io::Printer* printer) {
   }
 
   // oneof
-  map<string, string> vars;
+  std::map<string, string> vars;
   vars["message_name"] = descriptor_->name();
   for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
     const OneofDescriptor* oneof_desc = descriptor_->oneof_decl(i);
@@ -349,7 +349,7 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
     return;
   }
 
-  scoped_array<const FieldDescriptor*> sorted_fields(
+  std::unique_ptr<const FieldDescriptor*[]> sorted_fields(
     SortFieldsByNumber(descriptor_));
 
   printer->Print(
@@ -391,7 +391,7 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
 }
 
 void MessageGenerator::GenerateMergeFromMethods(io::Printer* printer) {
-  scoped_array<const FieldDescriptor*> sorted_fields(
+  std::unique_ptr<const FieldDescriptor*[]> sorted_fields(
     SortFieldsByNumber(descriptor_));
 
   printer->Print(
