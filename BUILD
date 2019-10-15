@@ -45,17 +45,19 @@ MSVC_COPTS = [
 ]
 
 COPTS = select({
-    ":msvc" : MSVC_COPTS,
+    ":msvc": MSVC_COPTS,
     "//conditions:default": [
         "-DHAVE_PTHREAD",
         "-DHAVE_ZLIB",
-        "-Wall",
         "-Woverloaded-virtual",
         "-Wno-sign-compare",
         "-Wno-unused-function",
         # Prevents ISO C++ const string assignment warnings for pyext sources.
         "-Wno-write-strings",
     ],
+}) + select({
+    ":android": ["-std=c++11"],
+    "//conditions:default": [],
 })
 
 load(":compiler_config_setting.bzl", "create_compiler_config_setting")
