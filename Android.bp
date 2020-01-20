@@ -209,9 +209,6 @@ cc_library {
     defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     target: {
         android: {
             static: {
