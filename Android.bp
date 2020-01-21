@@ -104,9 +104,6 @@ cc_library {
     host_supported: true,
     recovery_available: true,
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
