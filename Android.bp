@@ -104,9 +104,6 @@ cc_library {
     host_supported: true,
     recovery_available: true,
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
@@ -209,9 +206,6 @@ cc_library {
     defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     target: {
         android: {
             static: {
