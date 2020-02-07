@@ -198,6 +198,7 @@ get_filename_component(protobuf_source_dir ${protobuf_SOURCE_DIR} PATH)
 include_directories(
   ${ZLIB_INCLUDE_DIRECTORIES}
   ${protobuf_BINARY_DIR}
+  ${protobuf_source_dir}/android
   ${protobuf_source_dir}/src)
 
 if (MSVC)
