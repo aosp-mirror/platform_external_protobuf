@@ -297,7 +297,16 @@
 // ANDROID: autotdetect RTTI.  Managing RTTI through command line -D
 // parameters is hard across modules, just autodetect it.
 #undef GOOGLE_PROTOBUF_NO_RTTI
+
+#if defined(__clang__)
 #if !__has_feature(cxx_rtti)
+#define GOOGLE_PROTOBUF_NO_RTTI 1
+#endif
+#elif defined(__GNUC__)
+#if !defined(__GXX_RTTI)
+#define GOOGLE_PROTOBUF_NO_RTTI 1
+#endif
+#else
 #define GOOGLE_PROTOBUF_NO_RTTI 1
 #endif
 
