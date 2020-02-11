@@ -104,9 +104,6 @@ cc_library {
     host_supported: true,
     recovery_available: true,
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
@@ -209,9 +206,6 @@ cc_library {
     defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     target: {
         android: {
             static: {
@@ -255,6 +249,34 @@ cc_library {
     },
 
     rtti: true,
+}
+
+cc_library_host_static {
+    name: "libprotoc-kythe",
+    defaults: ["protobuf-cflags-defaults"],
+    srcs: [
+        "src/google/protobuf/compiler/code_generator.cc",
+        "src/google/protobuf/compiler/cpp/cpp_helpers.cc",
+        "src/google/protobuf/compiler/cpp/cpp_enum.cc",
+        "src/google/protobuf/compiler/cpp/cpp_enum_field.cc",
+        "src/google/protobuf/compiler/cpp/cpp_extension.cc",
+        "src/google/protobuf/compiler/cpp/cpp_field.cc",
+        "src/google/protobuf/compiler/cpp/cpp_file.cc",
+        "src/google/protobuf/compiler/cpp/cpp_generator.cc",
+        "src/google/protobuf/compiler/cpp/cpp_map_field.cc",
+        "src/google/protobuf/compiler/cpp/cpp_message.cc",
+        "src/google/protobuf/compiler/cpp/cpp_message_field.cc",
+        "src/google/protobuf/compiler/cpp/cpp_padding_optimizer.cc",
+        "src/google/protobuf/compiler/cpp/cpp_primitive_field.cc",
+        "src/google/protobuf/compiler/cpp/cpp_service.cc",
+        "src/google/protobuf/compiler/cpp/cpp_string_field.cc",
+        "src/google/protobuf/compiler/plugin.cc",
+        "src/google/protobuf/compiler/plugin.pb.cc",
+    ],
+    local_include_dirs: [
+        "src",
+    ],
+    visibility: ["//external/kythe"],
 }
 
 // Android Protocol buffer compiler, aprotoc (host executable)
@@ -396,7 +418,7 @@ cc_test {
 java_defaults {
     name: "libprotobuf_errorprone_defaults",
     errorprone: {
-        javacflags: ["-Xep:MissingOverride:OFF"],  // b/73499927
+        javacflags: ["-Xep:MissingOverride:OFF"], // b/73499927
     },
 }
 
@@ -574,6 +596,7 @@ java_library_host {
     ],
 
     proto: {
+        type: "full",
         local_include_dirs: [
             "src",
         ],
@@ -596,7 +619,6 @@ java_library_host {
         "libprotobuf-java-full",
     ],
 }
-
 
 // Java full library (compatibility for old host-side users)
 // =======================================================
