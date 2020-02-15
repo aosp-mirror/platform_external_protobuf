@@ -112,6 +112,11 @@ cc_library {
             enabled: true,
         },
     },
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adbd",
+        "test_com.android.adbd",
+    ],
 }
 
 // C++ lite library for the platform and host.
