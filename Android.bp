@@ -116,6 +116,8 @@ cc_library {
         "//apex_available:platform",
         "com.android.adbd",
         "test_com.android.adbd",
+        "com.android.os.statsd",
+        "test_com.android.os.statsd",
     ],
 }
 
