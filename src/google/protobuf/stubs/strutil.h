@@ -43,7 +43,7 @@
 namespace google {
 namespace protobuf {
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER < 1800
 #define strtoll  _strtoi64
 #define strtoull _strtoui64
 #elif defined(__DECCXX) && defined(__osf__)
@@ -159,8 +159,6 @@ inline string StripSuffixString(const string& str, const string& suffix) {
 // ----------------------------------------------------------------------
 PROTOBUF_EXPORT void ReplaceCharacters(string* s, const char* remove,
                                        char replacewith);
-PROTOBUF_EXPORT void StripString(string* s, const char* remove,
-                                 char replacewith);
 
 PROTOBUF_EXPORT void StripWhitespace(string* s);
 
@@ -931,6 +929,14 @@ inline bool EndsWith(StringPiece text, StringPiece suffix) {
               suffix.size()) == 0);
 }
 }  // namespace strings
+
+namespace internal {
+
+// A locale-independent version of the standard strtod(), which always
+// uses a dot as the decimal separator.
+double NoLocaleStrtod(const char* str, char** endptr);
+
+}  // namespace internal
 
 }  // namespace protobuf
 }  // namespace google

@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -28,43 +28,32 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_JAVANANO_MAP_FIELD_H__
-#define GOOGLE_PROTOBUF_COMPILER_JAVANANO_MAP_FIELD_H__
+// Author: qrczak@google.com (Marcin Kowalczyk)
 
-#include <map>
-#include <string>
-#include <vector>
-#include <google/protobuf/compiler/javanano/javanano_field.h>
+#include <google/protobuf/python/python_protobuf.h>
 
 namespace google {
 namespace protobuf {
-namespace compiler {
-namespace javanano {
+namespace python {
 
-class MapFieldGenerator : public FieldGenerator {
- public:
-  explicit MapFieldGenerator(
-      const FieldDescriptor* descriptor, const Params& params);
-  ~MapFieldGenerator();
+static const Message* GetCProtoInsidePyProtoStub(PyObject* msg) { return NULL; }
+static Message* MutableCProtoInsidePyProtoStub(PyObject* msg) { return NULL; }
 
-  // implements FieldGenerator ---------------------------------------
-  void GenerateMembers(io::Printer* printer, bool lazy_init) const;
-  void GenerateClearCode(io::Printer* printer) const;
-  void GenerateMergingCode(io::Printer* printer) const;
-  void GenerateSerializationCode(io::Printer* printer) const;
-  void GenerateSerializedSizeCode(io::Printer* printer) const;
-  void GenerateEqualsCode(io::Printer* printer) const;
-  void GenerateHashCodeCode(io::Printer* printer) const;
+// This is initialized with a default, stub implementation.
+// If python-google.protobuf.cc is loaded, the function pointer is overridden
+// with a full implementation.
+const Message* (*GetCProtoInsidePyProtoPtr)(PyObject* msg) =
+    GetCProtoInsidePyProtoStub;
+Message* (*MutableCProtoInsidePyProtoPtr)(PyObject* msg) =
+    MutableCProtoInsidePyProtoStub;
 
- private:
-  const FieldDescriptor* descriptor_;
-  map<string, string> variables_;
+const Message* GetCProtoInsidePyProto(PyObject* msg) {
+  return GetCProtoInsidePyProtoPtr(msg);
+}
+Message* MutableCProtoInsidePyProto(PyObject* msg) {
+  return MutableCProtoInsidePyProtoPtr(msg);
+}
 
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(MapFieldGenerator);
-};
-
-}  // namespace javanano
-}  // namespace compiler
+}  // namespace python
 }  // namespace protobuf
 }  // namespace google
-#endif  // GOOGLE_PROTOBUF_COMPILER_JAVANANO_MAP_FIELD_H__

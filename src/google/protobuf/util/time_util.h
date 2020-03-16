@@ -37,7 +37,14 @@
 #include <ostream>
 #include <string>
 #ifdef _MSC_VER
+#ifdef _XBOX_ONE
+struct timeval {
+  int64 tv_sec;  /* seconds */
+  int64 tv_usec; /* and microseconds */
+};
+#else
 #include <winsock2.h>
+#endif  // _XBOX_ONE
 #else
 #include <sys/time.h>
 #endif
@@ -224,15 +231,15 @@ inline Duration operator-(const Duration& d1, const Duration& d2) {
   return result -= d2;
 }
 // Multiplicative operators
-template<typename T>
+template <typename T>
 inline Duration operator*(Duration d, T r) {
   return d *= r;
 }
-template<typename T>
+template <typename T>
 inline Duration operator*(T r, Duration d) {
   return d *= r;
 }
-template<typename T>
+template <typename T>
 inline Duration operator/(Duration d, T r) {
   return d /= r;
 }
@@ -250,7 +257,7 @@ inline std::ostream& operator<<(std::ostream& out, const Duration& d) {
 
 // Overloaded operators for Timestamp
 //
-// Assignement operators.
+// Assignment operators.
 PROTOBUF_EXPORT Timestamp& operator+=(Timestamp& t,
                                       const Duration& d);  // NOLINT
 PROTOBUF_EXPORT Timestamp& operator-=(Timestamp& t,

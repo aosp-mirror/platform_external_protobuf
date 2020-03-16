@@ -39,27 +39,29 @@
 #define GOOGLE_PROTOBUF_COMPILER_COMMAND_LINE_INTERFACE_H__
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include <google/protobuf/stubs/common.h>
-
 #include <google/protobuf/port_def.inc>
 
 namespace google {
 namespace protobuf {
 
-class Descriptor;            // descriptor.h
-class DescriptorDatabase;    // descriptor_database.h
-class DescriptorPool;        // descriptor.h
-class FileDescriptor;        // descriptor.h
-class FileDescriptorSet;     // descriptor.h
-class FileDescriptorProto;   // descriptor.pb.h
-template<typename T> class RepeatedPtrField;  // repeated_field.h
-class SimpleDescriptorDatabase;               // descriptor_database.h
+class Descriptor;           // descriptor.h
+class DescriptorDatabase;   // descriptor_database.h
+class DescriptorPool;       // descriptor.h
+class FileDescriptor;       // descriptor.h
+class FileDescriptorSet;    // descriptor.h
+class FileDescriptorProto;  // descriptor.pb.h
+template <typename T>
+class RepeatedPtrField;          // repeated_field.h
+class SimpleDescriptorDatabase;  // descriptor_database.h
 
 namespace compiler {
 
@@ -128,8 +130,7 @@ class PROTOC_EXPORT CommandLineInterface {
   //   protoc --foo_out=enable_bar:outdir
   // The text before the colon is passed to CodeGenerator::Generate() as the
   // "parameter".
-  void RegisterGenerator(const std::string& flag_name,
-                         CodeGenerator* generator,
+  void RegisterGenerator(const std::string& flag_name, CodeGenerator* generator,
                          const std::string& help_text);
 
   // Register a code generator for a language.
@@ -153,7 +154,7 @@ class PROTOC_EXPORT CommandLineInterface {
   // The compiler determines the executable name to search for by concatenating
   // exe_name_prefix with the unrecognized flag name, removing "_out".  So, for
   // example, if exe_name_prefix is "protoc-" and you pass the flag --foo_out,
-  // the compiler will try to run the program "protoc-foo".
+  // the compiler will try to run the program "protoc-gen-foo".
   //
   // The plugin program should implement the following usage:
   //   plugin [--out=OUTDIR] [--parameter=PARAMETER] PROTO_FILES < DESCRIPTORS
@@ -199,9 +200,7 @@ class PROTOC_EXPORT CommandLineInterface {
   // Provides some text which will be printed when the --version flag is
   // used.  The version of libprotoc will also be printed on the next line
   // after this text.
-  void SetVersionInfo(const std::string& text) {
-    version_info_ = text;
-  }
+  void SetVersionInfo(const std::string& text) { version_info_ = text; }
 
 
  private:
@@ -210,14 +209,16 @@ class PROTOC_EXPORT CommandLineInterface {
   class ErrorPrinter;
   class GeneratorContextImpl;
   class MemoryOutputStream;
-  typedef std::unordered_map<std::string, GeneratorContextImpl*> GeneratorContextMap;
+  typedef std::unordered_map<std::string, std::unique_ptr<GeneratorContextImpl>>
+      GeneratorContextMap;
 
   // Clear state from previous Run().
   void Clear();
 
   // Remaps the proto file so that it is relative to one of the directories
   // in proto_path_.  Returns false if an error occurred.
-  bool MakeProtoProtoPathRelative(DiskSourceTree* source_tree, std::string* proto,
+  bool MakeProtoProtoPathRelative(DiskSourceTree* source_tree,
+                                  std::string* proto,
                                   DescriptorDatabase* fallback_database);
 
   // Remaps each file in input_files_ so that it is relative to one of the
@@ -238,7 +239,8 @@ class PROTOC_EXPORT CommandLineInterface {
 
   // Read an argument file and append the file's content to the list of
   // arguments. Return false if the file cannot be read.
-  bool ExpandArgumentFile(const std::string& file, std::vector<std::string>* arguments);
+  bool ExpandArgumentFile(const std::string& file,
+                          std::vector<std::string>* arguments);
 
   // Parses a command-line argument into a name/value pair.  Returns
   // true if the next argument in the argv should be used as the value,
@@ -272,6 +274,7 @@ class PROTOC_EXPORT CommandLineInterface {
 
   // Parses input_files_ into parsed_files
   bool ParseInputFiles(DescriptorPool* descriptor_pool,
+                       DiskSourceTree* source_tree,
                        std::vector<const FileDescriptor*>* parsed_files);
 
   // Generate the given output file from the given input.
@@ -307,8 +310,7 @@ class PROTOC_EXPORT CommandLineInterface {
   // If include_json_name is true, populate the json_name field of
   // FieldDescriptorProto for all fields.
   static void GetTransitiveDependencies(
-      const FileDescriptor* file,
-      bool include_json_name,
+      const FileDescriptor* file, bool include_json_name,
       bool include_source_code_info,
       std::set<const FileDescriptor*>* already_seen,
       RepeatedPtrField<FileDescriptorProto>* output);
@@ -374,21 +376,21 @@ class PROTOC_EXPORT CommandLineInterface {
   Mode mode_;
 
   enum PrintMode {
-    PRINT_NONE,               // Not in MODE_PRINT
-    PRINT_FREE_FIELDS,        // --print_free_fields
+    PRINT_NONE,         // Not in MODE_PRINT
+    PRINT_FREE_FIELDS,  // --print_free_fields
   };
 
   PrintMode print_mode_;
 
   enum ErrorFormat {
-    ERROR_FORMAT_GCC,   // GCC error output format (default).
-    ERROR_FORMAT_MSVS   // Visual Studio output (--error_format=msvs).
+    ERROR_FORMAT_GCC,  // GCC error output format (default).
+    ERROR_FORMAT_MSVS  // Visual Studio output (--error_format=msvs).
   };
 
   ErrorFormat error_format_;
 
   std::vector<std::pair<std::string, std::string> >
-      proto_path_;                   // Search path for proto files.
+      proto_path_;                        // Search path for proto files.
   std::vector<std::string> input_files_;  // Names of the input proto files.
 
   // Names of proto files which are allowed to be imported. Used by build
@@ -403,8 +405,8 @@ class PROTOC_EXPORT CommandLineInterface {
   // output_directives_ lists all the files we are supposed to output and what
   // generator to use for each.
   struct OutputDirective {
-    std::string name;                // E.g. "--foo_out"
-    CodeGenerator* generator;   // NULL for plugins
+    std::string name;          // E.g. "--foo_out"
+    CodeGenerator* generator;  // NULL for plugins
     std::string parameter;
     std::string output_location;
   };

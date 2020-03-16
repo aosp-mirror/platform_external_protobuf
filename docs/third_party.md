@@ -16,19 +16,19 @@ These are projects we know about implementing Protocol Buffers for other program
 * C: https://github.com/cloudwu/pbc/
 * C: https://github.com/haberman/upb/wiki
 * C: https://github.com/squidfunk/protobluff
+* C: https://github.com/eerimoq/pbtools
 * C++: https://github.com/google/protobuf (Google-official implementation)
 * C/C++: http://spbc.sf.net/
 * C#: http://code.google.com/p/protobuf-csharp-port
-* C#: http://code.google.com/p/protosharp/
 * C#: https://silentorbit.com/protobuf/
 * C#/.NET/WCF/VB: http://code.google.com/p/protobuf-net/
 * Clojure: http://github.com/ninjudd/clojure-protobuf
 * Clojure: https://github.com/clojusc/protobuf
+* Clojure: https://protojure.github.io
 * Common Lisp: http://github.com/ndantam/s-protobuf
 * Common Lisp: http://github.com/brown/protobuf
 * D: https://github.com/dcarp/protobuf-d
 * D: https://github.com/msoucy/dproto
-* D: http://256.makerslocal.org/wiki/index.php/ProtocolBuffer
 * D: https://github.com/opticron/ProtocolBuffer
 * Dart: https://github.com/dart-lang/dart-protobuf (runtime) https://github.com/dart-lang/dart-protoc-plugin (code generator)
 * Delphi: http://sourceforge.net/projects/protobuf-delphi/
@@ -39,6 +39,7 @@ These are projects we know about implementing Protocol Buffers for other program
 * Erlang: https://github.com/tomas-abrahamsson/gpb
 * Erlang: http://piqi.org/
 * Erlang: https://github.com/basho/erlang_protobuffs (no longer maintained, use gpb instead)
+* Hacklang/HHVM: https://github.com/y3llowcake/proto-hack
 * GDScript: https://github.com/oniksan/godobuf (Godot v3 engine plugin)
 * Go: https://github.com/golang/protobuf (Google-official implementation)
 * Go: https://github.com/akunspy/gopbuf
@@ -59,6 +60,7 @@ These are projects we know about implementing Protocol Buffers for other program
 * Javascript: http://code.google.com/p/protobuf-for-node/
 * Javascript: http://code.google.com/p/protostuff/
 * Julia: https://github.com/tanmaykm/ProtoBuf.jl
+* Kotlin: https://github.com/marcoferrer/kroto-plus
 * Kotlin: https://github.com/Kotlin/kotlinx.serialization
 * Lua: http://code.google.com/p/protoc-gen-lua/
 * Lua: http://github.com/indygreg/lua-protobuf
@@ -78,7 +80,7 @@ These are projects we know about implementing Protocol Buffers for other program
 * PHP: http://drslump.github.com/Protobuf-PHP
 * Prolog: http://www.swi-prolog.org/pldoc/package/protobufs.html
 * Python: https://github.com/google/protobuf (Google-official implementation)
-* Python: http://eigenein.github.com/protobuf/
+* Python: https://github.com/eigenein/protobuf
 * R: http://cran.r-project.org/package=RProtoBuf
 * Ruby: http://code.google.com/p/ruby-protobuf/
 * Ruby: http://github.com/mozy/ruby-protocol-buffers
@@ -92,6 +94,7 @@ These are projects we know about implementing Protocol Buffers for other program
 * Solidity: https://github.com/celer-network/pb3-gen-sol
 * Swift: https://github.com/alexeyxo/protobuf-swift
 * Swift: https://github.com/apple/swift-protobuf/
+* Typescript: https://github.com/y3llowcake/protoc-gen-ts
 * Vala: https://launchpad.net/protobuf-vala
 * Visual Basic: http://code.google.com/p/protobuf-net/
 
@@ -110,6 +113,7 @@ GRPC (http://www.grpc.io/) is Google's RPC implementation for Protocol Buffers. 
 * http://deltavsoft.com/RcfUserGuide/Protobufs (C++)
 * http://code.google.com/p/protobuf-mina-rpc/ (Python client, Java server)
 * http://code.google.com/p/casocklib/ (C++)
+* https://protojure.github.io (Clojure)
 * http://code.google.com/p/cxf-protobuf/ (Java)
 * http://code.google.com/p/protobuf-remote/ (C++/C#)
 * http://code.google.com/p/protobuf-rpc-pro/ (Java)
@@ -171,4 +175,5 @@ There are miscellaneous other things you may find useful as a Protocol Buffers d
 * [Make protoc plugins in NodeJS](https://github.com/konsumer/node-protoc-plugin)
 * [ProfaneDB - A Protocol Buffers database](https://profanedb.gitlab.io)
 * [Protocol Buffer property-based testing utility and example message generator (Python / Hypothesis)](https://github.com/CurataEng/hypothesis-protobuf)
-* [Protolock - CLI utility to prevent backward-incompatible changes to .proto files](https://github.com/nilslice/protolock) 
+* [Protolock - CLI utility to prevent backward-incompatible changes to .proto files](https://github.com/nilslice/protolock)
+* [Optional GRPC - GRPC for testable microservices (Python)](https://github.com/mattpaletta/optional-grpc.git)

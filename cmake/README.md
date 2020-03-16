@@ -13,13 +13,13 @@ Environment Setup
 
 Open the appropriate *Command Prompt* from the *Start* menu.
 
-For example *VS2013 x64 Native Tools Command Prompt*:
+For example *x86 Native Tools Command Prompt for VS 2019*:
 
-    C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64>
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional>
 
 Change to your working directory:
 
-    C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64>cd C:\Path\to
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional>cd C:\Path\to
     C:\Path\to>
 
 Where *C:\Path\to* is path to your real working directory.
@@ -121,7 +121,7 @@ It will generate *nmake* *Makefile* in current directory.
 To create *Visual Studio* solution file:
 
      C:\Path\to\protobuf\cmake\build>mkdir solution & cd solution
-     C:\Path\to\protobuf\cmake\build\solution>cmake -G "Visual Studio 14 2015 Win64" ^
+     C:\Path\to\protobuf\cmake\build\solution>cmake -G "Visual Studio 16 2019" ^
      -DCMAKE_INSTALL_PREFIX=../../../../install ^
      ../..
 
@@ -130,11 +130,11 @@ It will generate *Visual Studio* solution file *protobuf.sln* in current directo
 If the *gmock* directory does not exist, and you do not want to build protobuf unit tests,
 you need to add *cmake* command argument `-Dprotobuf_BUILD_TESTS=OFF` to disable testing.
 
-To make a *Visual Studio* file for Visual Studio 15 2017, create the *Visual Studio* 
-solution file above and edit the CmakeCache file.
-	
+To make a *Visual Studio* file for Visual Studio 16 2019, create the *Visual Studio*
+solution file above and edit the CMakeCache file.
+
 	C:Path\to\protobuf\cmake\build\solution\CMakeCache
-	
+
 Then create the *Visual Studio* solution file again
 
 Compiling
@@ -177,9 +177,9 @@ You should see output similar to:
 
      Running main() from gmock_main.cc
      [==========] Running 1546 tests from 165 test cases.
-     
+
      ...
-     
+
      [==========] 1546 tests from 165 test cases ran. (2529 ms total)
      [  PASSED  ] 1546 tests.
 
@@ -198,7 +198,7 @@ To run specific tests:
      [ RUN      ] AnyTest.TestIs
      [       OK ] AnyTest.TestIs (0 ms)
      [----------] 3 tests from AnyTest (1 ms total)
-     
+
      [----------] Global test environment tear-down
      [==========] 3 tests from 1 test case ran. (2 ms total)
      [  PASSED  ] 3 tests.
@@ -310,7 +310,7 @@ If you already have ZLIB library and headers at some other location on your syst
 
 	-DZLIB_INCLUDE_DIR=<path to dir containing zlib headers>
 	-DZLIB_LIB=<path to dir containing zlib>
-	
+
 Build and testing protobuf as usual.
 
 Notes on Compiler Warnings

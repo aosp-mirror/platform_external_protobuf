@@ -17,14 +17,12 @@ set(libprotobuf_files
   ${protobuf_source_dir}/src/google/protobuf/io/gzip_stream.cc
   ${protobuf_source_dir}/src/google/protobuf/io/printer.cc
   ${protobuf_source_dir}/src/google/protobuf/io/tokenizer.cc
-  ${protobuf_source_dir}/src/google/protobuf/io/zero_copy_stream_impl.cc
   ${protobuf_source_dir}/src/google/protobuf/map_field.cc
   ${protobuf_source_dir}/src/google/protobuf/message.cc
   ${protobuf_source_dir}/src/google/protobuf/reflection_ops.cc
   ${protobuf_source_dir}/src/google/protobuf/service.cc
   ${protobuf_source_dir}/src/google/protobuf/source_context.pb.cc
   ${protobuf_source_dir}/src/google/protobuf/struct.pb.cc
-  ${protobuf_source_dir}/src/google/protobuf/stubs/mathlimits.cc
   ${protobuf_source_dir}/src/google/protobuf/stubs/substitute.cc
   ${protobuf_source_dir}/src/google/protobuf/text_format.cc
   ${protobuf_source_dir}/src/google/protobuf/timestamp.pb.cc
@@ -72,14 +70,12 @@ set(libprotobuf_includes
   ${protobuf_source_dir}/src/google/protobuf/io/gzip_stream.h
   ${protobuf_source_dir}/src/google/protobuf/io/printer.h
   ${protobuf_source_dir}/src/google/protobuf/io/tokenizer.h
-  ${protobuf_source_dir}/src/google/protobuf/io/zero_copy_stream_impl.h
   ${protobuf_source_dir}/src/google/protobuf/map_field.h
   ${protobuf_source_dir}/src/google/protobuf/message.h
   ${protobuf_source_dir}/src/google/protobuf/reflection_ops.h
   ${protobuf_source_dir}/src/google/protobuf/service.h
   ${protobuf_source_dir}/src/google/protobuf/source_context.pb.h
   ${protobuf_source_dir}/src/google/protobuf/struct.pb.h
-  ${protobuf_source_dir}/src/google/protobuf/stubs/mathlimits.h
   ${protobuf_source_dir}/src/google/protobuf/stubs/substitute.h
   ${protobuf_source_dir}/src/google/protobuf/text_format.h
   ${protobuf_source_dir}/src/google/protobuf/timestamp.pb.h
@@ -120,7 +116,10 @@ add_library(libprotobuf ${protobuf_SHARED_OR_STATIC}
   ${libprotobuf_lite_files} ${libprotobuf_files} ${libprotobuf_includes} ${libprotobuf_rc_files})
 target_link_libraries(libprotobuf ${CMAKE_THREAD_LIBS_INIT})
 if(protobuf_WITH_ZLIB)
-    target_link_libraries(libprotobuf ${ZLIB_LIBRARIES})
+  target_link_libraries(libprotobuf ${ZLIB_LIBRARIES})
+endif()
+if(protobuf_LINK_LIBATOMIC)
+  target_link_libraries(libprotobuf atomic)
 endif()
 target_include_directories(libprotobuf PUBLIC ${protobuf_source_dir}/src)
 if(MSVC AND protobuf_BUILD_SHARED_LIBS)

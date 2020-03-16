@@ -36,7 +36,8 @@
 #define GOOGLE_PROTOBUF_COMPILER_CSHARP_HELPERS_H__
 
 #include <string>
-#include <google/protobuf/stubs/port.h>
+#include <google/protobuf/port.h>
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/compiler/code_generator.h>
@@ -75,6 +76,8 @@ std::string StripDotProto(const std::string& proto_file);
 
 // Gets unqualified name of the reflection class
 std::string GetReflectionClassUnqualifiedName(const FileDescriptor* descriptor);
+// Gets unqualified name of the extension class
+std::string GetExtensionClassUnqualifiedName(const FileDescriptor* descriptor);
 
 std::string GetClassName(const EnumDescriptor* descriptor);
 
@@ -110,6 +113,8 @@ FieldGeneratorBase* CreateFieldGenerator(const FieldDescriptor* descriptor,
                                          int presenceIndex,
                                          const Options* options);
 
+std::string GetFullExtensionName(const FieldDescriptor* descriptor);
+
 bool IsNullable(const FieldDescriptor* descriptor);
 
 // Determines whether the given message is a map entry message,
@@ -117,6 +122,9 @@ bool IsNullable(const FieldDescriptor* descriptor);
 inline bool IsMapEntryMessage(const Descriptor* descriptor) {
   return descriptor->options().map_entry();
 }
+
+// Checks if this descriptor is for a group and gets its end tag or 0 if it's not a group
+uint GetGroupEndTag(const Descriptor* descriptor);
 
 // Determines whether we're generating code for the proto representation of
 // descriptors etc, for use in the runtime. This is the only type which is

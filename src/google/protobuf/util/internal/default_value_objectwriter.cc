@@ -67,13 +67,9 @@ DefaultValueObjectWriter::DefaultValueObjectWriter(
       suppress_empty_list_(false),
       preserve_proto_field_names_(false),
       use_ints_for_enums_(false),
-      field_scrub_callback_(nullptr),
       ow_(ow) {}
 
 DefaultValueObjectWriter::~DefaultValueObjectWriter() {
-  for (int i = 0; i < string_values_.size(); ++i) {
-    delete string_values_[i];
-  }
   if (own_typeinfo_) {
     delete typeinfo_;
   }
@@ -156,7 +152,7 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::RenderString(
   } else {
     // Since StringPiece is essentially a pointer, takes a copy of "value" to
     // avoid ownership issues.
-    string_values_.push_back(new string(value));
+    string_values_.emplace_back(new std::string(value));
     RenderDataPiece(name, DataPiece(*string_values_.back(), true));
   }
   return this;
@@ -169,7 +165,7 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::RenderBytes(
   } else {
     // Since StringPiece is essentially a pointer, takes a copy of "value" to
     // avoid ownership issues.
-    string_values_.push_back(new string(value.ToString()));
+    string_values_.emplace_back(new std::string(value));
     RenderDataPiece(name, DataPiece(*string_values_.back(), false, true));
   }
   return this;
@@ -186,25 +182,27 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::RenderNull(
 }
 
 void DefaultValueObjectWriter::RegisterFieldScrubCallBack(
-    FieldScrubCallBackPtr field_scrub_callback) {
-  field_scrub_callback_.reset(field_scrub_callback.release());
+    FieldScrubCallBack field_scrub_callback) {
+  field_scrub_callback_ = std::move(field_scrub_callback);
 }
 
 DefaultValueObjectWriter::Node* DefaultValueObjectWriter::CreateNewNode(
-    const string& name, const google::protobuf::Type* type, NodeKind kind,
-    const DataPiece& data, bool is_placeholder, const std::vector<string>& path,
-    bool suppress_empty_list, bool preserve_proto_field_names,
-    bool use_ints_for_enums, FieldScrubCallBack* field_scrub_callback) {
+    const std::string& name, const google::protobuf::Type* type, NodeKind kind,
+    const DataPiece& data, bool is_placeholder,
+    const std::vector<std::string>& path, bool suppress_empty_list,
+    bool preserve_proto_field_names, bool use_ints_for_enums,
+    FieldScrubCallBack field_scrub_callback) {
   return new Node(name, type, kind, data, is_placeholder, path,
                   suppress_empty_list, preserve_proto_field_names,
-                  use_ints_for_enums, field_scrub_callback);
+                  use_ints_for_enums, std::move(field_scrub_callback));
 }
 
 DefaultValueObjectWriter::Node::Node(
-    const string& name, const google::protobuf::Type* type, NodeKind kind,
-    const DataPiece& data, bool is_placeholder, const std::vector<string>& path,
-    bool suppress_empty_list, bool preserve_proto_field_names,
-    bool use_ints_for_enums, FieldScrubCallBack* field_scrub_callback)
+    const std::string& name, const google::protobuf::Type* type, NodeKind kind,
+    const DataPiece& data, bool is_placeholder,
+    const std::vector<std::string>& path, bool suppress_empty_list,
+    bool preserve_proto_field_names, bool use_ints_for_enums,
+    FieldScrubCallBack field_scrub_callback)
     : name_(name),
       type_(type),
       kind_(kind),
@@ -215,7 +213,7 @@ DefaultValueObjectWriter::Node::Node(
       suppress_empty_list_(suppress_empty_list),
       preserve_proto_field_names_(preserve_proto_field_names),
       use_ints_for_enums_(use_ints_for_enums),
-      field_scrub_callback_(field_scrub_callback) {}
+      field_scrub_callback_(std::move(field_scrub_callback)) {}
 
 DefaultValueObjectWriter::Node* DefaultValueObjectWriter::Node::FindChild(
     StringPiece name) {
@@ -282,7 +280,7 @@ const google::protobuf::Type* DefaultValueObjectWriter::Node::GetMapValueType(
     if (sub_field.number() != 2) {
       continue;
     }
-    if (sub_field.kind() != google::protobuf::Field_Kind_TYPE_MESSAGE) {
+    if (sub_field.kind() != google::protobuf::Field::TYPE_MESSAGE) {
       // This map's value type is not a message type. We don't need to
       // get the field_type in this case.
       break;
@@ -313,7 +311,7 @@ void DefaultValueObjectWriter::Node::PopulateChildren(
     return;
   }
   std::vector<Node*> new_children;
-  std::unordered_map<string, int> orig_children_map;
+  std::unordered_map<std::string, int> orig_children_map;
 
   // Creates a map of child nodes to speed up lookup.
   for (int i = 0; i < children_.size(); ++i) {
@@ -325,17 +323,16 @@ void DefaultValueObjectWriter::Node::PopulateChildren(
 
     // This code is checking if the field to be added to the tree should be
     // scrubbed or not by calling the field_scrub_callback_ callback function.
-    std::vector<string> path;
+    std::vector<std::string> path;
     if (!path_.empty()) {
       path.insert(path.begin(), path_.begin(), path_.end());
     }
     path.push_back(field.name());
-    if (field_scrub_callback_ != nullptr &&
-        field_scrub_callback_->Run(path, &field)) {
+    if (field_scrub_callback_ && field_scrub_callback_(path, &field)) {
       continue;
     }
 
-    std::unordered_map<string, int>::iterator found =
+    std::unordered_map<std::string, int>::iterator found =
         orig_children_map.find(field.name());
     // If the child field has already been set, we just add it to the new list
     // of children.
@@ -349,7 +346,7 @@ void DefaultValueObjectWriter::Node::PopulateChildren(
     bool is_map = false;
     NodeKind kind = PRIMITIVE;
 
-    if (field.kind() == google::protobuf::Field_Kind_TYPE_MESSAGE) {
+    if (field.kind() == google::protobuf::Field::TYPE_MESSAGE) {
       kind = OBJECT;
       util::StatusOr<const google::protobuf::Type*> found_result =
           typeinfo->ResolveTypeUrl(field.type_url());
@@ -372,8 +369,7 @@ void DefaultValueObjectWriter::Node::PopulateChildren(
     }
 
     if (!is_map &&
-        field.cardinality() ==
-            google::protobuf::Field_Cardinality_CARDINALITY_REPEATED) {
+        field.cardinality() == google::protobuf::Field::CARDINALITY_REPEATED) {
       kind = LIST;
     }
 
@@ -439,61 +435,63 @@ DataPiece DefaultValueObjectWriter::CreateDefaultDataPieceForField(
     const google::protobuf::Field& field, const TypeInfo* typeinfo,
     bool use_ints_for_enums) {
   switch (field.kind()) {
-    case google::protobuf::Field_Kind_TYPE_DOUBLE: {
+    case google::protobuf::Field::TYPE_DOUBLE: {
       return DataPiece(ConvertTo<double>(
           field.default_value(), &DataPiece::ToDouble, static_cast<double>(0)));
     }
-    case google::protobuf::Field_Kind_TYPE_FLOAT: {
+    case google::protobuf::Field::TYPE_FLOAT: {
       return DataPiece(ConvertTo<float>(
           field.default_value(), &DataPiece::ToFloat, static_cast<float>(0)));
     }
-    case google::protobuf::Field_Kind_TYPE_INT64:
-    case google::protobuf::Field_Kind_TYPE_SINT64:
-    case google::protobuf::Field_Kind_TYPE_SFIXED64: {
+    case google::protobuf::Field::TYPE_INT64:
+    case google::protobuf::Field::TYPE_SINT64:
+    case google::protobuf::Field::TYPE_SFIXED64: {
       return DataPiece(ConvertTo<int64>(
           field.default_value(), &DataPiece::ToInt64, static_cast<int64>(0)));
     }
-    case google::protobuf::Field_Kind_TYPE_UINT64:
-    case google::protobuf::Field_Kind_TYPE_FIXED64: {
+    case google::protobuf::Field::TYPE_UINT64:
+    case google::protobuf::Field::TYPE_FIXED64: {
       return DataPiece(ConvertTo<uint64>(
           field.default_value(), &DataPiece::ToUint64, static_cast<uint64>(0)));
     }
-    case google::protobuf::Field_Kind_TYPE_INT32:
-    case google::protobuf::Field_Kind_TYPE_SINT32:
-    case google::protobuf::Field_Kind_TYPE_SFIXED32: {
+    case google::protobuf::Field::TYPE_INT32:
+    case google::protobuf::Field::TYPE_SINT32:
+    case google::protobuf::Field::TYPE_SFIXED32: {
       return DataPiece(ConvertTo<int32>(
           field.default_value(), &DataPiece::ToInt32, static_cast<int32>(0)));
     }
-    case google::protobuf::Field_Kind_TYPE_BOOL: {
+    case google::protobuf::Field::TYPE_BOOL: {
       return DataPiece(
           ConvertTo<bool>(field.default_value(), &DataPiece::ToBool, false));
     }
-    case google::protobuf::Field_Kind_TYPE_STRING: {
+    case google::protobuf::Field::TYPE_STRING: {
       return DataPiece(field.default_value(), true);
     }
-    case google::protobuf::Field_Kind_TYPE_BYTES: {
+    case google::protobuf::Field::TYPE_BYTES: {
       return DataPiece(field.default_value(), false, true);
     }
-    case google::protobuf::Field_Kind_TYPE_UINT32:
-    case google::protobuf::Field_Kind_TYPE_FIXED32: {
+    case google::protobuf::Field::TYPE_UINT32:
+    case google::protobuf::Field::TYPE_FIXED32: {
       return DataPiece(ConvertTo<uint32>(
           field.default_value(), &DataPiece::ToUint32, static_cast<uint32>(0)));
     }
-    case google::protobuf::Field_Kind_TYPE_ENUM: {
+    case google::protobuf::Field::TYPE_ENUM: {
       return FindEnumDefault(field, typeinfo, use_ints_for_enums);
     }
-    default: { return DataPiece::NullData(); }
+    default: {
+      return DataPiece::NullData();
+    }
   }
 }
 
 DefaultValueObjectWriter* DefaultValueObjectWriter::StartObject(
     StringPiece name) {
   if (current_ == nullptr) {
-    std::vector<string> path;
-    root_.reset(CreateNewNode(
-        string(name), &type_, OBJECT, DataPiece::NullData(), false, path,
-        suppress_empty_list_, preserve_proto_field_names_, use_ints_for_enums_,
-        field_scrub_callback_.get()));
+    std::vector<std::string> path;
+    root_.reset(CreateNewNode(std::string(name), &type_, OBJECT,
+                              DataPiece::NullData(), false, path,
+                              suppress_empty_list_, preserve_proto_field_names_,
+                              use_ints_for_enums_, field_scrub_callback_));
     root_->PopulateChildren(typeinfo_);
     current_ = root_.get();
     return this;
@@ -504,14 +502,14 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::StartObject(
     // If current_ is a list or a map node, we should create a new child and use
     // the type of current_ as the type of the new child.
     std::unique_ptr<Node> node(
-        CreateNewNode(string(name),
+        CreateNewNode(std::string(name),
                       ((current_->kind() == LIST || current_->kind() == MAP)
                            ? current_->type()
                            : nullptr),
                       OBJECT, DataPiece::NullData(), false,
                       child == nullptr ? current_->path() : child->path(),
                       suppress_empty_list_, preserve_proto_field_names_,
-                      use_ints_for_enums_, field_scrub_callback_.get()));
+                      use_ints_for_enums_, field_scrub_callback_));
     child = node.get();
     current_->AddChild(node.release());
   }
@@ -540,22 +538,22 @@ DefaultValueObjectWriter* DefaultValueObjectWriter::EndObject() {
 DefaultValueObjectWriter* DefaultValueObjectWriter::StartList(
     StringPiece name) {
   if (current_ == nullptr) {
-    std::vector<string> path;
-    root_.reset(CreateNewNode(string(name), &type_, LIST, DataPiece::NullData(),
-                              false, path, suppress_empty_list_,
-                              preserve_proto_field_names_, use_ints_for_enums_,
-                              field_scrub_callback_.get()));
+    std::vector<std::string> path;
+    root_.reset(CreateNewNode(std::string(name), &type_, LIST,
+                              DataPiece::NullData(), false, path,
+                              suppress_empty_list_, preserve_proto_field_names_,
+                              use_ints_for_enums_, field_scrub_callback_));
     current_ = root_.get();
     return this;
   }
   MaybePopulateChildrenOfAny(current_);
   Node* child = current_->FindChild(name);
   if (child == nullptr || child->kind() != LIST) {
-    std::unique_ptr<Node> node(
-        CreateNewNode(string(name), nullptr, LIST, DataPiece::NullData(), false,
-                      child == nullptr ? current_->path() : child->path(),
-                      suppress_empty_list_, preserve_proto_field_names_,
-                      use_ints_for_enums_, field_scrub_callback_.get()));
+    std::unique_ptr<Node> node(CreateNewNode(
+        std::string(name), nullptr, LIST, DataPiece::NullData(), false,
+        child == nullptr ? current_->path() : child->path(),
+        suppress_empty_list_, preserve_proto_field_names_, use_ints_for_enums_,
+        field_scrub_callback_));
     child = node.get();
     current_->AddChild(node.release());
   }
@@ -587,9 +585,9 @@ void DefaultValueObjectWriter::RenderDataPiece(StringPiece name,
   MaybePopulateChildrenOfAny(current_);
   if (current_->type() != nullptr && current_->type()->name() == kAnyType &&
       name == "@type") {
-    util::StatusOr<string> data_string = data.ToString();
+    util::StatusOr<std::string> data_string = data.ToString();
     if (data_string.ok()) {
-      const string& string_value = data_string.ValueOrDie();
+      const std::string& string_value = data_string.ValueOrDie();
       // If the type of current_ is "Any" and its "@type" field is being set
       // here, sets the type of current_ to be the type specified by the
       // "@type".
@@ -614,10 +612,10 @@ void DefaultValueObjectWriter::RenderDataPiece(StringPiece name,
   if (child == nullptr || child->kind() != PRIMITIVE) {
     // No children are found, creates a new child.
     std::unique_ptr<Node> node(
-        CreateNewNode(string(name), nullptr, PRIMITIVE, data, false,
+        CreateNewNode(std::string(name), nullptr, PRIMITIVE, data, false,
                       child == nullptr ? current_->path() : child->path(),
                       suppress_empty_list_, preserve_proto_field_names_,
-                      use_ints_for_enums_, field_scrub_callback_.get()));
+                      use_ints_for_enums_, field_scrub_callback_));
     current_->AddChild(node.release());
   } else {
     child->set_data(data);
