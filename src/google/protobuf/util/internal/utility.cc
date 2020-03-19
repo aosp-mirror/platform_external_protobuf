@@ -31,6 +31,8 @@
 #include <google/protobuf/util/internal/utility.h>
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 #include <google/protobuf/stubs/callback.h>
 #include <google/protobuf/stubs/common.h>
@@ -41,9 +43,10 @@
 #include <google/protobuf/util/internal/constants.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/map_util.h>
-#include <google/protobuf/stubs/mathlimits.h>
 
+// clang-format off
 #include <google/protobuf/port_def.inc>
+// clang-format on
 
 namespace google {
 namespace protobuf {
@@ -52,7 +55,7 @@ namespace converter {
 
 bool GetBoolOptionOrDefault(
     const RepeatedPtrField<google::protobuf::Option>& options,
-    const string& option_name, bool default_value) {
+    StringPiece option_name, bool default_value) {
   const google::protobuf::Option* opt = FindOptionOrNull(options, option_name);
   if (opt == nullptr) {
     return default_value;
@@ -62,7 +65,7 @@ bool GetBoolOptionOrDefault(
 
 int64 GetInt64OptionOrDefault(
     const RepeatedPtrField<google::protobuf::Option>& options,
-    const string& option_name, int64 default_value) {
+    StringPiece option_name, int64 default_value) {
   const google::protobuf::Option* opt = FindOptionOrNull(options, option_name);
   if (opt == nullptr) {
     return default_value;
@@ -72,7 +75,7 @@ int64 GetInt64OptionOrDefault(
 
 double GetDoubleOptionOrDefault(
     const RepeatedPtrField<google::protobuf::Option>& options,
-    const string& option_name, double default_value) {
+    StringPiece option_name, double default_value) {
   const google::protobuf::Option* opt = FindOptionOrNull(options, option_name);
   if (opt == nullptr) {
     return default_value;
@@ -80,18 +83,18 @@ double GetDoubleOptionOrDefault(
   return GetDoubleFromAny(opt->value());
 }
 
-string GetStringOptionOrDefault(
+std::string GetStringOptionOrDefault(
     const RepeatedPtrField<google::protobuf::Option>& options,
-    const string& option_name, const string& default_value) {
+    StringPiece option_name, StringPiece default_value) {
   const google::protobuf::Option* opt = FindOptionOrNull(options, option_name);
   if (opt == nullptr) {
-    return default_value;
+    return std::string(default_value);
   }
   return GetStringFromAny(opt->value());
 }
 
 template <typename T>
-void ParseFromAny(const string& data, T* result) {
+void ParseFromAny(const std::string& data, T* result) {
   result->ParseFromString(data);
 }
 
@@ -115,7 +118,7 @@ double GetDoubleFromAny(const google::protobuf::Any& any) {
   return i.value();
 }
 
-string GetStringFromAny(const google::protobuf::Any& any) {
+std::string GetStringFromAny(const google::protobuf::Any& any) {
   google::protobuf::StringValue s;
   ParseFromAny(any.value(), &s);
   return s.value();
@@ -133,13 +136,13 @@ const StringPiece GetTypeWithoutUrl(StringPiece type_url) {
   }
 }
 
-const string GetFullTypeWithUrl(StringPiece simple_type) {
+const std::string GetFullTypeWithUrl(StringPiece simple_type) {
   return StrCat(kTypeServiceBaseUrl, "/", simple_type);
 }
 
 const google::protobuf::Option* FindOptionOrNull(
     const RepeatedPtrField<google::protobuf::Option>& options,
-    const string& option_name) {
+    StringPiece option_name) {
   for (int i = 0; i < options.size(); ++i) {
     const google::protobuf::Option& opt = options.Get(i);
     if (opt.name() == option_name) {
@@ -219,7 +222,7 @@ const google::protobuf::EnumValue* FindEnumValueByNameWithoutUnderscoreOrNull(
   if (enum_type != nullptr) {
     for (int i = 0; i < enum_type->enumvalue_size(); ++i) {
       const google::protobuf::EnumValue& enum_value = enum_type->enumvalue(i);
-      string enum_name_without_underscore = enum_value.name();
+      std::string enum_name_without_underscore = enum_value.name();
 
       // Remove underscore from the name.
       enum_name_without_underscore.erase(
@@ -227,7 +230,7 @@ const google::protobuf::EnumValue* FindEnumValueByNameWithoutUnderscoreOrNull(
                       enum_name_without_underscore.end(), '_'),
           enum_name_without_underscore.end());
       // Make the name uppercase.
-      for (string::iterator it = enum_name_without_underscore.begin();
+      for (std::string::iterator it = enum_name_without_underscore.begin();
            it != enum_name_without_underscore.end(); ++it) {
         *it = ascii_toupper(*it);
       }
@@ -240,19 +243,19 @@ const google::protobuf::EnumValue* FindEnumValueByNameWithoutUnderscoreOrNull(
   return nullptr;
 }
 
-string EnumValueNameToLowerCamelCase(const StringPiece input) {
-  string input_string(input);
+std::string EnumValueNameToLowerCamelCase(StringPiece input) {
+  std::string input_string(input);
   std::transform(input_string.begin(), input_string.end(), input_string.begin(),
                  ::tolower);
   return ToCamelCase(input_string);
 }
 
-string ToCamelCase(const StringPiece input) {
+std::string ToCamelCase(StringPiece input) {
   bool capitalize_next = false;
   bool was_cap = true;
   bool is_cap = false;
   bool first_word = true;
-  string result;
+  std::string result;
   result.reserve(input.size());
 
   for (size_t i = 0; i < input.size(); ++i, was_cap = is_cap) {
@@ -290,10 +293,10 @@ string ToCamelCase(const StringPiece input) {
   return result;
 }
 
-string ToSnakeCase(StringPiece input) {
+std::string ToSnakeCase(StringPiece input) {
   bool was_not_underscore = false;  // Initialize to false for case 1 (below)
   bool was_not_cap = false;
-  string result;
+  std::string result;
   result.reserve(input.size() << 1);
 
   for (size_t i = 0; i < input.size(); ++i) {
@@ -326,7 +329,7 @@ string ToSnakeCase(StringPiece input) {
   return result;
 }
 
-std::set<string>* well_known_types_ = NULL;
+std::set<std::string>* well_known_types_ = NULL;
 PROTOBUF_NAMESPACE_ID::internal::once_flag well_known_types_init_;
 const char* well_known_types_name_array_[] = {
     "google.protobuf.Timestamp",   "google.protobuf.Duration",
@@ -339,28 +342,27 @@ const char* well_known_types_name_array_[] = {
 void DeleteWellKnownTypes() { delete well_known_types_; }
 
 void InitWellKnownTypes() {
-  well_known_types_ = new std::set<string>;
+  well_known_types_ = new std::set<std::string>;
   for (int i = 0; i < GOOGLE_ARRAYSIZE(well_known_types_name_array_); ++i) {
     well_known_types_->insert(well_known_types_name_array_[i]);
   }
   google::protobuf::internal::OnShutdown(&DeleteWellKnownTypes);
 }
 
-bool IsWellKnownType(const string& type_name) {
+bool IsWellKnownType(const std::string& type_name) {
   PROTOBUF_NAMESPACE_ID::internal::call_once(well_known_types_init_,
                                              InitWellKnownTypes);
   return ContainsKey(*well_known_types_, type_name);
 }
 
-bool IsValidBoolString(const string& bool_string) {
+bool IsValidBoolString(StringPiece bool_string) {
   return bool_string == "true" || bool_string == "false" ||
          bool_string == "1" || bool_string == "0";
 }
 
 bool IsMap(const google::protobuf::Field& field,
            const google::protobuf::Type& type) {
-  return field.cardinality() ==
-             google::protobuf::Field_Cardinality_CARDINALITY_REPEATED &&
+  return field.cardinality() == google::protobuf::Field::CARDINALITY_REPEATED &&
          (GetBoolOptionOrDefault(type.options(), "map_entry", false) ||
           GetBoolOptionOrDefault(type.options(),
                                  "google.protobuf.MessageOptions.map_entry",
@@ -375,16 +377,16 @@ bool IsMessageSetWireFormat(const google::protobuf::Type& type) {
              "google.protobuf.MessageOptions.message_set_wire_format", false);
 }
 
-string DoubleAsString(double value) {
-  if (MathLimits<double>::IsPosInf(value)) return "Infinity";
-  if (MathLimits<double>::IsNegInf(value)) return "-Infinity";
-  if (MathLimits<double>::IsNaN(value)) return "NaN";
+std::string DoubleAsString(double value) {
+  if (value == std::numeric_limits<double>::infinity()) return "Infinity";
+  if (value == -std::numeric_limits<double>::infinity()) return "-Infinity";
+  if (std::isnan(value)) return "NaN";
 
   return SimpleDtoa(value);
 }
 
-string FloatAsString(float value) {
-  if (MathLimits<float>::IsFinite(value)) return SimpleFtoa(value);
+std::string FloatAsString(float value) {
+  if (std::isfinite(value)) return SimpleFtoa(value);
   return DoubleAsString(value);
 }
 
@@ -394,9 +396,7 @@ bool SafeStrToFloat(StringPiece str, float* value) {
     return false;
   }
 
-  if (MathLimits<double>::IsInf(double_value) ||
-      MathLimits<double>::IsNaN(double_value))
-    return false;
+  if (std::isinf(double_value) || std::isnan(double_value)) return false;
 
   // Fail if the value is not representable in float.
   if (double_value > std::numeric_limits<float>::max() ||

@@ -30,8 +30,8 @@
 
 #include <string>
 
-#include <google/protobuf/unittest_no_field_presence.pb.h>
 #include <google/protobuf/unittest.pb.h>
+#include <google/protobuf/unittest_no_field_presence.pb.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/descriptor.h>
 #include <gtest/gtest.h>
@@ -68,7 +68,7 @@ void CheckDefaultValues(
   // default instance.
   EXPECT_EQ(41, m.optional_proto2_message().default_int32());
   EXPECT_EQ(false, m.has_optional_foreign_message());
-  EXPECT_EQ(proto2_nofieldpresence_unittest::TestAllTypes_NestedEnum_FOO,
+  EXPECT_EQ(proto2_nofieldpresence_unittest::TestAllTypes::FOO,
             m.optional_nested_enum());
   EXPECT_EQ(proto2_nofieldpresence_unittest::FOREIGN_FOO,
             m.optional_foreign_enum());
@@ -119,9 +119,8 @@ void FillValues(proto2_nofieldpresence_unittest::TestAllTypes* m) {
   m->mutable_optional_foreign_message()->set_c(43);
   m->mutable_optional_proto2_message()->set_optional_int32(44);
   m->set_optional_nested_enum(
-      proto2_nofieldpresence_unittest::TestAllTypes_NestedEnum_BAZ);
-  m->set_optional_foreign_enum(
-      proto2_nofieldpresence_unittest::FOREIGN_BAZ);
+      proto2_nofieldpresence_unittest::TestAllTypes::BAZ);
+  m->set_optional_foreign_enum(proto2_nofieldpresence_unittest::FOREIGN_BAZ);
   m->mutable_optional_lazy_message()->set_bb(45);
   m->add_repeated_int32(100);
   m->add_repeated_int64(101);
@@ -142,9 +141,8 @@ void FillValues(proto2_nofieldpresence_unittest::TestAllTypes* m) {
   m->add_repeated_foreign_message()->set_c(47);
   m->add_repeated_proto2_message()->set_optional_int32(48);
   m->add_repeated_nested_enum(
-      proto2_nofieldpresence_unittest::TestAllTypes_NestedEnum_BAZ);
-  m->add_repeated_foreign_enum(
-      proto2_nofieldpresence_unittest::FOREIGN_BAZ);
+      proto2_nofieldpresence_unittest::TestAllTypes::BAZ);
+  m->add_repeated_foreign_enum(proto2_nofieldpresence_unittest::FOREIGN_BAZ);
   m->add_repeated_lazy_message()->set_bb(49);
 
   m->set_oneof_uint32(1);
@@ -153,7 +151,7 @@ void FillValues(proto2_nofieldpresence_unittest::TestAllTypes* m) {
 }
 
 void CheckNonDefaultValues(
-const proto2_nofieldpresence_unittest::TestAllTypes& m) {
+    const proto2_nofieldpresence_unittest::TestAllTypes& m) {
   EXPECT_EQ(100, m.optional_int32());
   EXPECT_EQ(101, m.optional_int64());
   EXPECT_EQ(102, m.optional_uint32());
@@ -175,7 +173,7 @@ const proto2_nofieldpresence_unittest::TestAllTypes& m) {
   EXPECT_EQ(43, m.optional_foreign_message().c());
   EXPECT_EQ(true, m.has_optional_proto2_message());
   EXPECT_EQ(44, m.optional_proto2_message().optional_int32());
-  EXPECT_EQ(proto2_nofieldpresence_unittest::TestAllTypes_NestedEnum_BAZ,
+  EXPECT_EQ(proto2_nofieldpresence_unittest::TestAllTypes::BAZ,
             m.optional_nested_enum());
   EXPECT_EQ(proto2_nofieldpresence_unittest::FOREIGN_BAZ,
             m.optional_foreign_enum());
@@ -219,7 +217,7 @@ const proto2_nofieldpresence_unittest::TestAllTypes& m) {
   EXPECT_EQ(1, m.repeated_proto2_message_size());
   EXPECT_EQ(48, m.repeated_proto2_message(0).optional_int32());
   EXPECT_EQ(1, m.repeated_nested_enum_size());
-  EXPECT_EQ(proto2_nofieldpresence_unittest::TestAllTypes_NestedEnum_BAZ,
+  EXPECT_EQ(proto2_nofieldpresence_unittest::TestAllTypes::BAZ,
             m.repeated_nested_enum(0));
   EXPECT_EQ(1, m.repeated_foreign_enum_size());
   EXPECT_EQ(proto2_nofieldpresence_unittest::FOREIGN_BAZ,
@@ -271,8 +269,9 @@ TEST(NoFieldPresenceTest, MessageFieldPresenceTest) {
   EXPECT_EQ(false, message.has_optional_lazy_message());
 
   // Test field presence of a message field on the default instance.
-  EXPECT_EQ(false, proto2_nofieldpresence_unittest::TestAllTypes::
-            default_instance().has_optional_nested_message());
+  EXPECT_EQ(false,
+            proto2_nofieldpresence_unittest::TestAllTypes::default_instance()
+                .has_optional_nested_message());
 }
 
 TEST(NoFieldPresenceTest, ReflectionHasFieldTest) {
@@ -294,9 +293,11 @@ TEST(NoFieldPresenceTest, ReflectionHasFieldTest) {
   // Test field presence of a message field on the default instance.
   const FieldDescriptor* msg_field =
       desc->FindFieldByName("optional_nested_message");
-  EXPECT_EQ(false, r->HasField(
-      proto2_nofieldpresence_unittest::TestAllTypes::
-      default_instance(), msg_field));
+  EXPECT_EQ(
+      false,
+      r->HasField(
+          proto2_nofieldpresence_unittest::TestAllTypes::default_instance(),
+          msg_field));
 
   // Fill all fields, expect everything to report true (check oneofs below).
   FillValues(&message);
@@ -418,7 +419,7 @@ TEST(NoFieldPresenceTest, DontSerializeDefaultValuesTest) {
   // check that serialized data contains only non-zero numeric fields/non-empty
   // string/byte fields.
   proto2_nofieldpresence_unittest::TestAllTypes message;
-  string output;
+  std::string output;
 
   // All default values -> no output.
   message.SerializeToString(&output);
@@ -441,7 +442,7 @@ TEST(NoFieldPresenceTest, DontSerializeDefaultValuesTest) {
   message.set_optional_string("");
   message.set_optional_bytes("");
   message.set_optional_nested_enum(
-      proto2_nofieldpresence_unittest::TestAllTypes_NestedEnum_FOO);  // first enum entry
+      proto2_nofieldpresence_unittest::TestAllTypes::FOO);  // first enum entry
   message.set_optional_foreign_enum(
       proto2_nofieldpresence_unittest::FOREIGN_FOO);  // first enum entry
 
@@ -510,7 +511,7 @@ TEST(NoFieldPresenceTest, LazyMessageFieldHasBit) {
 
   // Serialize and parse with a new message object so that lazy field on new
   // object is in unparsed state.
-  string output;
+  std::string output;
   message.SerializeToString(&output);
   proto2_nofieldpresence_unittest::TestAllTypes message2;
   message2.ParseFromString(output);
@@ -529,7 +530,7 @@ TEST(NoFieldPresenceTest, OneofPresence) {
   // oneof fields still have field presence -- ensure that this goes on the wire
   // even though its value is the empty string.
   message.set_oneof_string("");
-  string serialized;
+  std::string serialized;
   message.SerializeToString(&serialized);
   // Tag: 113 --> tag is (113 << 3) | 2 (length delimited) = 906
   // varint: 0x8a 0x07
@@ -554,8 +555,9 @@ TEST(NoFieldPresenceTest, OneofPresence) {
             message.oneof_field_case());
 
   message.Clear();
-  message.set_oneof_enum(proto2_nofieldpresence_unittest::
-                         TestAllTypes_NestedEnum_FOO);  // default value.
+  message.set_oneof_enum(
+      proto2_nofieldpresence_unittest::TestAllTypes::FOO);  // default
+                                                            // value.
   message.SerializeToString(&serialized);
   EXPECT_EQ(3, serialized.size());
   EXPECT_TRUE(message.ParseFromString(serialized));
@@ -571,4 +573,3 @@ TEST(NoFieldPresenceTest, OneofPresence) {
 }  // namespace
 }  // namespace protobuf
 }  // namespace google
-

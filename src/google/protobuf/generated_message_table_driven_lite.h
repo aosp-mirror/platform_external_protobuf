@@ -40,7 +40,6 @@
 #include <google/protobuf/metadata_lite.h>
 #include <google/protobuf/repeated_field.h>
 #include <google/protobuf/wire_format_lite.h>
-#include <google/protobuf/wire_format_lite_inl.h>
 #include <type_traits>
 
 
@@ -103,7 +102,7 @@ inline ExtensionSet* GetExtensionSet(MessageLite* msg, int64 extension_offset) {
 template <typename Type>
 inline Type* AddField(MessageLite* msg, int64 offset) {
   static_assert(std::is_pod<Type>::value ||
-                std::is_same<Type, InlinedStringField>::value,
+                    std::is_same<Type, InlinedStringField>::value,
                 "Do not assign");
 
   RepeatedField<Type>* repeated = Raw<RepeatedField<Type>>(msg, offset);
@@ -158,7 +157,7 @@ inline void SetOneofField(MessageLite* msg, uint32* oneof_case,
 // Clears a oneof field. The field argument should correspond to the particular
 // field that is currently set in the oneof.
 inline void ClearOneofField(const ParseTableField& field, Arena* arena,
-                     MessageLite* msg) {
+                            MessageLite* msg) {
   switch (field.processing_type & kTypeMask) {
     case WireFormatLite::TYPE_MESSAGE:
       if (arena == NULL) {
@@ -238,12 +237,12 @@ static inline bool HandleString(io::CodedInputStream* input, MessageLite* msg,
 
   switch (ctype) {
     case StringType_INLINED: {
-      InlinedStringField* s;
+      InlinedStringField* s = nullptr;
       switch (cardinality) {
         case Cardinality_SINGULAR:
           // TODO(ckennelly): Is this optimal?
-          s = MutableField<InlinedStringField>(
-              msg, has_bits, has_bit_index, offset);
+          s = MutableField<InlinedStringField>(msg, has_bits, has_bit_index,
+                                               offset);
           break;
         case Cardinality_REPEATED:
           s = AddField<InlinedStringField>(msg, offset);
@@ -253,7 +252,7 @@ static inline bool HandleString(io::CodedInputStream* input, MessageLite* msg,
           break;
       }
       GOOGLE_DCHECK(s != nullptr);
-      ::std::string* value = s->MutableNoArena(NULL);
+      std::string* value = s->MutableNoArena(NULL);
       if (PROTOBUF_PREDICT_FALSE(!WireFormatLite::ReadString(input, value))) {
         return false;
       }
@@ -265,8 +264,8 @@ static inline bool HandleString(io::CodedInputStream* input, MessageLite* msg,
         case Cardinality_SINGULAR: {
           ArenaStringPtr* field = MutableField<ArenaStringPtr>(
               msg, has_bits, has_bit_index, offset);
-          std::string* value =
-              field->Mutable(static_cast<const std::string*>(default_ptr), arena);
+          std::string* value = field->Mutable(
+              static_cast<const std::string*>(default_ptr), arena);
           if (PROTOBUF_PREDICT_FALSE(
                   !WireFormatLite::ReadString(input, value))) {
             return false;
@@ -283,8 +282,8 @@ static inline bool HandleString(io::CodedInputStream* input, MessageLite* msg,
         } break;
         case Cardinality_ONEOF: {
           ArenaStringPtr* field = Raw<ArenaStringPtr>(msg, offset);
-          std::string* value =
-              field->Mutable(static_cast<const std::string*>(default_ptr), arena);
+          std::string* value = field->Mutable(
+              static_cast<const std::string*>(default_ptr), arena);
           if (PROTOBUF_PREDICT_FALSE(
                   !WireFormatLite::ReadString(input, value))) {
             return false;
@@ -320,7 +319,7 @@ inline bool HandleEnum(const ParseTable& table, io::CodedInputStream* input,
 
   AuxillaryParseTableField::EnumValidator validator =
       table.aux[field_number].enums.validator;
-  if (validator(value)) {
+  if (validator == nullptr || validator(value)) {
     switch (cardinality) {
       case Cardinality_SINGULAR:
         SetField(msg, presence, presence_index, offset, value);
@@ -544,8 +543,7 @@ bool MergePartialFromCodedStreamInlined(MessageLite* msg,
         {
           Arena* const arena =
               GetArena<InternalMetadata>(msg, table.arena_offset);
-          const void* default_ptr =
-              table.aux[field_number].strings.default_ptr;
+          const void* default_ptr = table.aux[field_number].strings.default_ptr;
 
           if (PROTOBUF_PREDICT_FALSE(
                   (!HandleString<UnknownFieldHandler, Cardinality_REPEATED,
@@ -783,8 +781,8 @@ bool MergePartialFromCodedStreamInlined(MessageLite* msg,
       // TODO(ckennelly): Use a computed goto on GCC/LLVM.
       //
       // Mask out kRepeatedMask bit, allowing the jump table to be smaller.
-      switch (static_cast<WireFormatLite::FieldType>(
-          processing_type ^ kRepeatedMask)) {
+      switch (static_cast<WireFormatLite::FieldType>(processing_type ^
+                                                     kRepeatedMask)) {
 #define HANDLE_PACKED_TYPE(TYPE, CPPTYPE, CPPTYPE_METHOD)                      \
   case WireFormatLite::TYPE_##TYPE: {                                          \
     RepeatedField<CPPTYPE>* values = Raw<RepeatedField<CPPTYPE>>(msg, offset); \
@@ -836,7 +834,7 @@ bool MergePartialFromCodedStreamInlined(MessageLite* msg,
               return false;
             }
 
-            if (validator(value)) {
+            if (validator == nullptr || validator(value)) {
               values->Add(value);
             } else {
               // TODO(ckennelly): Consider caching here.

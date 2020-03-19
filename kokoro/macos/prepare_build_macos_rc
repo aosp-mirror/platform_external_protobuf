@@ -5,7 +5,11 @@
 ##
 # Select Xcode version
 
-export DEVELOPER_DIR=/Applications/Xcode_9.1.app/Contents/Developer
+# Remember to update the Xcode version when Xcode_11.3.app is not available.
+# If xcode is not available, it will probably encounter the failure for
+# "autom4te: need GNU m4 1.4 or later: /usr/bin/m4"
+# go/kokoro/userdocs/macos/selecting_xcode.md for more information.
+export DEVELOPER_DIR=/Applications/Xcode_11.3.app/Contents/Developer
 
 ##
 # Select C/C++ compilers
@@ -18,8 +22,11 @@ export CXX=g++
 
 ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 source $HOME/.rvm/scripts/rvm
-brew uninstall node icu4c
-brew install gflags gpg gpg2 node pcre ruby
+brew uninstall node icu4c cmake wget
+brew prune
+brew install gflags gpg gpg2 node openssl pcre ruby cmake wget
+sudo chown -R $(whoami) /usr/local
+brew postinstall node
 
 ##
 # Install Tox

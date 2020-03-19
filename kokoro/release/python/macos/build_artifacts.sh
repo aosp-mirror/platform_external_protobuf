@@ -5,13 +5,16 @@ set -ex
 # change to repo root
 pushd $(dirname $0)/../../../..
 
+# Create stage dir
+ORIGINAL_DIR=`pwd`
+pushd ..
+cp -R $ORIGINAL_DIR stage
+export STAGE_DIR="`pwd`/stage"
+popd
+
 export REPO_DIR=protobuf
 export BUILD_VERSION=`grep -i "version" python/google/protobuf/__init__.py | grep -o "'.*'" | tr -d "'"`
-if [ -z $KOKORO_JOB_NAME ]; then
-  export BUILD_COMMIT=master
-else
-  export BUILD_COMMIT=`echo "$KOKORO_JOB_NAME" | cut -d '/' -f 3`
-fi
+export BUILD_COMMIT=`git rev-parse HEAD`
 export PLAT=x86_64
 export UNICODE_WIDTH=32
 export MACOSX_DEPLOYMENT_TARGET=10.9
@@ -32,8 +35,8 @@ build_artifact_version() {
 
   # Clean up env
   rm -rf venv
-  sudo rm -rf protobuf
-  git clone https://github.com/google/protobuf.git
+  sudo rm -rf $REPO_DIR
+  cp -R $STAGE_DIR $REPO_DIR
   export PATH=$OLD_PATH
 
   source multibuild/common_utils.sh
@@ -47,8 +50,13 @@ build_artifact_version() {
   mv wheelhouse/* $ARTIFACT_DIR
 }
 
+export MB_PYTHON_OSX_VER=10.9
 build_artifact_version 2.7
-build_artifact_version 3.4
-build_artifact_version 3.5
 build_artifact_version 3.6
 build_artifact_version 3.7
+build_artifact_version 3.8
+
+# python OSX10.9 does not have python 3.5
+export MB_PYTHON_OSX_VER=10.6
+build_artifact_version 3.5
+

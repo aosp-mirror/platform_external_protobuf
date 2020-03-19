@@ -43,8 +43,6 @@
 #include <google/protobuf/util/internal/constants.h>
 #include <google/protobuf/util/internal/utility.h>
 #include <google/protobuf/stubs/strutil.h>
-
-
 #include <google/protobuf/stubs/map_util.h>
 #include <google/protobuf/stubs/statusor.h>
 
@@ -57,10 +55,10 @@ namespace util {
 namespace converter {
 
 using ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite;
+using std::placeholders::_1;
 using util::Status;
 using util::StatusOr;
 using util::error::INVALID_ARGUMENT;
-using std::placeholders::_1;
 
 
 ProtoStreamObjectWriter::ProtoStreamObjectWriter(
@@ -117,7 +115,7 @@ namespace {
 void SplitSecondsAndNanos(StringPiece input, StringPiece* seconds,
                           StringPiece* nanos) {
   size_t idx = input.rfind('.');
-  if (idx != string::npos) {
+  if (idx != std::string::npos) {
     *seconds = input.substr(0, idx);
     *nanos = input.substr(idx + 1);
   } else {
@@ -328,9 +326,9 @@ void ProtoStreamObjectWriter::AnyWriter::StartAny(const DataPiece& value) {
   // Figure out the type url. This is a copy-paste from WriteString but we also
   // need the value, so we can't just call through to that.
   if (value.type() == DataPiece::TYPE_STRING) {
-    type_url_ = string(value.str());
+    type_url_ = std::string(value.str());
   } else {
-    StatusOr<string> s = value.ToString();
+    StatusOr<std::string> s = value.ToString();
     if (!s.ok()) {
       parent_->InvalidValue("String", s.status().message());
       invalid_ = true;
@@ -359,9 +357,9 @@ void ProtoStreamObjectWriter::AnyWriter::StartAny(const DataPiece& value) {
 
   // Create our object writer and initialize it with the first StartObject
   // call.
-  ow_.reset(new ProtoStreamObjectWriter(
-      parent_->typeinfo(), *type, &output_, parent_->listener(),
-      parent_->options_));
+  ow_.reset(new ProtoStreamObjectWriter(parent_->typeinfo(), *type, &output_,
+                                        parent_->listener(),
+                                        parent_->options_));
 
   // Don't call StartObject() for well-known types yet. Depending on the
   // type of actual data, we may not need to call StartObject(). For
@@ -456,7 +454,7 @@ ProtoStreamObjectWriter::Item::Item(ProtoStreamObjectWriter* enclosing,
     any_.reset(new AnyWriter(ow_));
   }
   if (item_type == MAP) {
-    map_keys_.reset(new std::unordered_set<string>);
+    map_keys_.reset(new std::unordered_set<std::string>);
   }
 }
 
@@ -473,13 +471,13 @@ ProtoStreamObjectWriter::Item::Item(ProtoStreamObjectWriter::Item* parent,
     any_.reset(new AnyWriter(ow_));
   }
   if (item_type == MAP) {
-    map_keys_.reset(new std::unordered_set<string>);
+    map_keys_.reset(new std::unordered_set<std::string>);
   }
 }
 
 bool ProtoStreamObjectWriter::Item::InsertMapKeyIfNotPresent(
     StringPiece map_key) {
-  return InsertIfNotPresent(map_keys_.get(), string(map_key));
+  return InsertIfNotPresent(map_keys_.get(), std::string(map_key));
 }
 
 ProtoStreamObjectWriter* ProtoStreamObjectWriter::StartObject(
@@ -607,6 +605,12 @@ ProtoStreamObjectWriter* ProtoStreamObjectWriter::StartObject(
     Push(name, Item::MESSAGE, false, false);
     Push("struct_value", Item::MESSAGE, true, false);
     Push("fields", Item::MAP, true, true);
+    return this;
+  }
+
+  // Legacy JSON map is a list of key value pairs. Starts a map entry object.
+  if (options_.use_legacy_json_map_format && name.empty()) {
+    Push(name, IsAny(*field) ? Item::ANY : Item::MESSAGE, false, false);
     return this;
   }
 
@@ -845,6 +849,10 @@ ProtoStreamObjectWriter* ProtoStreamObjectWriter::StartList(
   }
 
   if (IsMap(*field)) {
+    if (options_.use_legacy_json_map_format) {
+      Push(name, Item::MESSAGE, false, true);
+      return this;
+    }
     InvalidValue("Map", StrCat("Cannot bind a list to map for field '",
                                      name, "'."));
     IncrementInvalidDepth();
@@ -877,9 +885,34 @@ ProtoStreamObjectWriter* ProtoStreamObjectWriter::EndList() {
 
 Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
                                                   const DataPiece& data) {
-  string struct_field_name;
+  std::string struct_field_name;
   switch (data.type()) {
-    // Our JSON parser parses numbers as either int64, uint64, or double.
+    case DataPiece::TYPE_INT32: {
+      if (ow->options_.struct_integers_as_strings) {
+        StatusOr<int32> int_value = data.ToInt32();
+        if (int_value.ok()) {
+          ow->ProtoWriter::RenderDataPiece(
+              "string_value",
+              DataPiece(SimpleDtoa(int_value.ValueOrDie()), true));
+          return Status();
+        }
+      }
+      struct_field_name = "number_value";
+      break;
+    }
+    case DataPiece::TYPE_UINT32: {
+      if (ow->options_.struct_integers_as_strings) {
+        StatusOr<uint32> int_value = data.ToUint32();
+        if (int_value.ok()) {
+          ow->ProtoWriter::RenderDataPiece(
+              "string_value",
+              DataPiece(SimpleDtoa(int_value.ValueOrDie()), true));
+          return Status();
+        }
+      }
+      struct_field_name = "number_value";
+      break;
+    }
     case DataPiece::TYPE_INT64: {
       // If the option to treat integers as strings is set, then render them as
       // strings. Otherwise, fallback to rendering them as double.
@@ -904,6 +937,19 @@ Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
           ow->ProtoWriter::RenderDataPiece(
               "string_value",
               DataPiece(StrCat(int_value.ValueOrDie()), true));
+          return Status();
+        }
+      }
+      struct_field_name = "number_value";
+      break;
+    }
+    case DataPiece::TYPE_FLOAT: {
+      if (ow->options_.struct_integers_as_strings) {
+        StatusOr<float> float_value = data.ToFloat();
+        if (float_value.ok()) {
+          ow->ProtoWriter::RenderDataPiece(
+              "string_value",
+              DataPiece(SimpleDtoa(float_value.ValueOrDie()), true));
           return Status();
         }
       }
@@ -985,9 +1031,9 @@ Status ProtoStreamObjectWriter::RenderFieldMask(ProtoStreamObjectWriter* ow,
                                data.ValueAsStringOrDefault("")));
   }
 
-// TODO(tsun): figure out how to do proto descriptor based snake case
-// conversions as much as possible. Because ToSnakeCase sometimes returns the
-// wrong value.
+  // TODO(tsun): figure out how to do proto descriptor based snake case
+  // conversions as much as possible. Because ToSnakeCase sometimes returns the
+  // wrong value.
   return DecodeCompactFieldMaskPaths(data.str(),
                                      std::bind(&RenderOneFieldPath, ow, _1));
 }
@@ -1170,13 +1216,13 @@ ProtoStreamObjectWriter* ProtoStreamObjectWriter::RenderDataPiece(
 
 // Map of functions that are responsible for rendering well known type
 // represented by the key.
-std::unordered_map<string, ProtoStreamObjectWriter::TypeRenderer>*
+std::unordered_map<std::string, ProtoStreamObjectWriter::TypeRenderer>*
     ProtoStreamObjectWriter::renderers_ = NULL;
 PROTOBUF_NAMESPACE_ID::internal::once_flag writer_renderers_init_;
 
 void ProtoStreamObjectWriter::InitRendererMap() {
-  renderers_ =
-      new std::unordered_map<string, ProtoStreamObjectWriter::TypeRenderer>();
+  renderers_ = new std::unordered_map<std::string,
+                                      ProtoStreamObjectWriter::TypeRenderer>();
   (*renderers_)["type.googleapis.com/google.protobuf.Timestamp"] =
       &ProtoStreamObjectWriter::RenderTimestamp;
   (*renderers_)["type.googleapis.com/google.protobuf.Duration"] =
@@ -1230,7 +1276,7 @@ void ProtoStreamObjectWriter::DeleteRendererMap() {
 }
 
 ProtoStreamObjectWriter::TypeRenderer*
-ProtoStreamObjectWriter::FindTypeRenderer(const string& type_url) {
+ProtoStreamObjectWriter::FindTypeRenderer(const std::string& type_url) {
   PROTOBUF_NAMESPACE_ID::internal::call_once(writer_renderers_init_,
                                              InitRendererMap);
   return FindOrNull(*renderers_, type_url);
@@ -1279,9 +1325,8 @@ void ProtoStreamObjectWriter::PopOneElement() {
 
 bool ProtoStreamObjectWriter::IsMap(const google::protobuf::Field& field) {
   if (field.type_url().empty() ||
-      field.kind() != google::protobuf::Field_Kind_TYPE_MESSAGE ||
-      field.cardinality() !=
-          google::protobuf::Field_Cardinality_CARDINALITY_REPEATED) {
+      field.kind() != google::protobuf::Field::TYPE_MESSAGE ||
+      field.cardinality() != google::protobuf::Field::CARDINALITY_REPEATED) {
     return false;
   }
   const google::protobuf::Type* field_type =

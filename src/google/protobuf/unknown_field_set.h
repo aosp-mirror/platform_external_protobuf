@@ -39,12 +39,15 @@
 #define GOOGLE_PROTOBUF_UNKNOWN_FIELD_SET_H__
 
 #include <assert.h>
+
 #include <string>
 #include <vector>
+
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/parse_context.h>
 #include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 #include <google/protobuf/message_lite.h>
 #include <google/protobuf/port.h>
 
@@ -56,20 +59,15 @@
 
 namespace google {
 namespace protobuf {
-  namespace io {
-    class CodedInputStream;         // coded_stream.h
-    class CodedOutputStream;        // coded_stream.h
-    class ZeroCopyInputStream;      // zero_copy_stream.h
-  }
-  namespace internal {
-    class InternalMetadataWithArena;  // metadata.h
-    class WireFormat;               // wire_format.h
-    class MessageSetFieldSkipperUsingCord;
-                                    // extension_set_heavy.cc
-  }
+namespace internal {
+class InternalMetadataWithArena;  // metadata.h
+class WireFormat;                 // wire_format.h
+class MessageSetFieldSkipperUsingCord;
+// extension_set_heavy.cc
+}  // namespace internal
 
-class Message;                      // message.h
-class UnknownField;                 // below
+class Message;       // message.h
+class UnknownField;  // below
 
 // An UnknownFieldSet contains fields that were encountered while parsing a
 // message but were not defined by its type.  Keeping track of these can be
@@ -125,9 +123,7 @@ class PROTOBUF_EXPORT UnknownFieldSet {
   // Version of SpaceUsed() including sizeof(*this).
   size_t SpaceUsedLong() const;
 
-  int SpaceUsed() const {
-    return internal::ToIntSize(SpaceUsedLong());
-  }
+  int SpaceUsed() const { return internal::ToIntSize(SpaceUsedLong()); }
 
   // Returns the number of fields present in the UnknownFieldSet.
   inline int field_count() const;
@@ -171,7 +167,14 @@ class PROTOBUF_EXPORT UnknownFieldSet {
     return ParseFromArray(data.data(), static_cast<int>(data.size()));
   }
 
+  // Merges this message's unknown field data (if any).  This works whether
+  // the message is a lite or full proto (for legacy reasons, lite and full
+  // return different types for MessageType::unknown_fields()).
+  template <typename MessageType>
+  bool MergeFromMessage(const MessageType& message);
+
   static const UnknownFieldSet* default_instance();
+
  private:
   // For InternalMergeFrom
   friend class UnknownField;
@@ -180,12 +183,33 @@ class PROTOBUF_EXPORT UnknownFieldSet {
   void InternalMergeFrom(const UnknownFieldSet& other);
   void ClearFallback();
 
+  template <typename MessageType,
+            typename std::enable_if<
+                std::is_base_of<Message, MessageType>::value, int>::type = 0>
+  bool InternalMergeFromMessage(const MessageType& message) {
+    MergeFrom(message.GetReflection()->GetUnknownFields(message));
+    return true;
+  }
+
+  template <typename MessageType,
+            typename std::enable_if<
+                std::is_base_of<MessageLite, MessageType>::value &&
+                    !std::is_base_of<Message, MessageType>::value,
+                int>::type = 0>
+  bool InternalMergeFromMessage(const MessageType& message) {
+    const auto& unknown_fields = message.unknown_fields();
+    io::ArrayInputStream array_stream(unknown_fields.data(),
+                                      unknown_fields.size());
+    io::CodedInputStream coded_stream(&array_stream);
+    return MergeFromCodedStream(&coded_stream);
+  }
+
   std::vector<UnknownField> fields_;
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(UnknownFieldSet);
 };
 
-#if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
 namespace internal {
+
 inline void WriteVarint(uint32 num, uint64 val, UnknownFieldSet* unknown) {
   unknown->AddVarint(num, val);
 }
@@ -195,23 +219,28 @@ inline void WriteLengthDelimited(uint32 num, StringPiece val,
 }
 
 PROTOBUF_EXPORT
-const char* PackedValidEnumParser(const char* begin, const char* end,
-                                  void* object, ParseContext* ctx);
+const char* PackedEnumParser(void* object, const char* ptr, ParseContext* ctx,
+                             bool (*is_valid)(int),
+                             InternalMetadataWithArena* unknown, int field_num);
 PROTOBUF_EXPORT
-const char* PackedValidEnumParserArg(const char* begin, const char* end,
-                                     void* object, ParseContext* ctx);
+const char* PackedEnumParserArg(void* object, const char* ptr,
+                                ParseContext* ctx,
+                                bool (*is_valid)(const void*, int),
+                                const void* data,
+                                InternalMetadataWithArena* unknown,
+                                int field_num);
+
 PROTOBUF_EXPORT
-const char* UnknownGroupParse(const char* begin, const char* end, void* object,
+const char* UnknownGroupParse(UnknownFieldSet* unknown, const char* ptr,
                               ParseContext* ctx);
 PROTOBUF_EXPORT
-std::pair<const char*, bool> UnknownFieldParse(uint64 tag, ParseClosure parent,
-                                               const char* begin,
-                                               const char* end,
-                                               UnknownFieldSet* unknown,
-                                               ParseContext* ctx);
+const char* UnknownFieldParse(uint64 tag, UnknownFieldSet* unknown,
+                              const char* ptr, ParseContext* ctx);
+PROTOBUF_EXPORT
+const char* UnknownFieldParse(uint32 tag, InternalMetadataWithArena* metadata,
+                              const char* ptr, ParseContext* ctx);
 
 }  // namespace internal
-#endif  // GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
 
 // Represents one field in an UnknownFieldSet.
 class PROTOBUF_EXPORT UnknownField {
@@ -250,10 +279,14 @@ class PROTOBUF_EXPORT UnknownField {
   // These methods can take advantage of the underlying implementation and may
   // archieve a better performance than using getters to retrieve the data and
   // do the serialization yourself.
-  void SerializeLengthDelimitedNoTag(io::CodedOutputStream* output) const;
-  uint8* SerializeLengthDelimitedNoTagToArray(uint8* target) const;
+  void SerializeLengthDelimitedNoTag(io::CodedOutputStream* output) const {
+    output->SetCur(InternalSerializeLengthDelimitedNoTag(output->Cur(),
+                                                         output->EpsCopy()));
+  }
 
   inline size_t GetLengthDelimitedSize() const;
+  uint8* InternalSerializeLengthDelimitedNoTag(
+      uint8* target, io::EpsCopyOutputStream* stream) const;
 
 
   // If this UnknownField contains a pointer, delete it.
@@ -267,7 +300,7 @@ class PROTOBUF_EXPORT UnknownField {
   inline void SetType(Type type);
 
   union LengthDelimited {
-    std::string* string_value_;
+    std::string* string_value;
   };
 
   uint32 number_;
@@ -296,9 +329,7 @@ inline void UnknownFieldSet::Clear() {
   }
 }
 
-inline bool UnknownFieldSet::empty() const {
-  return fields_.empty();
-}
+inline bool UnknownFieldSet::empty() const { return fields_.empty(); }
 
 inline void UnknownFieldSet::Swap(UnknownFieldSet* x) {
   fields_.swap(x->fields_);
@@ -314,8 +345,8 @@ inline UnknownField* UnknownFieldSet::mutable_field(int index) {
   return &(fields_)[static_cast<size_t>(index)];
 }
 
-inline void UnknownFieldSet::AddLengthDelimited(
-    int number, const std::string& value) {
+inline void UnknownFieldSet::AddLengthDelimited(int number,
+                                                const std::string& value) {
   AddLengthDelimited(number)->assign(value);
 }
 
@@ -341,7 +372,7 @@ inline uint64 UnknownField::fixed64() const {
 }
 inline const std::string& UnknownField::length_delimited() const {
   assert(type() == TYPE_LENGTH_DELIMITED);
-  return *data_.length_delimited_.string_value_;
+  return *data_.length_delimited_.string_value;
 }
 inline const UnknownFieldSet& UnknownField::group() const {
   assert(type() == TYPE_GROUP);
@@ -362,20 +393,26 @@ inline void UnknownField::set_fixed64(uint64 value) {
 }
 inline void UnknownField::set_length_delimited(const std::string& value) {
   assert(type() == TYPE_LENGTH_DELIMITED);
-  data_.length_delimited_.string_value_->assign(value);
+  data_.length_delimited_.string_value->assign(value);
 }
 inline std::string* UnknownField::mutable_length_delimited() {
   assert(type() == TYPE_LENGTH_DELIMITED);
-  return data_.length_delimited_.string_value_;
+  return data_.length_delimited_.string_value;
 }
 inline UnknownFieldSet* UnknownField::mutable_group() {
   assert(type() == TYPE_GROUP);
   return data_.group_;
 }
+template <typename MessageType>
+bool UnknownFieldSet::MergeFromMessage(const MessageType& message) {
+  // SFINAE will route to the right version.
+  return InternalMergeFromMessage(message);
+}
+
 
 inline size_t UnknownField::GetLengthDelimitedSize() const {
   GOOGLE_DCHECK_EQ(TYPE_LENGTH_DELIMITED, type());
-  return data_.length_delimited_.string_value_->size();
+  return data_.length_delimited_.string_value->size();
 }
 
 inline void UnknownField::SetType(Type type) {

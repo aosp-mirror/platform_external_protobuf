@@ -37,6 +37,7 @@
 #include <unordered_set>
 
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/type.pb.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/descriptor.h>
@@ -50,21 +51,6 @@
 #include <google/protobuf/stubs/hash.h>
 
 #include <google/protobuf/port_def.inc>
-
-namespace google {
-namespace protobuf {
-namespace io {
-class CodedOutputStream;
-}  // namespace io
-}  // namespace protobuf
-}  // namespace google
-
-namespace google {
-namespace protobuf {
-class Type;
-class Field;
-}  // namespace protobuf
-}  // namespace google
 
 namespace google {
 namespace protobuf {
@@ -111,14 +97,17 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
     // value type is google.protobuf.NullType.
     bool ignore_null_value_map_entry;
 
+    // If true, accepts repeated key/value pair for a map proto field.
+    bool use_legacy_json_map_format;
+
     Options()
         : struct_integers_as_strings(false),
           ignore_unknown_fields(false),
           ignore_unknown_enum_values(false),
           use_lower_camel_for_enums(false),
-          // TODO(haon): Change this to false by default.
-          case_insensitive_enum_parsing(true),
-          ignore_null_value_map_entry(false) {}
+          case_insensitive_enum_parsing(false),
+          ignore_null_value_map_entry(false),
+          use_legacy_json_map_format(false) {}
 
     // Default instance of Options with all options set to defaults.
     static const Options& Defaults() {

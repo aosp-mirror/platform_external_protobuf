@@ -44,24 +44,9 @@ namespace compiler {
 namespace cpp {
 
 namespace {
-
-// When we are generating code for implicit weak fields, we need to insert some
-// additional casts. These functions return the casted expression if
-// implicit_weak_field is true but otherwise return the original expression.
-// Ordinarily a static_cast is enough to cast google::protobuf::MessageLite* to a class
-// deriving from it, but we need a reinterpret_cast in cases where the generated
-// message is forward-declared but its full definition is not visible.
-string StaticCast(const string& type, const string& expression,
-                  bool implicit_weak_field) {
-  if (implicit_weak_field) {
-    return "static_cast< " + type + " >(" + expression + ")";
-  } else {
-    return expression;
-  }
-}
-
-string ReinterpretCast(const string& type, const string& expression,
-                       bool implicit_weak_field) {
+std::string ReinterpretCast(const std::string& type,
+                            const std::string& expression,
+                            bool implicit_weak_field) {
   if (implicit_weak_field) {
     return "reinterpret_cast< " + type + " >(" + expression + ")";
   } else {
@@ -71,27 +56,24 @@ string ReinterpretCast(const string& type, const string& expression,
 
 void SetMessageVariables(const FieldDescriptor* descriptor,
                          const Options& options, bool implicit_weak,
-                         std::map<string, string>* variables) {
+                         std::map<std::string, std::string>* variables) {
   SetCommonFieldVariables(descriptor, variables, options);
-  (*variables)["type"] = FieldMessageTypeName(descriptor);
+  (*variables)["type"] = FieldMessageTypeName(descriptor, options);
   (*variables)["casted_member"] = ReinterpretCast(
       (*variables)["type"] + "*", (*variables)["name"] + "_", implicit_weak);
   (*variables)["type_default_instance"] =
-      DefaultInstanceName(descriptor->message_type());
+      QualifiedDefaultInstanceName(descriptor->message_type(), options);
+  (*variables)["type_default_instance_ptr"] =
+      QualifiedDefaultInstancePtr(descriptor->message_type(), options);
   (*variables)["type_reference_function"] =
       implicit_weak
-          ? ("  " + ReferenceFunctionName(descriptor->message_type()) + "();\n")
+          ? ("  " + (*variables)["proto_ns"] + "::internal::StrongReference(" +
+             (*variables)["type_default_instance"] + ");\n")
           : "";
-  (*variables)["stream_writer"] =
-      (*variables)["declared_type"] +
-      (HasFastArraySerialization(descriptor->message_type()->file(), options)
-           ? "MaybeToArray"
-           : "");
   // NOTE: Escaped here to unblock proto1->proto2 migration.
   // TODO(liujisi): Extend this to apply for other conflicting methods.
   (*variables)["release_name"] =
-      SafeFunctionName(descriptor->containing_type(),
-                       descriptor, "release_");
+      SafeFunctionName(descriptor->containing_type(), descriptor, "release_");
   (*variables)["full_name"] = descriptor->full_name();
 }
 
@@ -110,8 +92,7 @@ MessageFieldGenerator::MessageFieldGenerator(const FieldDescriptor* descriptor,
 
 MessageFieldGenerator::~MessageFieldGenerator() {}
 
-void MessageFieldGenerator::
-GeneratePrivateMembers(io::Printer* printer) const {
+void MessageFieldGenerator::GeneratePrivateMembers(io::Printer* printer) const {
   Formatter format(printer, variables_);
   if (implicit_weak_field_) {
     format("::$proto_ns$::MessageLite* $name$_;\n");
@@ -120,15 +101,19 @@ GeneratePrivateMembers(io::Printer* printer) const {
   }
 }
 
-void MessageFieldGenerator::
-GenerateAccessorDeclarations(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateAccessorDeclarations(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
       "$deprecated_attr$const $type$& ${1$$name$$}$() const;\n"
       "$deprecated_attr$$type$* ${1$$release_name$$}$();\n"
       "$deprecated_attr$$type$* ${1$mutable_$name$$}$();\n"
       "$deprecated_attr$void ${1$set_allocated_$name$$}$"
-      "($type$* $name$);\n",
+      "($type$* $name$);\n"
+      "private:\n"
+      "const $type$& ${1$_internal_$name$$}$() const;\n"
+      "$type$* ${1$_internal_mutable_$name$$}$();\n"
+      "public:\n",
       descriptor_);
   if (SupportsArenas(descriptor_)) {
     format(
@@ -147,6 +132,7 @@ void MessageFieldGenerator::GenerateNonInlineAccessorDefinitions(
     format(
         "void $classname$::unsafe_arena_set_allocated_$name$(\n"
         "    $type$* $name$) {\n"
+        "$annotate_accessor$"
         // If we're not on an arena, free whatever we were holding before.
         // (If we are on arena, we can just forget the earlier pointer.)
         "  if (GetArenaNoVirtual() == nullptr) {\n"
@@ -164,49 +150,48 @@ void MessageFieldGenerator::GenerateNonInlineAccessorDefinitions(
   }
 }
 
-void MessageFieldGenerator::
-GenerateInlineAccessorDefinitions(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateInlineAccessorDefinitions(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
-      "inline const $type$& $classname$::$name$() const {\n"
+      "inline const $type$& $classname$::_internal_$name$() const {\n"
+      "$type_reference_function$"
       "  const $type$* p = $casted_member$;\n"
-      "  // @@protoc_insertion_point(field_get:$full_name$)\n"
       "  return p != nullptr ? *p : *reinterpret_cast<const $type$*>(\n"
       "      &$type_default_instance$);\n"
+      "}\n"
+      "inline const $type$& $classname$::$name$() const {\n"
+      "$annotate_accessor$"
+      "  // @@protoc_insertion_point(field_get:$full_name$)\n"
+      "  return _internal_$name$();\n"
       "}\n");
 
+  if (SupportsArenas(descriptor_)) {
+    format(
+        "inline $type$* $classname$::$release_name$() {\n"
+        "  auto temp = unsafe_arena_release_$name$();\n"
+        "  if (GetArenaNoVirtual() != nullptr) {\n"
+        "    temp = ::$proto_ns$::internal::DuplicateIfNonNull(temp);\n"
+        "  }\n"
+        "  return temp;\n"
+        "}\n"
+        "inline $type$* $classname$::unsafe_arena_release_$name$() {\n");
+  } else {
+    format("inline $type$* $classname$::$release_name$() {\n");
+  }
   format(
-      "inline $type$* $classname$::$release_name$() {\n"
+      "$annotate_accessor$"
       "  // @@protoc_insertion_point(field_release:$full_name$)\n"
       "$type_reference_function$"
       "  $clear_hasbit$\n"
-      "  $type$* temp = $casted_member$;\n");
-  if (SupportsArenas(descriptor_)) {
-    format(
-        "  if (GetArenaNoVirtual() != nullptr) {\n"
-        "    temp = ::$proto_ns$::internal::DuplicateIfNonNull(temp);\n"
-        "  }\n");
-  }
-  format(
+      "  $type$* temp = $casted_member$;\n"
       "  $name$_ = nullptr;\n"
       "  return temp;\n"
       "}\n");
 
-  if (SupportsArenas(descriptor_)) {
-    format(
-        "inline $type$* $classname$::unsafe_arena_release_$name$() {\n"
-        "  // "
-        "@@protoc_insertion_point(field_unsafe_arena_release:$full_name$)\n"
-        "$type_reference_function$"
-        "  $clear_hasbit$\n"
-        "  $type$* temp = $casted_member$;\n"
-        "  $name$_ = nullptr;\n"
-        "  return temp;\n"
-        "}\n");
-  }
-
   format(
-      "inline $type$* $classname$::mutable_$name$() {\n"
+      "inline $type$* $classname$::_internal_mutable_$name$() {\n"
+      "$type_reference_function$"
       "  $set_hasbit$\n"
       "  if ($name$_ == nullptr) {\n"
       "    auto* p = CreateMaybeMessage<$type$>(GetArenaNoVirtual());\n");
@@ -217,14 +202,19 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
   }
   format(
       "  }\n"
-      "  // @@protoc_insertion_point(field_mutable:$full_name$)\n"
       "  return $casted_member$;\n"
+      "}\n"
+      "inline $type$* $classname$::mutable_$name$() {\n"
+      "$annotate_accessor$"
+      "  // @@protoc_insertion_point(field_mutable:$full_name$)\n"
+      "  return _internal_mutable_$name$();\n"
       "}\n");
 
   // We handle the most common case inline, and delegate less common cases to
   // the slow fallback function.
   format(
       "inline void $classname$::set_allocated_$name$($type$* $name$) {\n"
+      "$annotate_accessor$"
       "  ::$proto_ns$::Arena* message_arena = GetArenaNoVirtual();\n");
   format("  if (message_arena == nullptr) {\n");
   if (IsCrossFileMessage(descriptor_)) {
@@ -270,8 +260,8 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
       "}\n");
 }
 
-void MessageFieldGenerator::
-GenerateInternalAccessorDeclarations(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateInternalAccessorDeclarations(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   if (implicit_weak_field_) {
     format(
@@ -284,9 +274,9 @@ GenerateInternalAccessorDeclarations(io::Printer* printer) const {
   }
 }
 
-void MessageFieldGenerator::
-GenerateInternalAccessorDefinitions(io::Printer* printer) const {
-  // In theory, these accessors could be inline in HasBitSetters. However, in
+void MessageFieldGenerator::GenerateInternalAccessorDefinitions(
+    io::Printer* printer) const {
+  // In theory, these accessors could be inline in _Internal. However, in
   // practice, the linker is then not able to throw them out making implicit
   // weak dependencies not work at all.
   Formatter format(printer, variables_);
@@ -295,13 +285,13 @@ GenerateInternalAccessorDefinitions(io::Printer* printer) const {
     // MergePartialFromCodedStream, and their purpose is to provide access to
     // the field without creating a strong dependency on the message type.
     format(
-        "const ::$proto_ns$::MessageLite& $classname$::HasBitSetters::$name$(\n"
+        "const ::$proto_ns$::MessageLite& $classname$::_Internal::$name$(\n"
         "    const $classname$* msg) {\n"
         "  if (msg->$name$_ != nullptr) {\n"
         "    return *msg->$name$_;\n"
-        "  } else if (&$type_default_instance$ != nullptr) {\n"
+        "  } else if ($type_default_instance_ptr$ != nullptr) {\n"
         "    return *reinterpret_cast<const ::$proto_ns$::MessageLite*>(\n"
-        "        &$type_default_instance$);\n"
+        "        $type_default_instance_ptr$);\n"
         "  } else {\n"
         "    return "
         "*::$proto_ns$::internal::ImplicitWeakMessage::default_instance();\n"
@@ -310,20 +300,20 @@ GenerateInternalAccessorDefinitions(io::Printer* printer) const {
     if (SupportsArenas(descriptor_)) {
       format(
           "::$proto_ns$::MessageLite*\n"
-          "$classname$::HasBitSetters::mutable_$name$($classname$* msg) {\n");
+          "$classname$::_Internal::mutable_$name$($classname$* msg) {\n");
       if (HasFieldPresence(descriptor_->file())) {
         format("  msg->$set_hasbit$\n");
       }
       format(
           "  if (msg->$name$_ == nullptr) {\n"
-          "    if (&$type_default_instance$ == nullptr) {\n"
+          "    if ($type_default_instance_ptr$ == nullptr) {\n"
           "      msg->$name$_ = ::$proto_ns$::Arena::CreateMessage<\n"
           "          ::$proto_ns$::internal::ImplicitWeakMessage>(\n"
           "              msg->GetArenaNoVirtual());\n"
           "    } else {\n"
           "      msg->$name$_ = reinterpret_cast<const "
           "::$proto_ns$::MessageLite*>(\n"
-          "          &$type_default_instance$)->New("
+          "          $type_default_instance_ptr$)->New("
           "msg->GetArenaNoVirtual());\n"
           "    }\n"
           "  }\n"
@@ -332,19 +322,19 @@ GenerateInternalAccessorDefinitions(io::Printer* printer) const {
     } else {
       format(
           "::$proto_ns$::MessageLite*\n"
-          "$classname$::HasBitSetters::mutable_$name$($classname$* msg) {\n");
+          "$classname$::_Internal::mutable_$name$($classname$* msg) {\n");
       if (HasFieldPresence(descriptor_->file())) {
         format("  msg->$set_hasbit$\n");
       }
       format(
           "  if (msg->$name$_ == nullptr) {\n"
-          "    if (&$type_default_instance$ == nullptr) {\n"
+          "    if ($type_default_instance_ptr$ == nullptr) {\n"
           "      msg->$name$_ = "
           "new ::$proto_ns$::internal::ImplicitWeakMessage;\n"
           "    } else {\n"
           "      msg->$name$_ = "
           "reinterpret_cast<const ::$proto_ns$::MessageLite*>(\n"
-          "          &$type_default_instance$)->New();\n"
+          "          $type_default_instance_ptr$)->New();\n"
           "    }\n"
           "  }\n"
           "  return msg->$name$_;\n"
@@ -356,14 +346,13 @@ GenerateInternalAccessorDefinitions(io::Printer* printer) const {
     // message fields under serialize.
     format(
         "const $type$&\n"
-        "$classname$::HasBitSetters::$name$(const $classname$* msg) {\n"
+        "$classname$::_Internal::$name$(const $classname$* msg) {\n"
         "  return *msg->$field_member$;\n"
         "}\n");
   }
 }
 
-void MessageFieldGenerator::
-GenerateClearingCode(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateClearingCode(io::Printer* printer) const {
   Formatter format(printer, variables_);
   if (!HasFieldPresence(descriptor_->file())) {
     // If we don't have has-bits, message presence is indicated only by ptr !=
@@ -378,8 +367,8 @@ GenerateClearingCode(io::Printer* printer) const {
   }
 }
 
-void MessageFieldGenerator::
-GenerateMessageClearingCode(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateMessageClearingCode(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   if (!HasFieldPresence(descriptor_->file())) {
     // If we don't have has-bits, message presence is indicated only by ptr !=
@@ -396,26 +385,25 @@ GenerateMessageClearingCode(io::Printer* printer) const {
   }
 }
 
-void MessageFieldGenerator::
-GenerateMergingCode(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateMergingCode(io::Printer* printer) const {
   Formatter format(printer, variables_);
   if (implicit_weak_field_) {
     format(
-        "HasBitSetters::mutable_$name$(this)->CheckTypeAndMergeFrom(\n"
-        "    HasBitSetters::$name$(&from));\n");
+        "_Internal::mutable_$name$(this)->CheckTypeAndMergeFrom(\n"
+        "    _Internal::$name$(&from));\n");
   } else {
-    format("mutable_$name$()->$type$::MergeFrom(from.$name$());\n");
+    format(
+        "_internal_mutable_$name$()->$type$::MergeFrom(from._internal_$name$())"
+        ";\n");
   }
 }
 
-void MessageFieldGenerator::
-GenerateSwappingCode(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateSwappingCode(io::Printer* printer) const {
   Formatter format(printer, variables_);
   format("swap($name$_, other->$name$_);\n");
 }
 
-void MessageFieldGenerator::
-GenerateDestructorCode(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateDestructorCode(io::Printer* printer) const {
   Formatter format(printer, variables_);
   if (options_.opensource_runtime) {
     // TODO(gerbens) Remove this when we don't need to destruct default
@@ -428,60 +416,34 @@ GenerateDestructorCode(io::Printer* printer) const {
   format("delete $name$_;\n");
 }
 
-void MessageFieldGenerator::
-GenerateConstructorCode(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateConstructorCode(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format("$name$_ = nullptr;\n");
 }
 
-void MessageFieldGenerator::
-GenerateCopyConstructorCode(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateCopyConstructorCode(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
-      "if (from.has_$name$()) {\n"
+      "if (from._internal_has_$name$()) {\n"
       "  $name$_ = new $type$(*from.$name$_);\n"
       "} else {\n"
       "  $name$_ = nullptr;\n"
       "}\n");
 }
 
-void MessageFieldGenerator::
-GenerateMergeFromCodedStream(io::Printer* printer) const {
-  Formatter format(printer, variables_);
-  if (implicit_weak_field_) {
-    format(
-        "DO_(::$proto_ns$::internal::WireFormatLite::ReadMessage(\n"
-        "     input, HasBitSetters::mutable_$name$(this)));\n");
-  } else if (descriptor_->type() == FieldDescriptor::TYPE_MESSAGE) {
-    format(
-        "DO_(::$proto_ns$::internal::WireFormatLite::ReadMessage(\n"
-        "     input, mutable_$name$()));\n");
-  } else {
-    format(
-        "DO_(::$proto_ns$::internal::WireFormatLite::ReadGroup(\n"
-        "      $number$, input, mutable_$name$()));\n");
-  }
-}
-
-void MessageFieldGenerator::
-GenerateSerializeWithCachedSizes(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateSerializeWithCachedSizesToArray(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
-      "::$proto_ns$::internal::WireFormatLite::Write$stream_writer$(\n"
-      "  $number$, HasBitSetters::$name$(this), output);\n");
-}
-
-void MessageFieldGenerator::
-GenerateSerializeWithCachedSizesToArray(io::Printer* printer) const {
-  Formatter format(printer, variables_);
-  format(
+      "target = stream->EnsureSpace(target);\n"
       "target = ::$proto_ns$::internal::WireFormatLite::\n"
-      "  InternalWrite$declared_type$ToArray(\n"
-      "    $number$, HasBitSetters::$name$(this), target);\n");
+      "  InternalWrite$declared_type$(\n"
+      "    $number$, _Internal::$name$(this), target, stream);\n");
 }
 
-void MessageFieldGenerator::
-GenerateByteSize(io::Printer* printer) const {
+void MessageFieldGenerator::GenerateByteSize(io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
       "total_size += $tag_size$ +\n"
@@ -505,6 +467,7 @@ void MessageOneofFieldGenerator::GenerateNonInlineAccessorDefinitions(
   Formatter format(printer, variables_);
   format(
       "void $classname$::set_allocated_$name$($type$* $name$) {\n"
+      "$annotate_accessor$"
       "  ::$proto_ns$::Arena* message_arena = GetArenaNoVirtual();\n"
       "  clear_$oneof_name$();\n"
       "  if ($name$) {\n");
@@ -535,13 +498,14 @@ void MessageOneofFieldGenerator::GenerateNonInlineAccessorDefinitions(
       "}\n");
 }
 
-void MessageOneofFieldGenerator::
-GenerateInlineAccessorDefinitions(io::Printer* printer) const {
+void MessageOneofFieldGenerator::GenerateInlineAccessorDefinitions(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
       "inline $type$* $classname$::$release_name$() {\n"
+      "$annotate_accessor$"
       "  // @@protoc_insertion_point(field_release:$full_name$)\n"
-      "  if (has_$name$()) {\n"
+      "  if (_internal_has_$name$()) {\n"
       "    clear_has_$oneof_name$();\n"
       "      $type$* temp = $field_member$;\n");
   if (SupportsArenas(descriptor_)) {
@@ -559,19 +523,24 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
       "}\n");
 
   format(
-      "inline const $type$& $classname$::$name$() const {\n"
-      "  // @@protoc_insertion_point(field_get:$full_name$)\n"
-      "  return has_$name$()\n"
+      "inline const $type$& $classname$::_internal_$name$() const {\n"
+      "  return _internal_has_$name$()\n"
       "      ? *$field_member$\n"
       "      : *reinterpret_cast< $type$*>(&$type_default_instance$);\n"
+      "}\n"
+      "inline const $type$& $classname$::$name$() const {\n"
+      "$annotate_accessor$"
+      "  // @@protoc_insertion_point(field_get:$full_name$)\n"
+      "  return _internal_$name$();\n"
       "}\n");
 
   if (SupportsArenas(descriptor_)) {
     format(
         "inline $type$* $classname$::unsafe_arena_release_$name$() {\n"
+        "$annotate_accessor$"
         "  // @@protoc_insertion_point(field_unsafe_arena_release"
         ":$full_name$)\n"
-        "  if (has_$name$()) {\n"
+        "  if (_internal_has_$name$()) {\n"
         "    clear_has_$oneof_name$();\n"
         "    $type$* temp = $field_member$;\n"
         "    $field_member$ = nullptr;\n"
@@ -582,6 +551,7 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
         "}\n"
         "inline void $classname$::unsafe_arena_set_allocated_$name$"
         "($type$* $name$) {\n"
+        "$annotate_accessor$"
         // We rely on the oneof clear method to free the earlier contents of
         // this oneof. We can directly use the pointer we're given to set the
         // new value.
@@ -596,20 +566,24 @@ GenerateInlineAccessorDefinitions(io::Printer* printer) const {
   }
 
   format(
-      "inline $type$* $classname$::mutable_$name$() {\n"
-      "  if (!has_$name$()) {\n"
+      "inline $type$* $classname$::_internal_mutable_$name$() {\n"
+      "  if (!_internal_has_$name$()) {\n"
       "    clear_$oneof_name$();\n"
       "    set_has_$name$();\n"
       "    $field_member$ = CreateMaybeMessage< $type$ >(\n"
       "        GetArenaNoVirtual());\n"
       "  }\n"
-      "  // @@protoc_insertion_point(field_mutable:$full_name$)\n"
       "  return $field_member$;\n"
+      "}\n"
+      "inline $type$* $classname$::mutable_$name$() {\n"
+      "$annotate_accessor$"
+      "  // @@protoc_insertion_point(field_mutable:$full_name$)\n"
+      "  return _internal_mutable_$name$();\n"
       "}\n");
 }
 
-void MessageOneofFieldGenerator::
-GenerateClearingCode(io::Printer* printer) const {
+void MessageOneofFieldGenerator::GenerateClearingCode(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   if (SupportsArenas(descriptor_)) {
     format(
@@ -621,24 +595,24 @@ GenerateClearingCode(io::Printer* printer) const {
   }
 }
 
-void MessageOneofFieldGenerator::
-GenerateMessageClearingCode(io::Printer* printer) const {
+void MessageOneofFieldGenerator::GenerateMessageClearingCode(
+    io::Printer* printer) const {
   GenerateClearingCode(printer);
 }
 
-void MessageOneofFieldGenerator::
-GenerateSwappingCode(io::Printer* printer) const {
+void MessageOneofFieldGenerator::GenerateSwappingCode(
+    io::Printer* printer) const {
   // Don't print any swapping code. Swapping the union will swap this field.
 }
 
-void MessageOneofFieldGenerator::
-GenerateDestructorCode(io::Printer* printer) const {
+void MessageOneofFieldGenerator::GenerateDestructorCode(
+    io::Printer* printer) const {
   // We inherit from MessageFieldGenerator, so we need to override the default
   // behavior.
 }
 
-void MessageOneofFieldGenerator::
-GenerateConstructorCode(io::Printer* printer) const {
+void MessageOneofFieldGenerator::GenerateConstructorCode(
+    io::Printer* printer) const {
   // Don't print any constructor code. The field is in a union. We allocate
   // space only when this field is used.
 }
@@ -656,19 +630,27 @@ RepeatedMessageFieldGenerator::RepeatedMessageFieldGenerator(
 
 RepeatedMessageFieldGenerator::~RepeatedMessageFieldGenerator() {}
 
-void RepeatedMessageFieldGenerator::
-GeneratePrivateMembers(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GeneratePrivateMembers(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
-  format("::$proto_ns$::RepeatedPtrField< $type$ > $name$_;\n");
+  if (implicit_weak_field_) {
+    format("::$proto_ns$::WeakRepeatedPtrField< $type$ > $name$_;\n");
+  } else {
+    format("::$proto_ns$::RepeatedPtrField< $type$ > $name$_;\n");
+  }
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateAccessorDeclarations(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateAccessorDeclarations(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
       "$deprecated_attr$$type$* ${1$mutable_$name$$}$(int index);\n"
       "$deprecated_attr$::$proto_ns$::RepeatedPtrField< $type$ >*\n"
       "    ${1$mutable_$name$$}$();\n"
+      "private:\n"
+      "const $type$& ${1$_internal_$name$$}$(int index) const;\n"
+      "$type$* ${1$_internal_add_$name$$}$();\n"
+      "public:\n"
       "$deprecated_attr$const $type$& ${1$$name$$}$(int index) const;\n"
       "$deprecated_attr$$type$* ${1$add_$name$$}$();\n"
       "$deprecated_attr$const ::$proto_ns$::RepeatedPtrField< $type$ >&\n"
@@ -676,170 +658,125 @@ GenerateAccessorDeclarations(io::Printer* printer) const {
       descriptor_);
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateInlineAccessorDefinitions(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateInlineAccessorDefinitions(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
+  format.Set("weak", implicit_weak_field_ ? ".weak" : "");
+
   format(
       "inline $type$* $classname$::mutable_$name$(int index) {\n"
+      "$annotate_accessor$"
       // TODO(dlj): move insertion points
       "  // @@protoc_insertion_point(field_mutable:$full_name$)\n"
       "$type_reference_function$"
-      "  return $name$_.Mutable(index);\n"
+      "  return $name$_$weak$.Mutable(index);\n"
       "}\n"
       "inline ::$proto_ns$::RepeatedPtrField< $type$ >*\n"
       "$classname$::mutable_$name$() {\n"
+      "$annotate_accessor$"
       "  // @@protoc_insertion_point(field_mutable_list:$full_name$)\n"
       "$type_reference_function$"
-      "  return &$name$_;\n"
+      "  return &$name$_$weak$;\n"
       "}\n");
 
   if (options_.safe_boundary_check) {
     format(
-        "inline const $type$& $classname$::$name$(int index) const {\n"
-        "  // @@protoc_insertion_point(field_get:$full_name$)\n"
-        "  return $name$_.InternalCheckedGet(index,\n"
+        "inline const $type$& $classname$::_internal_$name$(int index) const "
+        "{\n"
+        "  return $name$_$weak$.InternalCheckedGet(index,\n"
         "      *reinterpret_cast<const $type$*>(&$type_default_instance$));\n"
         "}\n");
   } else {
     format(
-        "inline const $type$& $classname$::$name$(int index) const {\n"
-        "  // @@protoc_insertion_point(field_get:$full_name$)\n"
+        "inline const $type$& $classname$::_internal_$name$(int index) const "
+        "{\n"
         "$type_reference_function$"
-        "  return $name$_.Get(index);\n"
+        "  return $name$_$weak$.Get(index);\n"
         "}\n");
   }
 
   format(
+      "inline const $type$& $classname$::$name$(int index) const {\n"
+      "$annotate_accessor$"
+      "  // @@protoc_insertion_point(field_get:$full_name$)\n"
+      "  return _internal_$name$(index);\n"
+      "}\n"
+      "inline $type$* $classname$::_internal_add_$name$() {\n"
+      "  return $name$_$weak$.Add();\n"
+      "}\n"
       "inline $type$* $classname$::add_$name$() {\n"
+      "$annotate_accessor$"
       "  // @@protoc_insertion_point(field_add:$full_name$)\n"
-      "  return $name$_.Add();\n"
+      "  return _internal_add_$name$();\n"
       "}\n");
 
   format(
       "inline const ::$proto_ns$::RepeatedPtrField< $type$ >&\n"
       "$classname$::$name$() const {\n"
+      "$annotate_accessor$"
       "  // @@protoc_insertion_point(field_list:$full_name$)\n"
       "$type_reference_function$"
-      "  return $name$_;\n"
+      "  return $name$_$weak$;\n"
       "}\n");
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateClearingCode(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateClearingCode(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
-  if (implicit_weak_field_) {
-    format(
-        "CastToBase(&$name$_)->Clear<"
-        "::$proto_ns$::internal::ImplicitWeakTypeHandler<$type$>>();\n");
-  } else {
-    format("$name$_.Clear();\n");
-  }
+  format("$name$_.Clear();\n");
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateMergingCode(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateMergingCode(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
-  if (implicit_weak_field_) {
-    format(
-        "CastToBase(&$name$_)->MergeFrom<"
-        "::$proto_ns$::internal::ImplicitWeakTypeHandler<$type$>>(CastToBase("
-        "from.$name$_));\n");
-  } else {
-    format("$name$_.MergeFrom(from.$name$_);\n");
-  }
+  format("$name$_.MergeFrom(from.$name$_);\n");
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateSwappingCode(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateSwappingCode(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
-  format("CastToBase(&$name$_)->InternalSwap(CastToBase(&other->$name$_));\n");
+  format("$name$_.InternalSwap(&other->$name$_);\n");
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateConstructorCode(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateConstructorCode(
+    io::Printer* printer) const {
   // Not needed for repeated fields.
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateMergeFromCodedStream(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateSerializeWithCachedSizesToArray(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
-  if (descriptor_->type() == FieldDescriptor::TYPE_MESSAGE) {
-    if (implicit_weak_field_) {
-      format(
-          "DO_(::$proto_ns$::internal::WireFormatLite::"
-          "ReadMessage(input, CastToBase(&$name$_)->AddWeak(\n"
-          "    reinterpret_cast<const ::$proto_ns$::MessageLite*>(\n"
-          "        &$type_default_instance$))));\n");
-    } else {
-      format(
-          "DO_(::$proto_ns$::internal::WireFormatLite::"
-          "ReadMessage(\n"
-          "      input, add_$name$()));\n");
-    }
-  } else {
-    format(
-        "DO_(::$proto_ns$::internal::WireFormatLite::"
-        "ReadGroup($number$, input, add_$name$()));\n");
-  }
-}
-
-void RepeatedMessageFieldGenerator::
-GenerateSerializeWithCachedSizes(io::Printer* printer) const {
-  Formatter format(printer, variables_);
-  format(
-      "for (unsigned int i = 0,\n"
-      "    n = static_cast<unsigned int>(this->$name$_size()); i < n; i++) {\n"
-      "  ::$proto_ns$::internal::WireFormatLite::Write$stream_writer$(\n"
-      "    $number$,\n");
   if (implicit_weak_field_) {
     format(
-        "    CastToBase($name$_).Get<"
-        "::$proto_ns$::internal::ImplicitWeakTypeHandler<$type$>>("
-        "static_cast<int>(i)),\n");
+        "for (auto it = this->$name$_.pointer_begin(),\n"
+        "          end = this->$name$_.pointer_end(); it < end; ++it) {\n"
+        "  target = stream->EnsureSpace(target);\n"
+        "  target = ::$proto_ns$::internal::WireFormatLite::\n"
+        "    InternalWrite$declared_type$($number$, **it, target, stream);\n"
+        "}\n");
   } else {
-    format("    this->$name$(static_cast<int>(i)),\n");
+    format(
+        "for (unsigned int i = 0,\n"
+        "    n = static_cast<unsigned int>(this->_internal_$name$_size()); i < "
+        "n; i++) "
+        "{\n"
+        "  target = stream->EnsureSpace(target);\n"
+        "  target = ::$proto_ns$::internal::WireFormatLite::\n"
+        "    InternalWrite$declared_type$($number$, "
+        "this->_internal_$name$(i), target, stream);\n"
+        "}\n");
   }
-  format(
-      "    output);\n"
-      "}\n");
 }
 
-void RepeatedMessageFieldGenerator::
-GenerateSerializeWithCachedSizesToArray(io::Printer* printer) const {
+void RepeatedMessageFieldGenerator::GenerateByteSize(
+    io::Printer* printer) const {
   Formatter format(printer, variables_);
   format(
-      "for (unsigned int i = 0,\n"
-      "    n = static_cast<unsigned int>(this->$name$_size()); i < n; i++) {\n"
-      "  target = ::$proto_ns$::internal::WireFormatLite::\n"
-      "    InternalWrite$declared_type$ToArray(\n"
-      "      $number$, this->$name$(static_cast<int>(i)), target);\n"
-      "}\n");
-}
-
-void RepeatedMessageFieldGenerator::
-GenerateByteSize(io::Printer* printer) const {
-  Formatter format(printer, variables_);
-  format(
-      "{\n"
-      "  unsigned int count = static_cast<unsigned "
-      "int>(this->$name$_size());\n");
-  format.Indent();
-  format(
-      "total_size += $tag_size$UL * count;\n"
-      "for (unsigned int i = 0; i < count; i++) {\n"
+      "total_size += $tag_size$UL * this->_internal_$name$_size();\n"
+      "for (const auto& msg : this->$name$_) {\n"
       "  total_size +=\n"
-      "    ::$proto_ns$::internal::WireFormatLite::$declared_type$Size(\n");
-  if (implicit_weak_field_) {
-    format(
-        "      CastToBase($name$_).Get<"
-        "::$proto_ns$::internal::ImplicitWeakTypeHandler<$type$>>("
-        "static_cast<int>(i)));\n");
-  } else {
-    format("      this->$name$(static_cast<int>(i)));\n");
-  }
-  format("}\n");
-  format.Outdent();
-  format("}\n");
+      "    ::$proto_ns$::internal::WireFormatLite::$declared_type$Size(msg);\n"
+      "}\n");
 }
 
 }  // namespace cpp

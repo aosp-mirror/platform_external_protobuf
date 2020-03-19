@@ -39,21 +39,23 @@
 #define GOOGLE_PROTOBUF_GENERATED_MESSAGE_UTIL_H__
 
 #include <assert.h>
+
 #include <atomic>
 #include <climits>
 #include <string>
 #include <vector>
 
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
-#include <google/protobuf/parse_context.h>
+#include <google/protobuf/any.h>
 #include <google/protobuf/has_bits.h>
 #include <google/protobuf/implicit_weak_message.h>
 #include <google/protobuf/message_lite.h>
 #include <google/protobuf/stubs/once.h>  // Add direct dep on port for pb.cc
 #include <google/protobuf/port.h>
+#include <google/protobuf/repeated_field.h>
 #include <google/protobuf/wire_format_lite.h>
 #include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/stubs/casts.h>
 
 #include <google/protobuf/port_def.inc>
 
@@ -66,15 +68,26 @@ namespace protobuf {
 
 class Arena;
 
-namespace io { class CodedInputStream; }
+namespace io {
+class CodedInputStream;
+}
 
 namespace internal {
+
+template <typename To, typename From>
+inline To DownCast(From* f) {
+  return PROTOBUF_NAMESPACE_ID::internal::down_cast<To>(f);
+}
+template <typename To, typename From>
+inline To DownCast(From& f) {
+  return PROTOBUF_NAMESPACE_ID::internal::down_cast<To>(f);
+}
 
 
 PROTOBUF_EXPORT void InitProtobufDefaults();
 
 // This used by proto1
-PROTOBUF_EXPORT inline const ::std::string& GetEmptyString() {
+PROTOBUF_EXPORT inline const std::string& GetEmptyString() {
   InitProtobufDefaults();
   return GetEmptyStringAlreadyInited();
 }
@@ -85,8 +98,9 @@ PROTOBUF_EXPORT inline const ::std::string& GetEmptyString() {
 // helper here to keep the protobuf compiler from ever having to emit loops in
 // IsInitialized() methods.  We want the C++ compiler to inline this or not
 // as it sees fit.
-template <class Type> bool AllAreInitialized(const Type& t) {
-  for (int i = t.size(); --i >= 0; ) {
+template <typename Msg>
+bool AllAreInitialized(const RepeatedPtrField<Msg>& t) {
+  for (int i = t.size(); --i >= 0;) {
     if (!t.Get(i).IsInitialized()) return false;
   }
   return true;
@@ -134,6 +148,7 @@ PROTOBUF_EXPORT MessageLite* DuplicateIfNonNullInternal(MessageLite* message);
 PROTOBUF_EXPORT MessageLite* GetOwnedMessageInternal(Arena* message_arena,
                                                      MessageLite* submessage,
                                                      Arena* submessage_arena);
+PROTOBUF_EXPORT void GenericSwap(MessageLite* m1, MessageLite* m2);
 
 template <typename T>
 T* DuplicateIfNonNull(T* message) {
@@ -159,6 +174,7 @@ class PROTOBUF_EXPORT CachedSize {
  public:
   int Get() const { return size_.load(std::memory_order_relaxed); }
   void Set(int size) { size_.store(size, std::memory_order_relaxed); }
+
  private:
   std::atomic<int> size_{0};
 };
@@ -184,10 +200,19 @@ struct PROTOBUF_EXPORT SCCInfoBase {
   std::atomic<int> visit_status;
 #endif
   int num_deps;
+  int num_implicit_weak_deps;
   void (*init_func)();
   // This is followed by an array  of num_deps
   // const SCCInfoBase* deps[];
 };
+
+// Zero-length arrays are a language extension available in GCC and Clang but
+// not MSVC.
+#ifdef __GNUC__
+#define PROTOBUF_ARRAY_SIZE(n) (n)
+#else
+#define PROTOBUF_ARRAY_SIZE(n) ((n) ? (n) : 1)
+#endif
 
 template <int N>
 struct SCCInfo {
@@ -195,9 +220,14 @@ struct SCCInfo {
   // Semantically this is const SCCInfo<T>* which is is a templated type.
   // The obvious inheriting from SCCInfoBase mucks with struct initialization.
   // Attempts showed the compiler was generating dynamic initialization code.
-  // Zero length arrays produce warnings with MSVC.
-  SCCInfoBase* deps[N ? N : 1];
+  // This deps array consists of base.num_deps pointers to SCCInfoBase followed
+  // by base.num_implicit_weak_deps pointers to SCCInfoBase*. We need the extra
+  // pointer indirection for implicit weak fields. We cannot use a union type
+  // here, since that would prevent the array from being linker-initialized.
+  void* deps[PROTOBUF_ARRAY_SIZE(N)];
 };
+
+#undef PROTOBUF_ARRAY_SIZE
 
 PROTOBUF_EXPORT void InitSCCImpl(SCCInfoBase* scc);
 
@@ -213,36 +243,10 @@ PROTOBUF_EXPORT void DestroyString(const void* s);
 inline void OnShutdownDestroyMessage(const void* ptr) {
   OnShutdownRun(DestroyMessage, ptr);
 }
-// Destroy the string (call string destructor)
-inline void OnShutdownDestroyString(const ::std::string* ptr) {
+// Destroy the string (call std::string destructor)
+inline void OnShutdownDestroyString(const std::string* ptr) {
   OnShutdownRun(DestroyString, ptr);
 }
-
-#if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
-// To simplify generation of the parse loop code we take objects by void ptr.
-inline void InlineGreedyStringParser(void* str, const char* begin, int size,
-                                     ParseContext*) {
-  static_cast<std::string*>(str)->assign(begin, size);
-}
-
-
-inline bool StringCheck(const char* begin, int size, ParseContext* ctx) {
-  return true;
-}
-
-inline bool StringCheckUTF8(const char* begin, int size, ParseContext* ctx) {
-  return VerifyUTF8(StringPiece(begin, size), ctx);
-}
-
-inline bool StringCheckUTF8Verify(const char* begin, int size,
-                                  ParseContext* ctx) {
-#ifndef NDEBUG
-  VerifyUTF8(StringPiece(begin, size), ctx);
-#endif
-  return true;
-}
-
-#endif  // GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
 
 }  // namespace internal
 }  // namespace protobuf

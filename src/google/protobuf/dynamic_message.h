@@ -42,10 +42,11 @@
 #include <memory>
 #include <vector>
 
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/stubs/mutex.h>
+#include <google/protobuf/reflection.h>
 #include <google/protobuf/repeated_field.h>
-#include <google/protobuf/stubs/common.h>
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
@@ -57,8 +58,8 @@ namespace google {
 namespace protobuf {
 
 // Defined in other files.
-class Descriptor;        // descriptor.h
-class DescriptorPool;    // descriptor.h
+class Descriptor;      // descriptor.h
+class DescriptorPool;  // descriptor.h
 
 // Constructs implementations of Message which can emulate types which are not
 // known at compile-time.
@@ -155,28 +156,25 @@ class PROTOBUF_EXPORT DynamicMessageFactory : public MessageFactory {
 // Helper for computing a sorted list of map entries via reflection.
 class PROTOBUF_EXPORT DynamicMapSorter {
  public:
-  static std::vector<const Message*> Sort(const Message& message,
-                                          int map_size,
+  static std::vector<const Message*> Sort(const Message& message, int map_size,
                                           const Reflection* reflection,
                                           const FieldDescriptor* field) {
-    std::vector<const Message*> result(static_cast<size_t>(map_size));
-    const RepeatedPtrField<Message>& map_field =
-        reflection->GetRepeatedPtrField<Message>(message, field);
-    size_t i = 0;
-    for (RepeatedPtrField<Message>::const_pointer_iterator it =
-             map_field.pointer_begin(); it != map_field.pointer_end(); ) {
-      result[i++] = *it++;
+    std::vector<const Message*> result;
+    result.reserve(map_size);
+    RepeatedFieldRef<Message> map_field =
+        reflection->GetRepeatedFieldRef<Message>(message, field);
+    for (auto it = map_field.begin(); it != map_field.end(); ++it) {
+      result.push_back(&*it);
     }
-    GOOGLE_DCHECK_EQ(result.size(), i);
     MapEntryMessageComparator comparator(field->message_type());
     std::stable_sort(result.begin(), result.end(), comparator);
     // Complain if the keys aren't in ascending order.
 #ifndef NDEBUG
     for (size_t j = 1; j < static_cast<size_t>(map_size); j++) {
       if (!comparator(result[j - 1], result[j])) {
-        GOOGLE_LOG(ERROR) << (comparator(result[j], result[j - 1]) ?
-                      "internal error in map key sorting" :
-                      "map keys are not unique");
+        GOOGLE_LOG(ERROR) << (comparator(result[j], result[j - 1])
+                           ? "internal error in map key sorting"
+                           : "map keys are not unique");
       }
     }
 #endif

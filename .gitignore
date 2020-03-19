@@ -117,6 +117,7 @@ conformance/Conformance.pbobjc.h
 conformance/Conformance.pbobjc.m
 conformance/conformance_pb.js
 conformance/conformance_pb.rb
+conformance/core
 conformance/failing_tests.txt
 conformance/google/
 conformance/google-protobuf/
@@ -138,6 +139,10 @@ composer.lock
 php/tests/generated/
 php/tests/old_protoc
 php/tests/protobuf/
+php/tests/core
+php/tests/vgcore*
+php/tests/multirequest.result
+php/tests/nohup.out
 php/ext/google/protobuf/.libs/
 php/ext/google/protobuf/Makefile.fragments
 php/ext/google/protobuf/Makefile.global
@@ -196,6 +201,9 @@ cmake/cmake-build-debug/
 
 # Visual Studio 2017
 .vs
+
+# Visual Studio Code
+/.vscode/
 
 # IntelliJ
 .idea

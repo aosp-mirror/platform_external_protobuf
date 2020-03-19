@@ -68,23 +68,28 @@ string(REGEX REPLACE        "${protobuf_AC_INIT_REGEX}" "\\2"
 string(REGEX REPLACE        "${protobuf_AC_INIT_REGEX}" "\\3"
     protobuf_CONTACT        "${protobuf_AC_INIT_LINE}")
 # Parse version tweaks
-set(protobuf_VERSION_REGEX "^([0-9]+)\\.([0-9]+)\\.([0-9]+)-?(.*)$")
+set(protobuf_VERSION_REGEX "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-]rc[-]|\\.)?([0-9]*)$")
 string(REGEX REPLACE     "${protobuf_VERSION_REGEX}" "\\1"
   protobuf_VERSION_MAJOR "${protobuf_VERSION_STRING}")
 string(REGEX REPLACE     "${protobuf_VERSION_REGEX}" "\\2"
   protobuf_VERSION_MINOR "${protobuf_VERSION_STRING}")
 string(REGEX REPLACE     "${protobuf_VERSION_REGEX}" "\\3"
   protobuf_VERSION_PATCH "${protobuf_VERSION_STRING}")
-string(REGEX REPLACE     "${protobuf_VERSION_REGEX}" "\\4"
+string(REGEX REPLACE     "${protobuf_VERSION_REGEX}" "\\5"
   protobuf_VERSION_PRERELEASE "${protobuf_VERSION_STRING}")
+
+message(STATUS "${protobuf_VERSION_PRERELEASE}")
 
 # Package version
 set(protobuf_VERSION
   "${protobuf_VERSION_MAJOR}.${protobuf_VERSION_MINOR}.${protobuf_VERSION_PATCH}")
 
 if(protobuf_VERSION_PRERELEASE)
-  set(protobuf_VERSION "${protobuf_VERSION}-${protobuf_VERSION_PRERELEASE}")
+  set(protobuf_VERSION "${protobuf_VERSION}.${protobuf_VERSION_PRERELEASE}")
+else()
+  set(protobuf_VERSION "${protobuf_VERSION}.0")
 endif()
+message(STATUS "${protobuf_VERSION}")
 
 if(protobuf_VERBOSE)
   message(STATUS "Configuration script parsing status [")
@@ -126,6 +131,25 @@ endif (protobuf_WITH_ZLIB)
 if (HAVE_ZLIB)
   add_definitions(-DHAVE_ZLIB)
 endif (HAVE_ZLIB)
+
+# We need to link with libatomic on systems that do not have builtin atomics, or
+# don't have builtin support for 8 byte atomics
+set(protobuf_LINK_LIBATOMIC false)
+if (NOT MSVC)
+  include(CheckCXXSourceCompiles)
+  set(OLD_CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS})
+  set(CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS} -std=c++11)
+  check_cxx_source_compiles("
+    #include <atomic>
+    int main() {
+      return std::atomic<int64_t>{};
+    }
+  " protobuf_HAVE_BUILTIN_ATOMICS)
+  if (NOT protobuf_HAVE_BUILTIN_ATOMICS)
+    set(protobuf_LINK_LIBATOMIC true)
+  endif (NOT protobuf_HAVE_BUILTIN_ATOMICS)
+  set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+endif (NOT MSVC)
 
 if (protobuf_BUILD_SHARED_LIBS)
   set(protobuf_SHARED_OR_STATIC "SHARED")
@@ -175,7 +199,7 @@ if (MSVC)
   configure_file(extract_includes.bat.in extract_includes.bat)
 
   # Suppress linker warnings about files with no symbols defined.
-  set(CMAKE_STATIC_LINKER_FLAGS /ignore:4221)
+  set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /ignore:4221")
 
   # Configure Resource Compiler
   enable_language(RC)

@@ -31,6 +31,7 @@
 #include <google/protobuf/arena.h>
 
 #include <algorithm>
+#include <atomic>
 #include <limits>
 
 #include <google/protobuf/stubs/mutex.h>
@@ -49,7 +50,7 @@ namespace protobuf {
 namespace internal {
 
 
-std::atomic<int64> ArenaImpl::lifecycle_id_generator_;
+std::atomic<LifecycleId> ArenaImpl::lifecycle_id_generator_;
 #if defined(GOOGLE_PROTOBUF_NO_THREADLOCAL)
 ArenaImpl::ThreadCache& ArenaImpl::thread_cache() {
   static internal::ThreadLocalStorage<ThreadCache>* thread_cache_ =
@@ -58,7 +59,7 @@ ArenaImpl::ThreadCache& ArenaImpl::thread_cache() {
 }
 #elif defined(PROTOBUF_USE_DLLS)
 ArenaImpl::ThreadCache& ArenaImpl::thread_cache() {
-  static GOOGLE_THREAD_LOCAL ThreadCache thread_cache_ = { -1, NULL };
+  static GOOGLE_THREAD_LOCAL ThreadCache thread_cache_ = {-1, NULL};
   return thread_cache_;
 }
 #else
@@ -143,16 +144,6 @@ void ArenaImpl::SerialArena::AddCleanupFallback(void* elem,
   AddCleanup(elem, cleanup);
 }
 
-PROTOBUF_FUNC_ALIGN(32)
-void* ArenaImpl::AllocateAligned(size_t n) {
-  SerialArena* arena;
-  if (PROTOBUF_PREDICT_TRUE(GetSerialArenaFast(&arena))) {
-    return arena->AllocateAligned(n);
-  } else {
-    return AllocateAlignedFallback(n);
-  }
-}
-
 void* ArenaImpl::AllocateAlignedAndAddCleanup(size_t n,
                                               void (*cleanup)(void*)) {
   SerialArena* arena;
@@ -188,28 +179,6 @@ void ArenaImpl::AddCleanupFallback(void* elem, void (*cleanup)(void*)) {
   GetSerialArena()->AddCleanup(elem, cleanup);
 }
 
-inline PROTOBUF_ALWAYS_INLINE bool ArenaImpl::GetSerialArenaFast(
-    ArenaImpl::SerialArena** arena) {
-  // If this thread already owns a block in this arena then try to use that.
-  // This fast path optimizes the case where multiple threads allocate from the
-  // same arena.
-  ThreadCache* tc = &thread_cache();
-  if (PROTOBUF_PREDICT_TRUE(tc->last_lifecycle_id_seen == lifecycle_id_)) {
-    *arena = tc->last_serial_arena;
-    return true;
-  }
-
-  // Check whether we own the last accessed SerialArena on this arena.  This
-  // fast path optimizes the case where a single thread uses multiple arenas.
-  SerialArena* serial = hint_.load(std::memory_order_acquire);
-  if (PROTOBUF_PREDICT_TRUE(serial != NULL && serial->owner() == tc)) {
-    *arena = serial;
-    return true;
-  }
-
-  return false;
-}
-
 ArenaImpl::SerialArena* ArenaImpl::GetSerialArena() {
   SerialArena* arena;
   if (PROTOBUF_PREDICT_TRUE(GetSerialArenaFast(&arena))) {
@@ -242,7 +211,7 @@ uint64 ArenaImpl::SpaceAllocated() const {
 uint64 ArenaImpl::SpaceUsed() const {
   SerialArena* serial = threads_.load(std::memory_order_acquire);
   uint64 space_used = 0;
-  for ( ; serial; serial = serial->next()) {
+  for (; serial; serial = serial->next()) {
     space_used += serial->SpaceUsed();
   }
   return space_used;
@@ -286,7 +255,7 @@ uint64 ArenaImpl::SerialArena::Free(ArenaImpl::SerialArena* serial,
   // We have to be careful in this function, since we will be freeing the Block
   // that contains this SerialArena.  Be careful about accessing |serial|.
 
-  for (Block* b = serial->head_; b; ) {
+  for (Block* b = serial->head_; b;) {
     // This is inside the block we are freeing, so we need to read it now.
     Block* next_block = b->next();
     space_allocated += (b->size());
@@ -312,7 +281,7 @@ void ArenaImpl::CleanupList() {
   // properly synchronize Reset() or the destructor will throw a TSAN warning.
   SerialArena* serial = threads_.load(std::memory_order_relaxed);
 
-  for ( ; serial; serial = serial->next()) {
+  for (; serial; serial = serial->next()) {
     serial->CleanupList();
   }
 }
@@ -365,7 +334,7 @@ PROTOBUF_NOINLINE
 ArenaImpl::SerialArena* ArenaImpl::GetSerialArenaFallback(void* me) {
   // Look for this SerialArena in our linked list.
   SerialArena* serial = threads_.load(std::memory_order_acquire);
-  for ( ; serial; serial = serial->next()) {
+  for (; serial; serial = serial->next()) {
     if (serial->owner() == me) {
       break;
     }
@@ -389,6 +358,11 @@ ArenaImpl::SerialArena* ArenaImpl::GetSerialArenaFallback(void* me) {
 }
 
 }  // namespace internal
+
+PROTOBUF_FUNC_ALIGN(32)
+void* Arena::AllocateAlignedNoHook(size_t n) {
+  return impl_.AllocateAligned(n);
+}
 
 void Arena::CallDestructorHooks() {
   uint64 space_allocated = impl_.SpaceAllocated();
