@@ -559,6 +559,7 @@ java_library_static {
         // TODO(b/151068271) switch below to //apex_available:anyapex
         "com.android.permission",
         "com.android.bluetooth.updatable",
+        "com.android.wifi",
     ],
 }
 
