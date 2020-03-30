@@ -114,8 +114,7 @@ cc_library {
     },
     apex_available: [
         "//apex_available:platform",
-        "com.android.adbd",
-        "test_com.android.adbd",
+        "//apex_available:anyapex",
     ],
 }
 
@@ -447,6 +446,12 @@ java_library_static {
     },
 
     java_version: "1.7",
+
+    apex_available: [
+        "//apex_available:platform",
+        // TODO(b/151068271) switch this to //apex_available:anyapex
+        "com.android.wifi",
+    ],
 }
 
 // Java nano library (compatibility for old host-side users)
@@ -468,6 +473,12 @@ java_library_static {
     sdk_version: "8",
 
     srcs: ["javamicro/src/main/java/com/google/protobuf/micro/**/*.java"],
+
+    apex_available: [
+        "//apex_available:platform",
+        // TODO(b/151068271) switch this to //apex_available:anyapex
+        "com.android.bluetooth.updatable",
+    ],
 }
 
 // Java micro library (compatibility for old host-side users)
@@ -580,6 +591,12 @@ java_library_static {
     },
 
     java_version: "1.7",
+
+    apex_available: [
+        "//apex_available:platform",
+        // TODO(b/151068271) switch below to //apex_available:anyapex
+        "com.android.bluetooth.updatable",
+    ],
 }
 
 // Java lite library (compatibility for old host-side users)
