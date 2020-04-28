@@ -30,10 +30,11 @@
 
 package com.google.protobuf;
 
+import junit.framework.TestCase;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
-import junit.framework.TestCase;
 
 /**
  * Tests for {@link UnmodifiableLazyStringList}.
@@ -42,13 +43,13 @@ import junit.framework.TestCase;
  */
 public class UnmodifiableLazyStringListTest extends TestCase {
 
-  private static final String STRING_A = "A";
-  private static final String STRING_B = "B";
-  private static final String STRING_C = "C";
+  private static String STRING_A = "A";
+  private static String STRING_B = "B";
+  private static String STRING_C = "C";
 
-  private static final ByteString BYTE_STRING_A = ByteString.copyFromUtf8("A");
-  private static final ByteString BYTE_STRING_B = ByteString.copyFromUtf8("B");
-  private static final ByteString BYTE_STRING_C = ByteString.copyFromUtf8("C");
+  private static ByteString BYTE_STRING_A = ByteString.copyFromUtf8("A");
+  private static ByteString BYTE_STRING_B = ByteString.copyFromUtf8("B");
+  private static ByteString BYTE_STRING_C = ByteString.copyFromUtf8("C");
 
   public void testReadOnlyMethods() {
     LazyStringArrayList rawList = createSampleList();

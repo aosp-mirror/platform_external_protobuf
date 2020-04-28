@@ -30,7 +30,7 @@
 
 syntax = "proto3";
 
-package proto_util_converter.testing;
+package google.protobuf.testing;
 
 import "google/protobuf/wrappers.proto";
 

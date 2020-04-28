@@ -93,8 +93,8 @@ namespace Google.Protobuf
         private uint nextTag = 0;
         private bool hasNextTag = false;
 
-        internal const int DefaultRecursionLimit = 100;
-        internal const int DefaultSizeLimit = Int32.MaxValue;
+        internal const int DefaultRecursionLimit = 64;
+        internal const int DefaultSizeLimit = 64 << 20; // 64MB
         internal const int BufferSize = 4096;
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace Google.Protobuf
         /// <summary>
         /// Creates a new CodedInputStream reading data from the given byte array.
         /// </summary>
-        public CodedInputStream(byte[] buffer) : this(null, ProtoPreconditions.CheckNotNull(buffer, "buffer"), 0, buffer.Length, true)
+        public CodedInputStream(byte[] buffer) : this(null, ProtoPreconditions.CheckNotNull(buffer, "buffer"), 0, buffer.Length)
         {            
         }
 
@@ -129,7 +129,7 @@ namespace Google.Protobuf
         /// Creates a new <see cref="CodedInputStream"/> that reads from the given byte array slice.
         /// </summary>
         public CodedInputStream(byte[] buffer, int offset, int length)
-            : this(null, ProtoPreconditions.CheckNotNull(buffer, "buffer"), offset, offset + length, true)
+            : this(null, ProtoPreconditions.CheckNotNull(buffer, "buffer"), offset, offset + length)
         {            
             if (offset < 0 || offset > buffer.Length)
             {
@@ -158,15 +158,16 @@ namespace Google.Protobuf
         /// <c cref="CodedInputStream"/> is disposed; <c>false</c> to dispose of the given stream when the
         /// returned object is disposed.</param>
         public CodedInputStream(Stream input, bool leaveOpen)
-            : this(ProtoPreconditions.CheckNotNull(input, "input"), new byte[BufferSize], 0, 0, leaveOpen)
+            : this(ProtoPreconditions.CheckNotNull(input, "input"), new byte[BufferSize], 0, 0)
         {
+            this.leaveOpen = leaveOpen;
         }
         
         /// <summary>
         /// Creates a new CodedInputStream reading data from the given
         /// stream and buffer, using the default limits.
         /// </summary>
-        internal CodedInputStream(Stream input, byte[] buffer, int bufferPos, int bufferSize, bool leaveOpen)
+        internal CodedInputStream(Stream input, byte[] buffer, int bufferPos, int bufferSize)
         {
             this.input = input;
             this.buffer = buffer;
@@ -174,7 +175,6 @@ namespace Google.Protobuf
             this.bufferSize = bufferSize;
             this.sizeLimit = DefaultSizeLimit;
             this.recursionLimit = DefaultRecursionLimit;
-            this.leaveOpen = leaveOpen;
         }
 
         /// <summary>
@@ -185,8 +185,8 @@ namespace Google.Protobuf
         /// This chains to the version with the default limits instead of vice versa to avoid
         /// having to check that the default values are valid every time.
         /// </remarks>
-        internal CodedInputStream(Stream input, byte[] buffer, int bufferPos, int bufferSize, int sizeLimit, int recursionLimit, bool leaveOpen)
-            : this(input, buffer, bufferPos, bufferSize, leaveOpen)
+        internal CodedInputStream(Stream input, byte[] buffer, int bufferPos, int bufferSize, int sizeLimit, int recursionLimit)
+            : this(input, buffer, bufferPos, bufferSize)
         {
             if (sizeLimit <= 0)
             {
@@ -217,8 +217,7 @@ namespace Google.Protobuf
         /// and recursion limits.</returns>
         public static CodedInputStream CreateWithLimits(Stream input, int sizeLimit, int recursionLimit)
         {
-            // Note: we may want an overload accepting leaveOpen
-            return new CodedInputStream(input, new byte[BufferSize], 0, 0, sizeLimit, recursionLimit, false);
+            return new CodedInputStream(input, new byte[BufferSize], 0, 0, sizeLimit, recursionLimit);
         }
 
         /// <summary>
@@ -248,7 +247,7 @@ namespace Google.Protobuf
         /// <remarks>
         /// This limit is applied when reading from the underlying stream, as a sanity check. It is
         /// not applied when reading from a byte array data source without an underlying stream.
-        /// The default value is Int32.MaxValue.
+        /// The default value is 64MB.
         /// </remarks>
         /// <value>
         /// The size limit.
@@ -260,22 +259,12 @@ namespace Google.Protobuf
         /// to avoid maliciously-recursive data.
         /// </summary>
         /// <remarks>
-        /// The default limit is 100.
+        /// The default limit is 64.
         /// </remarks>
         /// <value>
         /// The recursion limit for this stream.
         /// </value>
         public int RecursionLimit { get { return recursionLimit; } }
-
-        /// <summary>
-        /// Internal-only property; when set to true, unknown fields will be discarded while parsing.
-        /// </summary>
-        internal bool DiscardUnknownFields { get; set; }
-
-        /// <summary>
-        /// Internal-only property; provides extension identifiers to compatible messages while parsing.
-        /// </summary>
-        internal ExtensionRegistry ExtensionRegistry { get; set; }
 
         /// <summary>
         /// Disposes of this instance, potentially closing any underlying stream.
@@ -378,19 +367,15 @@ namespace Google.Protobuf
                 if (IsAtEnd)
                 {
                     lastTag = 0;
-                    return 0;
+                    return 0; // This is the only case in which we return 0.
                 }
 
                 lastTag = ReadRawVarint32();
             }
-            if (WireFormat.GetTagFieldNumber(lastTag) == 0)
+            if (lastTag == 0)
             {
-                // If we actually read a tag with a field of 0, that's not a valid tag.
+                // If we actually read zero, that's not a valid tag.
                 throw InvalidProtocolBufferException.InvalidTag();
-            }
-            if (ReachedLimit)
-            {
-                return 0;
             }
             return lastTag;
         }
@@ -438,10 +423,7 @@ namespace Google.Protobuf
             }
         }
 
-        /// <summary>
-        /// Skip a group.
-        /// </summary>
-        internal void SkipGroup(uint startGroupTag)
+        private void SkipGroup(uint startGroupTag)
         {
             // Note: Currently we expect this to be the way that groups are read. We could put the recursion
             // depth changes into the ReadTag method instead, potentially...
@@ -565,7 +547,7 @@ namespace Google.Protobuf
             {
                 return "";
             }
-            if (length <= bufferSize - bufferPos && length > 0)
+            if (length <= bufferSize - bufferPos)
             {
                 // Fast path:  We already have the bytes in a contiguous buffer, so
                 //   just copy directly from it.
@@ -579,7 +561,7 @@ namespace Google.Protobuf
 
         /// <summary>
         /// Reads an embedded message field value from the stream.
-        /// </summary>
+        /// </summary>   
         public void ReadMessage(IMessage builder)
         {
             int length = ReadLength();
@@ -598,20 +580,6 @@ namespace Google.Protobuf
             }
             --recursionDepth;
             PopLimit(oldLimit);
-        }
-
-        /// <summary>
-        /// Reads an embedded group field from the stream.
-        /// </summary>
-        public void ReadGroup(IMessage builder)
-        {
-            if (recursionDepth >= recursionLimit)
-            {
-                throw InvalidProtocolBufferException.RecursionLimitExceeded();
-            }
-            ++recursionDepth;
-            builder.MergeFrom(this);
-            --recursionDepth;
         }
 
         /// <summary>
@@ -644,7 +612,9 @@ namespace Google.Protobuf
         }
 
         /// <summary>
-        /// Reads an enum field value from the stream.
+        /// Reads an enum field value from the stream. If the enum is valid for type T,
+        /// then the ref value is set and it returns true.  Otherwise the unknown output
+        /// value is set and this method returns false.
         /// </summary>   
         public int ReadEnum()
         {
@@ -1081,7 +1051,7 @@ namespace Google.Protobuf
                 RecomputeBufferSizeAfterLimit();
                 int totalBytesRead =
                     totalBytesRetired + bufferSize + bufferSizeAfterLimit;
-                if (totalBytesRead < 0 || totalBytesRead > sizeLimit)
+                if (totalBytesRead > sizeLimit || totalBytesRead < 0)
                 {
                     throw InvalidProtocolBufferException.SizeLimitExceeded();
                 }
@@ -1301,6 +1271,7 @@ namespace Google.Protobuf
                 }
             }
         }
+
         #endregion
     }
 }

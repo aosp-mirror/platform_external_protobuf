@@ -42,17 +42,13 @@ namespace Google.Protobuf
         private const int LittleEndian64Size = 8;
         private const int LittleEndian32Size = 4;        
 
-        internal const int DoubleSize = LittleEndian64Size;
-        internal const int FloatSize = LittleEndian32Size;
-        internal const int BoolSize = 1;
-
         /// <summary>
         /// Computes the number of bytes that would be needed to encode a
         /// double field, including the tag.
         /// </summary>
         public static int ComputeDoubleSize(double value)
         {
-            return DoubleSize;
+            return LittleEndian64Size;
         }
 
         /// <summary>
@@ -61,7 +57,7 @@ namespace Google.Protobuf
         /// </summary>
         public static int ComputeFloatSize(float value)
         {
-            return FloatSize;
+            return LittleEndian32Size;
         }
 
         /// <summary>
@@ -123,7 +119,7 @@ namespace Google.Protobuf
         /// </summary>
         public static int ComputeBoolSize(bool value)
         {
-            return BoolSize;
+            return 1;
         }
 
         /// <summary>

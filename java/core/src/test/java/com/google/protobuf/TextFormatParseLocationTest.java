@@ -32,7 +32,9 @@ package com.google.protobuf;
 
 import junit.framework.TestCase;
 
-/** Test @{link TextFormatParseLocation}. */
+/**
+ * Test @{link TextFormatParseLocation}.
+ */
 public class TextFormatParseLocationTest extends TestCase {
 
   public void testCreateEmpty() {

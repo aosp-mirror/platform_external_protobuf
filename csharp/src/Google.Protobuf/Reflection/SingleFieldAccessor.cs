@@ -48,7 +48,6 @@ namespace Google.Protobuf.Reflection
 
         private readonly Action<IMessage, object> setValueDelegate;
         private readonly Action<IMessage> clearDelegate;
-        private readonly Func<IMessage, bool> hasDelegate;
 
         internal SingleFieldAccessor(PropertyInfo property, FieldDescriptor descriptor) : base(property, descriptor)
         {
@@ -57,44 +56,21 @@ namespace Google.Protobuf.Reflection
                 throw new ArgumentException("Not all required properties/methods available");
             }
             setValueDelegate = ReflectionUtil.CreateActionIMessageObject(property.GetSetMethod());
-            if (descriptor.File.Proto.Syntax == "proto2")
-            {
-                MethodInfo hasMethod = property.DeclaringType.GetRuntimeProperty("Has" + property.Name).GetMethod;
-                if (hasMethod == null) {
-                  throw new ArgumentException("Not all required properties/methods are available");
-                }
-                hasDelegate = ReflectionUtil.CreateFuncIMessageBool(hasMethod);
-                MethodInfo clearMethod = property.DeclaringType.GetRuntimeMethod("Clear" + property.Name, ReflectionUtil.EmptyTypes);
-                if (clearMethod == null) {
-                  throw new ArgumentException("Not all required properties/methods are available");
-                }
-                clearDelegate = ReflectionUtil.CreateActionIMessage(clearMethod);
-            }
-            else
-            {
-                hasDelegate = message => {
-                  throw new InvalidOperationException("HasValue is not implemented for proto3 fields");
-                };
-                var clrType = property.PropertyType;
 
-                // TODO: Validate that this is a reasonable single field? (Should be a value type, a message type, or string/ByteString.)
-                object defaultValue =
-                    descriptor.FieldType == FieldType.Message ? null
-                    : clrType == typeof(string) ? ""
-                    : clrType == typeof(ByteString) ? ByteString.Empty
-                    : Activator.CreateInstance(clrType);
-                clearDelegate = message => SetValue(message, defaultValue);
-            }
+            var clrType = property.PropertyType;
+            
+            // TODO: Validate that this is a reasonable single field? (Should be a value type, a message type, or string/ByteString.)
+            object defaultValue =
+                descriptor.FieldType == FieldType.Message ? null
+                : clrType == typeof(string) ? ""
+                : clrType == typeof(ByteString) ? ByteString.Empty
+                : Activator.CreateInstance(clrType);
+            clearDelegate = message => SetValue(message, defaultValue);
         }
 
         public override void Clear(IMessage message)
         {
             clearDelegate(message);
-        }
-
-        public override bool HasValue(IMessage message)
-        {
-            return hasDelegate(message);
         }
 
         public override void SetValue(IMessage message, object value)

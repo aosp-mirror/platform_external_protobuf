@@ -35,6 +35,7 @@
 #include <google/protobuf/compiler/objectivec/objectivec_helpers.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/wire_format.h>
+#include <google/protobuf/stubs/strutil.h>
 
 namespace google {
 namespace protobuf {
@@ -44,7 +45,7 @@ namespace objectivec {
 namespace {
 
 void SetMessageVariables(const FieldDescriptor* descriptor,
-                         std::map<string, string>* variables) {
+                         map<string, string>* variables) {
   const string& message_type = ClassName(descriptor->message_type());
   (*variables)["type"] = message_type;
   (*variables)["containing_class"] = ClassName(descriptor->containing_type());
@@ -66,7 +67,7 @@ MessageFieldGenerator::MessageFieldGenerator(const FieldDescriptor* descriptor,
 MessageFieldGenerator::~MessageFieldGenerator() {}
 
 void MessageFieldGenerator::DetermineForwardDeclarations(
-    std::set<string>* fwd_decls) const {
+    set<string>* fwd_decls) const {
   ObjCObjFieldGenerator::DetermineForwardDeclarations(fwd_decls);
   // Class name is already in "storage_type".
   fwd_decls->insert("@class " + variable("storage_type"));
@@ -94,7 +95,7 @@ RepeatedMessageFieldGenerator::RepeatedMessageFieldGenerator(
 RepeatedMessageFieldGenerator::~RepeatedMessageFieldGenerator() {}
 
 void RepeatedMessageFieldGenerator::DetermineForwardDeclarations(
-    std::set<string>* fwd_decls) const {
+    set<string>* fwd_decls) const {
   RepeatedFieldGenerator::DetermineForwardDeclarations(fwd_decls);
   // Class name is already in "storage_type".
   fwd_decls->insert("@class " + variable("storage_type"));

@@ -42,13 +42,11 @@
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/logging.h>
 
-#include <google/protobuf/port_def.inc>
-
 namespace google {
 namespace protobuf {
 namespace io {
 
-class ZeroCopyInputStream;  // zero_copy_stream.h
+class ZeroCopyInputStream;     // zero_copy_stream.h
 
 // Defined in this file.
 class ErrorCollector;
@@ -63,7 +61,7 @@ typedef int ColumnNumber;
 // Abstract interface for an object which collects the errors that occur
 // during parsing.  A typical implementation might simply print the errors
 // to stdout.
-class PROTOBUF_EXPORT ErrorCollector {
+class LIBPROTOBUF_EXPORT ErrorCollector {
  public:
   inline ErrorCollector() {}
   virtual ~ErrorCollector();
@@ -72,13 +70,13 @@ class PROTOBUF_EXPORT ErrorCollector {
   // column numbers.  The numbers are zero-based, so you may want to add
   // 1 to each before printing them.
   virtual void AddError(int line, ColumnNumber column,
-                        const std::string& message) = 0;
+                        const string& message) = 0;
 
   // Indicates that there was a warning in the input at the given line and
   // column numbers.  The numbers are zero-based, so you may want to add
   // 1 to each before printing them.
   virtual void AddWarning(int line, ColumnNumber column,
-                          const std::string& message) {}
+                          const string& message) { }
 
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ErrorCollector);
@@ -90,7 +88,7 @@ class PROTOBUF_EXPORT ErrorCollector {
 // precise descriptions.  Whitespace and comments are skipped.  By default,
 // C- and C++-style comments are recognized, but other styles can be used by
 // calling set_comment_style().
-class PROTOBUF_EXPORT Tokenizer {
+class LIBPROTOBUF_EXPORT Tokenizer {
  public:
   // Construct a Tokenizer that reads and tokenizes text from the given
   // input stream and writes errors to the given error_collector.
@@ -99,8 +97,8 @@ class PROTOBUF_EXPORT Tokenizer {
   ~Tokenizer();
 
   enum TokenType {
-    TYPE_START,  // Next() has not yet been called.
-    TYPE_END,    // End of input reached.  "text" is empty.
+    TYPE_START,       // Next() has not yet been called.
+    TYPE_END,         // End of input reached.  "text" is empty.
 
     TYPE_IDENTIFIER,  // A sequence of letters, digits, and underscores, not
                       // starting with a digit.  It is an error for a number
@@ -126,7 +124,7 @@ class PROTOBUF_EXPORT Tokenizer {
   // Structure representing a token read from the token stream.
   struct Token {
     TokenType type;
-    std::string text;  // The exact text of the token as it appeared in
+    string text;       // The exact text of the token as it appeared in
                        // the input.  e.g. tokens of TYPE_STRING will still
                        // be escaped and in quotes.
 
@@ -192,31 +190,31 @@ class PROTOBUF_EXPORT Tokenizer {
   //   /* Block comment attached to
   //    * grault. */
   //   optional int32 grault = 6;
-  bool NextWithComments(std::string* prev_trailing_comments,
-                        std::vector<std::string>* detached_comments,
-                        std::string* next_leading_comments);
+  bool NextWithComments(string* prev_trailing_comments,
+                        vector<string>* detached_comments,
+                        string* next_leading_comments);
 
   // Parse helpers ---------------------------------------------------
 
   // Parses a TYPE_FLOAT token.  This never fails, so long as the text actually
   // comes from a TYPE_FLOAT token parsed by Tokenizer.  If it doesn't, the
   // result is undefined (possibly an assert failure).
-  static double ParseFloat(const std::string& text);
+  static double ParseFloat(const string& text);
 
   // Parses a TYPE_STRING token.  This never fails, so long as the text actually
   // comes from a TYPE_STRING token parsed by Tokenizer.  If it doesn't, the
   // result is undefined (possibly an assert failure).
-  static void ParseString(const std::string& text, std::string* output);
+  static void ParseString(const string& text, string* output);
 
   // Identical to ParseString, but appends to output.
-  static void ParseStringAppend(const std::string& text, std::string* output);
+  static void ParseStringAppend(const string& text, string* output);
 
   // Parses a TYPE_INTEGER token.  Returns false if the result would be
   // greater than max_value.  Otherwise, returns true and sets *output to the
   // result.  If the text is not from a Token of type TYPE_INTEGER originally
   // parsed by a Tokenizer, the result is undefined (possibly an assert
   // failure).
-  static bool ParseInteger(const std::string& text, uint64 max_value,
+  static bool ParseInteger(const string& text, uint64 max_value,
                            uint64* output);
 
   // Options ---------------------------------------------------------
@@ -252,23 +250,23 @@ class PROTOBUF_EXPORT Tokenizer {
   }
 
   // External helper: validate an identifier.
-  static bool IsIdentifier(const std::string& text);
+  static bool IsIdentifier(const string& text);
 
   // -----------------------------------------------------------------
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Tokenizer);
 
-  Token current_;   // Returned by current().
-  Token previous_;  // Returned by previous().
+  Token current_;           // Returned by current().
+  Token previous_;          // Returned by previous().
 
   ZeroCopyInputStream* input_;
   ErrorCollector* error_collector_;
 
-  char current_char_;   // == buffer_[buffer_pos_], updated by NextChar().
-  const char* buffer_;  // Current buffer returned from input_.
-  int buffer_size_;     // Size of buffer_.
-  int buffer_pos_;      // Current position within the buffer.
-  bool read_error_;     // Did we previously encounter a read error?
+  char current_char_;       // == buffer_[buffer_pos_], updated by NextChar().
+  const char* buffer_;      // Current buffer returned from input_.
+  int buffer_size_;         // Size of buffer_.
+  int buffer_pos_;          // Current position within the buffer.
+  bool read_error_;         // Did we previously encounter a read error?
 
   // Line and column number of current_char_ within the whole input stream.
   int line_;
@@ -278,7 +276,7 @@ class PROTOBUF_EXPORT Tokenizer {
   // Call RecordTo(&str) to start recording and StopRecording() to stop.
   // E.g. StartToken() calls RecordTo(&current_.text).  record_start_ is the
   // position within the current buffer where recording started.
-  std::string* record_target_;
+  string* record_target_;
   int record_start_;
 
   // Options.
@@ -301,7 +299,7 @@ class PROTOBUF_EXPORT Tokenizer {
   // Read a new buffer from the input.
   void Refresh();
 
-  inline void RecordTo(std::string* target);
+  inline void RecordTo(string* target);
   inline void StopRecording();
 
   // Called when the current character is the first character of a new
@@ -313,7 +311,7 @@ class PROTOBUF_EXPORT Tokenizer {
   inline void EndToken();
 
   // Convenience method to add an error at the current line and column.
-  void AddError(const std::string& message) {
+  void AddError(const string& message) {
     error_collector_->AddError(line_, column_, message);
   }
 
@@ -331,14 +329,14 @@ class PROTOBUF_EXPORT Tokenizer {
   // depending on what was read.  This needs to know if the first
   // character was a zero in order to correctly recognize hex and octal
   // numbers.
-  // It also needs to know if the first character was a . to parse floating
+  // It also needs to know if the first characted was a . to parse floating
   // point correctly.
   TokenType ConsumeNumber(bool started_with_zero, bool started_with_dot);
 
   // Consume the rest of a line.
-  void ConsumeLineComment(std::string* content);
+  void ConsumeLineComment(string* content);
   // Consume until "*/".
-  void ConsumeBlockComment(std::string* content);
+  void ConsumeBlockComment(string* content);
 
   enum NextCommentStatus {
     // Started a line comment.
@@ -369,44 +367,45 @@ class PROTOBUF_EXPORT Tokenizer {
 
   // Returns true if the current character is of the given character
   // class, but does not consume anything.
-  template <typename CharacterClass>
+  template<typename CharacterClass>
   inline bool LookingAt();
 
   // If the current character is in the given class, consume it and return
   // true.  Otherwise return false.
   // e.g. TryConsumeOne<Letter>()
-  template <typename CharacterClass>
+  template<typename CharacterClass>
   inline bool TryConsumeOne();
 
   // Like above, but try to consume the specific character indicated.
   inline bool TryConsume(char c);
 
   // Consume zero or more of the given character class.
-  template <typename CharacterClass>
+  template<typename CharacterClass>
   inline void ConsumeZeroOrMore();
 
   // Consume one or more of the given character class or log the given
   // error message.
   // e.g. ConsumeOneOrMore<Digit>("Expected digits.");
-  template <typename CharacterClass>
+  template<typename CharacterClass>
   inline void ConsumeOneOrMore(const char* error);
 };
 
 // inline methods ====================================================
-inline const Tokenizer::Token& Tokenizer::current() { return current_; }
+inline const Tokenizer::Token& Tokenizer::current() {
+  return current_;
+}
 
-inline const Tokenizer::Token& Tokenizer::previous() { return previous_; }
+inline const Tokenizer::Token& Tokenizer::previous() {
+  return previous_;
+}
 
-inline void Tokenizer::ParseString(const std::string& text,
-                                   std::string* output) {
+inline void Tokenizer::ParseString(const string& text, string* output) {
   output->clear();
   ParseStringAppend(text, output);
 }
 
 }  // namespace io
 }  // namespace protobuf
+
 }  // namespace google
-
-#include <google/protobuf/port_undef.inc>
-
 #endif  // GOOGLE_PROTOBUF_IO_TOKENIZER_H__

@@ -49,14 +49,13 @@ namespace Google.Protobuf
             Assert.AreEqual(first.GetHashCode(), second.GetHashCode());
         }
 
-        public static void AssertInequality<T>(T first, T second, bool checkHashcode = true) where T : IEquatable<T>
+        public static void AssertInequality<T>(T first, T second) where T : IEquatable<T>
         {
             Assert.IsFalse(first.Equals(second));
             Assert.IsFalse(first.Equals((object) second));
             // While this isn't a requirement, the chances of this test failing due to
             // coincidence rather than a bug are very small.
-            // For such rare cases, an argument can be used to disable the check.
-            if (checkHashcode && first != null && second != null)
+            if (first != null && second != null)
             {
                 Assert.AreNotEqual(first.GetHashCode(), second.GetHashCode());
             }

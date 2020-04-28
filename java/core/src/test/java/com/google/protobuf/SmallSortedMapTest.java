@@ -30,6 +30,8 @@
 
 package com.google.protobuf;
 
+import junit.framework.TestCase;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,9 +40,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import junit.framework.TestCase;
 
-/** @author darick@google.com Darick Tong */
+/**
+ * @author darick@google.com Darick Tong
+ */
 public class SmallSortedMapTest extends TestCase {
   // java.util.AbstractMap.SimpleEntry is private in JDK 1.5. We re-implement it
   // here for JDK 1.5 users.
@@ -76,16 +79,16 @@ public class SmallSortedMapTest extends TestCase {
 
     @Override
     public boolean equals(Object o) {
-      if (!(o instanceof Map.Entry)) {
+      if (!(o instanceof Map.Entry))
         return false;
-      }
       Map.Entry e = (Map.Entry) o;
       return eq(key, e.getKey()) && eq(value, e.getValue());
     }
 
     @Override
     public int hashCode() {
-      return ((key == null) ? 0 : key.hashCode()) ^ ((value == null) ? 0 : value.hashCode());
+      return ((key == null) ? 0 : key.hashCode()) ^
+          ((value == null) ? 0 : value.hashCode());
     }
   }
 
@@ -99,10 +102,14 @@ public class SmallSortedMapTest extends TestCase {
 
   private void runPutAndGetTest(int numElements) {
     // Test with even and odd arraySize
-    SmallSortedMap<Integer, Integer> map1 = SmallSortedMap.newInstanceForTest(3);
-    SmallSortedMap<Integer, Integer> map2 = SmallSortedMap.newInstanceForTest(4);
-    SmallSortedMap<Integer, Integer> map3 = SmallSortedMap.newInstanceForTest(3);
-    SmallSortedMap<Integer, Integer> map4 = SmallSortedMap.newInstanceForTest(4);
+    SmallSortedMap<Integer, Integer> map1 =
+        SmallSortedMap.newInstanceForTest(3);
+    SmallSortedMap<Integer, Integer> map2 =
+        SmallSortedMap.newInstanceForTest(4);
+    SmallSortedMap<Integer, Integer> map3 =
+        SmallSortedMap.newInstanceForTest(3);
+    SmallSortedMap<Integer, Integer> map4 =
+        SmallSortedMap.newInstanceForTest(4);
 
     // Test with puts in ascending order.
     for (int i = 0; i < numElements; i++) {
@@ -130,7 +137,7 @@ public class SmallSortedMapTest extends TestCase {
     for (SmallSortedMap<Integer, Integer> map : allMaps) {
       assertEquals(numElements, map.size());
       for (int i = 0; i < numElements; i++) {
-        assertEquals(Integer.valueOf(i + 1), map.get(i));
+        assertEquals(new Integer(i + 1), map.get(i));
       }
     }
 
@@ -146,7 +153,7 @@ public class SmallSortedMapTest extends TestCase {
       assertNull(map.remove(i + 1));
     }
     for (int i = 0; i < 6; i++) {
-      assertEquals(Integer.valueOf(i + 1), map.put(i, i + 2));
+      assertEquals(new Integer(i + 1), map.put(i, i + 2));
     }
   }
 
@@ -159,22 +166,22 @@ public class SmallSortedMapTest extends TestCase {
 
     assertEquals(3, map.getNumArrayEntries());
     assertEquals(3, map.getNumOverflowEntries());
-    assertEquals(6, map.size());
+    assertEquals(6,  map.size());
     assertEquals(makeSortedKeySet(0, 1, 2, 3, 4, 5), map.keySet());
 
-    assertEquals(Integer.valueOf(2), map.remove(1));
+    assertEquals(new Integer(2), map.remove(1));
     assertEquals(3, map.getNumArrayEntries());
     assertEquals(2, map.getNumOverflowEntries());
-    assertEquals(5, map.size());
+    assertEquals(5,  map.size());
     assertEquals(makeSortedKeySet(0, 2, 3, 4, 5), map.keySet());
 
-    assertEquals(Integer.valueOf(5), map.remove(4));
+    assertEquals(new Integer(5), map.remove(4));
     assertEquals(3, map.getNumArrayEntries());
     assertEquals(1, map.getNumOverflowEntries());
-    assertEquals(4, map.size());
+    assertEquals(4,  map.size());
     assertEquals(makeSortedKeySet(0, 2, 3, 5), map.keySet());
 
-    assertEquals(Integer.valueOf(4), map.remove(3));
+    assertEquals(new Integer(4), map.remove(3));
     assertEquals(3, map.getNumArrayEntries());
     assertEquals(0, map.getNumOverflowEntries());
     assertEquals(3, map.size());
@@ -185,7 +192,7 @@ public class SmallSortedMapTest extends TestCase {
     assertEquals(0, map.getNumOverflowEntries());
     assertEquals(3, map.size());
 
-    assertEquals(Integer.valueOf(1), map.remove(0));
+    assertEquals(new Integer(1), map.remove(0));
     assertEquals(2, map.getNumArrayEntries());
     assertEquals(0, map.getNumOverflowEntries());
     assertEquals(2, map.size());
@@ -210,15 +217,16 @@ public class SmallSortedMapTest extends TestCase {
     assertEquals(3, map.getNumArrayEntries());
     for (int i = 0; i < 3; i++) {
       Map.Entry<Integer, Integer> entry = map.getArrayEntryAt(i);
-      assertEquals(Integer.valueOf(i), entry.getKey());
-      assertEquals(Integer.valueOf(i + 1), entry.getValue());
+      assertEquals(new Integer(i), entry.getKey());
+      assertEquals(new Integer(i + 1), entry.getValue());
     }
-    Iterator<Map.Entry<Integer, Integer>> it = map.getOverflowEntries().iterator();
+    Iterator<Map.Entry<Integer, Integer>> it =
+        map.getOverflowEntries().iterator();
     for (int i = 3; i < 6; i++) {
       assertTrue(it.hasNext());
       Map.Entry<Integer, Integer> entry = it.next();
-      assertEquals(Integer.valueOf(i), entry.getKey());
-      assertEquals(Integer.valueOf(i + 1), entry.getValue());
+      assertEquals(new Integer(i), entry.getKey());
+      assertEquals(new Integer(i + 1), entry.getValue());
     }
     assertFalse(it.hasNext());
   }
@@ -230,8 +238,10 @@ public class SmallSortedMapTest extends TestCase {
     }
     Set<Map.Entry<Integer, Integer>> entrySet = map.entrySet();
     for (int i = 0; i < 6; i++) {
-      assertTrue(entrySet.contains(new SimpleEntry<Integer, Integer>(i, i + 1)));
-      assertFalse(entrySet.contains(new SimpleEntry<Integer, Integer>(i, i)));
+      assertTrue(
+          entrySet.contains(new SimpleEntry<Integer, Integer>(i, i + 1)));
+      assertFalse(
+          entrySet.contains(new SimpleEntry<Integer, Integer>(i, i)));
     }
   }
 
@@ -239,12 +249,13 @@ public class SmallSortedMapTest extends TestCase {
     SmallSortedMap<Integer, Integer> map = SmallSortedMap.newInstanceForTest(3);
     Set<Map.Entry<Integer, Integer>> entrySet = map.entrySet();
     for (int i = 0; i < 6; i++) {
-      Map.Entry<Integer, Integer> entry = new SimpleEntry<Integer, Integer>(i, i + 1);
+      Map.Entry<Integer, Integer> entry =
+          new SimpleEntry<Integer, Integer>(i, i + 1);
       assertTrue(entrySet.add(entry));
       assertFalse(entrySet.add(entry));
     }
     for (int i = 0; i < 6; i++) {
-      assertEquals(Integer.valueOf(i + 1), map.get(i));
+      assertEquals(new Integer(i + 1), map.get(i));
     }
     assertEquals(3, map.getNumArrayEntries());
     assertEquals(3, map.getNumOverflowEntries());
@@ -258,7 +269,8 @@ public class SmallSortedMapTest extends TestCase {
       assertNull(map.put(i, i + 1));
     }
     for (int i = 0; i < 6; i++) {
-      Map.Entry<Integer, Integer> entry = new SimpleEntry<Integer, Integer>(i, i + 1);
+      Map.Entry<Integer, Integer> entry =
+          new SimpleEntry<Integer, Integer>(i, i + 1);
       assertTrue(entrySet.remove(entry));
       assertFalse(entrySet.remove(entry));
     }
@@ -273,7 +285,7 @@ public class SmallSortedMapTest extends TestCase {
     for (int i = 0; i < 6; i++) {
       assertNull(map.put(i, i + 1));
     }
-    map.clear();
+    map.entrySet().clear();
     assertTrue(map.isEmpty());
     assertEquals(0, map.getNumArrayEntries());
     assertEquals(0, map.getNumOverflowEntries());
@@ -289,8 +301,8 @@ public class SmallSortedMapTest extends TestCase {
     for (int i = 0; i < 6; i++) {
       assertTrue(it.hasNext());
       Map.Entry<Integer, Integer> entry = it.next();
-      assertEquals(Integer.valueOf(i), entry.getKey());
-      assertEquals(Integer.valueOf(i + 1), entry.getValue());
+      assertEquals(new Integer(i), entry.getKey());
+      assertEquals(new Integer(i + 1), entry.getValue());
     }
     assertFalse(it.hasNext());
   }
@@ -321,7 +333,7 @@ public class SmallSortedMapTest extends TestCase {
       entry.setValue(i + 23);
     }
     for (int i = 0; i < 6; i++) {
-      assertEquals(Integer.valueOf(i + 23), map.get(i));
+      assertEquals(new Integer(i + 23), map.get(i));
     }
   }
 
@@ -331,7 +343,7 @@ public class SmallSortedMapTest extends TestCase {
       assertNull(map.put(i, i + 1));
     }
     map.makeImmutable();
-    assertEquals(Integer.valueOf(1), map.get(0));
+    assertEquals(new Integer(1), map.get(0));
     assertEquals(6, map.size());
 
     try {

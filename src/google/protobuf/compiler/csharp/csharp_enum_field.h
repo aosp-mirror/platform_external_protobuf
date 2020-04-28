@@ -44,34 +44,32 @@ namespace csharp {
 class EnumFieldGenerator : public PrimitiveFieldGenerator {
  public:
   EnumFieldGenerator(const FieldDescriptor* descriptor,
-                     int presenceIndex,
+                     int fieldOrdinal,
                      const Options *options);
   ~EnumFieldGenerator();
-
-  EnumFieldGenerator(const EnumFieldGenerator&) = delete;
-  EnumFieldGenerator& operator=(const EnumFieldGenerator&) = delete;
 
   virtual void GenerateCodecCode(io::Printer* printer);
   virtual void GenerateParsingCode(io::Printer* printer);
   virtual void GenerateSerializationCode(io::Printer* printer);
   virtual void GenerateSerializedSizeCode(io::Printer* printer);
-  virtual void GenerateExtensionCode(io::Printer* printer);
+
+ private:
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(EnumFieldGenerator);
 };
 
 class EnumOneofFieldGenerator : public PrimitiveOneofFieldGenerator {
  public:
   EnumOneofFieldGenerator(const FieldDescriptor* descriptor,
-                          int presenceIndex,
+                          int fieldOrdinal,
                           const Options *options);
   ~EnumOneofFieldGenerator();
 
-  EnumOneofFieldGenerator(const EnumOneofFieldGenerator&) = delete;
-  EnumOneofFieldGenerator& operator=(const EnumOneofFieldGenerator&) = delete;
-
-  virtual void GenerateMergingCode(io::Printer* printer);
   virtual void GenerateParsingCode(io::Printer* printer);
   virtual void GenerateSerializationCode(io::Printer* printer);
   virtual void GenerateSerializedSizeCode(io::Printer* printer);
+
+ private:
+  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(EnumOneofFieldGenerator);
 };
 
 }  // namespace csharp

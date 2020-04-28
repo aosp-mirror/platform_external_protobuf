@@ -17,9 +17,6 @@
 # This file is used for testing.  The original is at:
 #   http://code.google.com/p/pymox/
 
-import inspect
-
-
 class StubOutForTesting:
   """Sample Usage:
      You want os.path.exists() to always return true during testing.

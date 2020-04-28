@@ -38,6 +38,7 @@
 #include <google/protobuf/compiler/objectivec/objectivec_primitive_field.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/wire_format.h>
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/strutil.h>
 
 namespace google {
@@ -48,7 +49,7 @@ namespace objectivec {
 namespace {
 
 void SetCommonFieldVariables(const FieldDescriptor* descriptor,
-                             std::map<string, string>* variables) {
+                             map<string, string>* variables) {
   string camel_case_name = FieldName(descriptor);
   string raw_field_name;
   if (descriptor->type() == FieldDescriptor::TYPE_GROUP) {
@@ -63,7 +64,7 @@ void SetCommonFieldVariables(const FieldDescriptor* descriptor,
 
   SourceLocation location;
   if (descriptor->GetSourceLocation(&location)) {
-    (*variables)["comments"] = BuildCommentsString(location, true);
+    (*variables)["comments"] = BuildCommentsString(location);
   } else {
     (*variables)["comments"] = "\n";
   }
@@ -75,7 +76,7 @@ void SetCommonFieldVariables(const FieldDescriptor* descriptor,
   (*variables)["raw_field_name"] = raw_field_name;
   (*variables)["field_number_name"] =
       classname + "_FieldNumber_" + capitalized_name;
-  (*variables)["field_number"] = StrCat(descriptor->number());
+  (*variables)["field_number"] = SimpleItoa(descriptor->number());
   (*variables)["field_type"] = GetCapitalizedType(descriptor);
   (*variables)["deprecated_attribute"] = GetOptionalDeprecatedAttribute(descriptor);
   std::vector<string> field_flags;
@@ -92,7 +93,7 @@ void SetCommonFieldVariables(const FieldDescriptor* descriptor,
     field_flags.push_back("GPBFieldHasEnumDescriptor");
   }
 
-  (*variables)["fieldflags"] = BuildFlagsString(FLAGTYPE_FIELD, field_flags);
+  (*variables)["fieldflags"] = BuildFlagsString(field_flags);
 
   (*variables)["default"] = DefaultValue(descriptor);
   (*variables)["default_name"] = GPBGenericValueFieldName(descriptor);
@@ -177,7 +178,7 @@ void FieldGenerator::GenerateCFunctionImplementations(
 }
 
 void FieldGenerator::DetermineForwardDeclarations(
-    std::set<string>* fwd_decls) const {
+    set<string>* fwd_decls) const {
   // Nothing
 }
 
@@ -213,7 +214,7 @@ void FieldGenerator::GenerateFieldDescription(
 }
 
 void FieldGenerator::SetRuntimeHasBit(int has_index) {
-  variables_["has_index"] = StrCat(has_index);
+  variables_["has_index"] = SimpleItoa(has_index);
 }
 
 void FieldGenerator::SetNoHasBit(void) {
@@ -227,8 +228,8 @@ int FieldGenerator::ExtraRuntimeHasBitsNeeded(void) const {
 void FieldGenerator::SetExtraRuntimeHasBitsBase(int index_base) {
   // NOTE: src/google/protobuf/compiler/plugin.cc makes use of cerr for some
   // error cases, so it seems to be ok to use as a back door for errors.
-  std::cerr << "Error: should have overridden SetExtraRuntimeHasBitsBase()." << std::endl;
-  std::cerr.flush();
+  cerr << "Error: should have overriden SetExtraRuntimeHasBitsBase()." << endl;
+  cerr.flush();
   abort();
 }
 
@@ -236,7 +237,7 @@ void FieldGenerator::SetOneofIndexBase(int index_base) {
   if (descriptor_->containing_oneof() != NULL) {
     int index = descriptor_->containing_oneof()->index() + index_base;
     // Flip the sign to mark it as a oneof.
-    variables_["has_index"] = StrCat(-index);
+    variables_["has_index"] = SimpleItoa(-index);
   }
 }
 
@@ -334,7 +335,7 @@ void ObjCObjFieldGenerator::GeneratePropertyDeclaration(
   if (WantsHasProperty()) {
     printer->Print(
         variables_,
-        "/** Test to see if @c $name$ has been set. */\n"
+        "/// Test to see if @c $name$ has been set.\n"
         "@property(nonatomic, readwrite) BOOL has$capitalized_name$$deprecated_attribute$;\n");
   }
   if (IsInitName(variables_.find("name")->second)) {
@@ -386,7 +387,7 @@ void RepeatedFieldGenerator::GeneratePropertyDeclaration(
       "$comments$"
       "$array_comment$"
       "@property(nonatomic, readwrite, strong, null_resettable) $array_property_type$ *$name$$storage_attribute$$deprecated_attribute$;\n"
-      "/** The number of items in @c $name$ without causing the array to be created. */\n"
+      "/// The number of items in @c $name$ without causing the array to be created.\n"
       "@property(nonatomic, readonly) NSUInteger $name$_Count$deprecated_attribute$;\n");
   if (IsInitName(variables_.find("name")->second)) {
     // If property name starts with init we need to annotate it to get past ARC.
@@ -409,8 +410,10 @@ bool RepeatedFieldGenerator::RuntimeUsesHasBit(void) const {
 FieldGeneratorMap::FieldGeneratorMap(const Descriptor* descriptor,
                                      const Options& options)
     : descriptor_(descriptor),
-      field_generators_(descriptor->field_count()),
-      extension_generators_(descriptor->extension_count()) {
+      field_generators_(
+          new scoped_ptr<FieldGenerator>[descriptor->field_count()]),
+      extension_generators_(
+          new scoped_ptr<FieldGenerator>[descriptor->extension_count()]) {
   // Construct all the FieldGenerators.
   for (int i = 0; i < descriptor->field_count(); i++) {
     field_generators_[i].reset(

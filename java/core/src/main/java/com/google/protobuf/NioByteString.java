@@ -30,8 +30,6 @@
 
 package com.google.protobuf;
 
-import static com.google.protobuf.Internal.checkNotNull;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidObjectException;
@@ -44,26 +42,33 @@ import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.List;
 
-/** A {@link ByteString} that wraps around a {@link ByteBuffer}. */
+/**
+ * A {@link ByteString} that wraps around a {@link ByteBuffer}.
+ */
 final class NioByteString extends ByteString.LeafByteString {
   private final ByteBuffer buffer;
 
   NioByteString(ByteBuffer buffer) {
-    checkNotNull(buffer, "buffer");
+    if (buffer == null) {
+      throw new NullPointerException("buffer");
+    }
 
-    // Use native byte order for fast fixed32/64 operations.
     this.buffer = buffer.slice().order(ByteOrder.nativeOrder());
   }
 
   // =================================================================
   // Serializable
 
-  /** Magic method that lets us override serialization behavior. */
+  /**
+   * Magic method that lets us override serialization behavior.
+   */
   private Object writeReplace() {
     return ByteString.copyFrom(buffer.slice());
   }
 
-  /** Magic method that lets us override deserialization behavior. */
+  /**
+   * Magic method that lets us override deserialization behavior.
+   */
   private void readObject(@SuppressWarnings("unused") ObjectInputStream in) throws IOException {
     throw new InvalidObjectException("NioByteString instances are not to be serialized directly");
   }
@@ -79,13 +84,6 @@ final class NioByteString extends ByteString.LeafByteString {
     } catch (IndexOutOfBoundsException e) {
       throw new ArrayIndexOutOfBoundsException(e.getMessage());
     }
-  }
-
-  @Override
-  public byte internalByteAt(int index) {
-    // it isn't possible to avoid the bounds checking inside of ByteBuffer, so just use the default
-    // implementation.
-    return byteAt(index);
   }
 
   @Override
@@ -268,7 +266,7 @@ final class NioByteString extends ByteString.LeafByteString {
 
   @Override
   public CodedInputStream newCodedInput() {
-    return CodedInputStream.newInstance(buffer, true);
+    return CodedInputStream.newInstance(buffer);
   }
 
   /**

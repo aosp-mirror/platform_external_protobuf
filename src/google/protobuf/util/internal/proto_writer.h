@@ -32,11 +32,10 @@
 #define GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTO_WRITER_H__
 
 #include <deque>
+#include <google/protobuf/stubs/hash.h>
 #include <string>
-#include <vector>
 
 #include <google/protobuf/stubs/common.h>
-#include <google/protobuf/type.pb.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/descriptor.h>
@@ -46,12 +45,21 @@
 #include <google/protobuf/util/internal/structured_objectwriter.h>
 #include <google/protobuf/util/type_resolver.h>
 #include <google/protobuf/stubs/bytestream.h>
-#include <google/protobuf/stubs/hash.h>
-#include <google/protobuf/stubs/status.h>
-
-#include <google/protobuf/port_def.inc>
 
 namespace google {
+namespace protobuf {
+namespace io {
+class CodedOutputStream;
+}  // namespace io
+}  // namespace protobuf
+
+
+namespace protobuf {
+class Type;
+class Field;
+}  // namespace protobuf
+
+
 namespace protobuf {
 namespace util {
 namespace converter {
@@ -64,52 +72,50 @@ class ObjectLocationTracker;
 // special types by inheriting from it or by wrapping it.
 //
 // It also supports streaming.
-class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+class LIBPROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
  public:
 // Constructor. Does not take ownership of any parameter passed in.
   ProtoWriter(TypeResolver* type_resolver, const google::protobuf::Type& type,
               strings::ByteSink* output, ErrorListener* listener);
-  ~ProtoWriter() override;
+  virtual ~ProtoWriter();
 
   // ObjectWriter methods.
-  ProtoWriter* StartObject(StringPiece name) override;
-  ProtoWriter* EndObject() override;
-  ProtoWriter* StartList(StringPiece name) override;
-  ProtoWriter* EndList() override;
-  ProtoWriter* RenderBool(StringPiece name, bool value) override {
+  virtual ProtoWriter* StartObject(StringPiece name);
+  virtual ProtoWriter* EndObject();
+  virtual ProtoWriter* StartList(StringPiece name);
+  virtual ProtoWriter* EndList();
+  virtual ProtoWriter* RenderBool(StringPiece name, bool value) {
     return RenderDataPiece(name, DataPiece(value));
   }
-  ProtoWriter* RenderInt32(StringPiece name, int32 value) override {
+  virtual ProtoWriter* RenderInt32(StringPiece name, int32 value) {
     return RenderDataPiece(name, DataPiece(value));
   }
-  ProtoWriter* RenderUint32(StringPiece name, uint32 value) override {
+  virtual ProtoWriter* RenderUint32(StringPiece name, uint32 value) {
     return RenderDataPiece(name, DataPiece(value));
   }
-  ProtoWriter* RenderInt64(StringPiece name, int64 value) override {
+  virtual ProtoWriter* RenderInt64(StringPiece name, int64 value) {
     return RenderDataPiece(name, DataPiece(value));
   }
-  ProtoWriter* RenderUint64(StringPiece name, uint64 value) override {
+  virtual ProtoWriter* RenderUint64(StringPiece name, uint64 value) {
     return RenderDataPiece(name, DataPiece(value));
   }
-  ProtoWriter* RenderDouble(StringPiece name, double value) override {
+  virtual ProtoWriter* RenderDouble(StringPiece name, double value) {
     return RenderDataPiece(name, DataPiece(value));
   }
-  ProtoWriter* RenderFloat(StringPiece name, float value) override {
+  virtual ProtoWriter* RenderFloat(StringPiece name, float value) {
     return RenderDataPiece(name, DataPiece(value));
   }
-  ProtoWriter* RenderString(StringPiece name,
-                            StringPiece value) override {
+  virtual ProtoWriter* RenderString(StringPiece name, StringPiece value) {
     return RenderDataPiece(name,
                            DataPiece(value, use_strict_base64_decoding()));
   }
-  ProtoWriter* RenderBytes(StringPiece name, StringPiece value) override {
+  virtual ProtoWriter* RenderBytes(StringPiece name, StringPiece value) {
     return RenderDataPiece(
         name, DataPiece(value, false, use_strict_base64_decoding()));
   }
-  ProtoWriter* RenderNull(StringPiece name) override {
+  virtual ProtoWriter* RenderNull(StringPiece name) {
     return RenderDataPiece(name, DataPiece::NullData());
   }
-
 
   // Renders a DataPiece 'value' into a field whose wire type is determined
   // from the given field 'name'.
@@ -118,14 +124,14 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
 
   // Returns the location tracker to use for tracking locations for errors.
   const LocationTrackerInterface& location() {
-    return element_ != nullptr ? *element_ : *tracker_;
+    return element_ != NULL ? *element_ : *tracker_;
   }
 
   // When true, we finished writing to output a complete message.
-  bool done() override { return done_; }
+  bool done() { return done_; }
 
   // Returns the proto stream object.
-  io::CodedOutputStream* stream() { return stream_.get(); }
+  google::protobuf::io::CodedOutputStream* stream() { return stream_.get(); }
 
   // Getters and mutators of invalid_depth_.
   void IncrementInvalidDepth() { ++invalid_depth_; }
@@ -136,27 +142,8 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
 
   const TypeInfo* typeinfo() { return typeinfo_; }
 
-  void set_ignore_unknown_fields(bool ignore_unknown_fields) {
-    ignore_unknown_fields_ = ignore_unknown_fields;
-  }
-
-  bool ignore_unknown_fields() { return ignore_unknown_fields_; }
-
-  void set_ignore_unknown_enum_values(bool ignore_unknown_enum_values) {
-    ignore_unknown_enum_values_ = ignore_unknown_enum_values;
-  }
-
-  void set_use_lower_camel_for_enums(bool use_lower_camel_for_enums) {
-    use_lower_camel_for_enums_ = use_lower_camel_for_enums;
-  }
-
-  void set_case_insensitive_enum_parsing(bool case_insensitive_enum_parsing) {
-    case_insensitive_enum_parsing_ = case_insensitive_enum_parsing;
-  }
-
  protected:
-  class PROTOBUF_EXPORT ProtoElement : public BaseElement,
-                                       public LocationTrackerInterface {
+  class LIBPROTOBUF_EXPORT ProtoElement : public BaseElement, public LocationTrackerInterface {
    public:
     // Constructor for the root element. No parent nor field.
     ProtoElement(const TypeInfo* typeinfo, const google::protobuf::Type& type,
@@ -166,7 +153,7 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
     ProtoElement(ProtoElement* parent, const google::protobuf::Field* field,
                  const google::protobuf::Type& type, bool is_list);
 
-    ~ProtoElement() override {}
+    virtual ~ProtoElement() {}
 
     // Called just before the destructor for clean up:
     //   - reports any missing required fields
@@ -176,7 +163,7 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
     ProtoElement* pop();
 
     // Accessors
-    // parent_field() may be nullptr if we are at root.
+    // parent_field() may be NULL if we are at root.
     const google::protobuf::Field* parent_field() const {
       return parent_field_;
     }
@@ -186,20 +173,18 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
     void RegisterField(const google::protobuf::Field* field);
 
     // To report location on error messages.
-    std::string ToString() const override;
+    virtual string ToString() const;
 
-    ProtoElement* parent() const override {
+    virtual ProtoElement* parent() const {
       return static_cast<ProtoElement*>(BaseElement::parent());
     }
 
-    // Returns true if the index is already taken by a preceding oneof input.
+    // Returns true if the index is already taken by a preceeding oneof input.
     bool IsOneofIndexTaken(int32 index);
 
     // Marks the oneof 'index' as taken. Future inputs to this oneof will
     // generate an error.
     void TakeOneofIndex(int32 index);
-
-    bool proto3() { return proto3_; }
 
    private:
     // Used for access to variables of the enclosing instance of
@@ -207,14 +192,11 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
     ProtoWriter* ow_;
 
     // Describes the element as a field in the parent message.
-    // parent_field_ is nullptr if and only if this element is the root element.
+    // parent_field_ is NULL if and only if this element is the root element.
     const google::protobuf::Field* parent_field_;
 
     // TypeInfo to lookup types.
     const TypeInfo* typeinfo_;
-
-    // Whether the type_ is proto3 or not.
-    bool proto3_;
 
     // Additional variables if this element is a message:
     // (Root element is always a message).
@@ -231,7 +213,7 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
 
     // Set of oneof indices already seen for the type_. Used to validate
     // incoming messages so no more than one oneof is set.
-    std::vector<bool> oneof_indices_;
+    hash_set<int32> oneof_indices_;
 
     GOOGLE_DISALLOW_IMPLICIT_CONSTRUCTORS(ProtoElement);
   };
@@ -245,7 +227,7 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
   ProtoWriter(const TypeInfo* typeinfo, const google::protobuf::Type& type,
               strings::ByteSink* output, ErrorListener* listener);
 
-  ProtoElement* element() override { return element_.get(); }
+  virtual ProtoElement* element() { return element_.get(); }
 
   // Helper methods for calling ErrorListener. See error_listener.h.
   void InvalidName(StringPiece unknown_name, StringPiece message);
@@ -254,16 +236,14 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
 
   // Common code for BeginObject() and BeginList() that does invalid_depth_
   // bookkeeping associated with name lookup.
-  const google::protobuf::Field* BeginNamed(StringPiece name,
-                                            bool is_list);
+  const google::protobuf::Field* BeginNamed(StringPiece name, bool is_list);
 
   // Lookup the field in the current element. Looks in the base descriptor
   // and in any extension. This will report an error if the field cannot be
-  // found when ignore_unknown_names_ is false or if multiple matching
-  // extensions are found.
+  // found or if multiple matching extensions are found.
   const google::protobuf::Field* Lookup(StringPiece name);
 
-  // Lookup the field type in the type descriptor. Returns nullptr if the type
+  // Lookup the field type in the type descriptor. Returns NULL if the type
   // is not known.
   const google::protobuf::Type* LookupType(
       const google::protobuf::Field* field);
@@ -302,14 +282,6 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
                                     const DataPiece& value);
 
  private:
-  // Writes an ENUM field, including tag, to the stream.
-  static util::Status WriteEnum(int field_number, const DataPiece& data,
-                                  const google::protobuf::Enum* enum_type,
-                                  io::CodedOutputStream* stream,
-                                  bool use_lower_camel_for_enums,
-                                  bool case_insensitive_enum_parsing,
-                                  bool ignore_unknown_values);
-
   // Variables for describing the structure of the input tree:
   // master_type_: descriptor for the whole protobuf message.
   // typeinfo_ : the TypeInfo object to lookup types.
@@ -321,25 +293,12 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
   // Indicates whether we finished writing root message completely.
   bool done_;
 
-  // If true, don't report unknown field names to the listener.
-  bool ignore_unknown_fields_;
-
-  // If true, don't report unknown enum values to the listener.
-  bool ignore_unknown_enum_values_;
-
-  // If true, check if enum name in camel case or without underscore matches the
-  // field name.
-  bool use_lower_camel_for_enums_;
-
-  // If true, check if enum name in UPPER_CASE matches the field name.
-  bool case_insensitive_enum_parsing_;
-
   // Variable for internal state processing:
   // element_    : the current element.
   // size_insert_: sizes of nested messages.
   //               pos  - position to insert the size field.
   //               size - size value to be inserted.
-  std::unique_ptr<ProtoElement> element_;
+  google::protobuf::scoped_ptr<ProtoElement> element_;
   std::deque<SizeInfo> size_insert_;
 
   // Variables for output generation:
@@ -348,9 +307,9 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
   // adapter_ : internal adapter between CodedOutputStream and buffer_.
   // stream_  : wrapper for writing tags and other encodings in wire format.
   strings::ByteSink* output_;
-  std::string buffer_;
-  io::StringOutputStream adapter_;
-  std::unique_ptr<io::CodedOutputStream> stream_;
+  string buffer_;
+  google::protobuf::io::StringOutputStream adapter_;
+  google::protobuf::scoped_ptr<google::protobuf::io::CodedOutputStream> stream_;
 
   // Variables for error tracking and reporting:
   // listener_     : a place to report any errors found.
@@ -358,7 +317,7 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
   // tracker_      : the root location tracker interface.
   ErrorListener* listener_;
   int invalid_depth_;
-  std::unique_ptr<LocationTrackerInterface> tracker_;
+  google::protobuf::scoped_ptr<LocationTrackerInterface> tracker_;
 
   GOOGLE_DISALLOW_IMPLICIT_CONSTRUCTORS(ProtoWriter);
 };
@@ -366,8 +325,6 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
 }  // namespace converter
 }  // namespace util
 }  // namespace protobuf
+
 }  // namespace google
-
-#include <google/protobuf/port_undef.inc>
-
 #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTO_WRITER_H__

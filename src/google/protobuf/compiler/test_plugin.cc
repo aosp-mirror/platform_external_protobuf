@@ -33,23 +33,11 @@
 // This is a dummy code generator plugin used by
 // command_line_interface_unittest.
 
-#include <stdlib.h>
 #include <string>
-#include <google/protobuf/compiler/mock_code_generator.h>
+#include <stdlib.h>
 #include <google/protobuf/compiler/plugin.h>
-
-namespace google {
-namespace protobuf {
-namespace compiler {
-
-int ProtobufMain(int argc, char* argv[]) {
-  MockCodeGenerator generator("test_plugin");
-  return PluginMain(argc, argv, &generator);
-}
-
-}  // namespace compiler
-}  // namespace protobuf
-}  // namespace google
+#include <google/protobuf/compiler/mock_code_generator.h>
+#include <google/protobuf/stubs/strutil.h>
 
 int main(int argc, char* argv[]) {
 #ifdef _MSC_VER
@@ -57,5 +45,7 @@ int main(int argc, char* argv[]) {
   // please.
   _set_abort_behavior(0, ~0);
 #endif  // !_MSC_VER
-  return google::protobuf::compiler::ProtobufMain(argc, argv);
+
+  google::protobuf::compiler::MockCodeGenerator generator("test_plugin");
+  return google::protobuf::compiler::PluginMain(argc, argv, &generator);
 }

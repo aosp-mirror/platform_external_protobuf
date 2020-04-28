@@ -32,8 +32,11 @@
 #include <string>
 
 #include <google/protobuf/compiler/objectivec/objectivec_map_field.h>
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/compiler/objectivec/objectivec_helpers.h>
 #include <google/protobuf/io/printer.h>
+#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/stubs/substitute.h>
 
 namespace google {
 namespace protobuf {
@@ -112,7 +115,7 @@ MapFieldGenerator::MapFieldGenerator(const FieldDescriptor* descriptor,
   if (value_field_flags.find("GPBFieldHasEnumDescriptor") != string::npos) {
     field_flags.push_back("GPBFieldHasEnumDescriptor");
   }
-  variables_["fieldflags"] = BuildFlagsString(FLAGTYPE_FIELD, field_flags);
+  variables_["fieldflags"] = BuildFlagsString(field_flags);
 
   ObjectiveCType value_objc_type = GetObjectiveCType(value_descriptor);
   const bool value_is_object_type =
@@ -159,7 +162,7 @@ void MapFieldGenerator::FinishInitialization(void) {
 }
 
 void MapFieldGenerator::DetermineForwardDeclarations(
-    std::set<string>* fwd_decls) const {
+    set<string>* fwd_decls) const {
   RepeatedFieldGenerator::DetermineForwardDeclarations(fwd_decls);
   const FieldDescriptor* value_descriptor =
       descriptor_->message_type()->FindFieldByName("value");

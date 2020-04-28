@@ -41,29 +41,26 @@
 
 namespace google {
 namespace protobuf {
-namespace compiler {
-namespace java {
-class Context;            // context.h
-class ClassNameResolver;  // name_resolver.h
-}  // namespace java
-}  // namespace compiler
-}  // namespace protobuf
-}  // namespace google
+  namespace compiler {
+    namespace java {
+      class Context;            // context.h
+      class ClassNameResolver;  // name_resolver.h
+    }
+  }
+}
 
-namespace google {
 namespace protobuf {
 namespace compiler {
 namespace java {
 
 class ImmutableEnumFieldGenerator : public ImmutableFieldGenerator {
  public:
-  explicit ImmutableEnumFieldGenerator(const FieldDescriptor* descriptor,
-                                       int messageBitIndex, int builderBitIndex,
-                                       Context* context);
+  explicit ImmutableEnumFieldGenerator(
+      const FieldDescriptor* descriptor, int messageBitIndex,
+      int builderBitIndex, Context* context);
   ~ImmutableEnumFieldGenerator();
 
-  // implements ImmutableFieldGenerator
-  // ---------------------------------------
+  // implements ImmutableFieldGenerator ---------------------------------------
   int GetNumBitsForMessage() const;
   int GetNumBitsForBuilder() const;
   void GenerateInterfaceMembers(io::Printer* printer) const;
@@ -81,11 +78,14 @@ class ImmutableEnumFieldGenerator : public ImmutableFieldGenerator {
   void GenerateEqualsCode(io::Printer* printer) const;
   void GenerateHashCode(io::Printer* printer) const;
 
-  std::string GetBoxedType() const;
+  string GetBoxedType() const;
 
  protected:
   const FieldDescriptor* descriptor_;
-  std::map<std::string, std::string> variables_;
+  map<string, string> variables_;
+  const int messageBitIndex_;
+  const int builderBitIndex_;
+  Context* context_;
   ClassNameResolver* name_resolver_;
 
  private:
@@ -94,9 +94,9 @@ class ImmutableEnumFieldGenerator : public ImmutableFieldGenerator {
 
 class ImmutableEnumOneofFieldGenerator : public ImmutableEnumFieldGenerator {
  public:
-  ImmutableEnumOneofFieldGenerator(const FieldDescriptor* descriptor,
-                                   int messageBitIndex, int builderBitIndex,
-                                   Context* context);
+  ImmutableEnumOneofFieldGenerator(
+      const FieldDescriptor* descriptor, int messageBitIndex,
+      int builderBitIndex, Context* context);
   ~ImmutableEnumOneofFieldGenerator();
 
   void GenerateMembers(io::Printer* printer) const;
@@ -139,11 +139,14 @@ class RepeatedImmutableEnumFieldGenerator : public ImmutableFieldGenerator {
   void GenerateEqualsCode(io::Printer* printer) const;
   void GenerateHashCode(io::Printer* printer) const;
 
-  std::string GetBoxedType() const;
+  string GetBoxedType() const;
 
  private:
   const FieldDescriptor* descriptor_;
-  std::map<std::string, std::string> variables_;
+  map<string, string> variables_;
+  const int messageBitIndex_;
+  const int builderBitIndex_;
+  Context* context_;
   ClassNameResolver* name_resolver_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(RepeatedImmutableEnumFieldGenerator);
@@ -152,6 +155,6 @@ class RepeatedImmutableEnumFieldGenerator : public ImmutableFieldGenerator {
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
-}  // namespace google
 
+}  // namespace google
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_ENUM_FIELD_H__

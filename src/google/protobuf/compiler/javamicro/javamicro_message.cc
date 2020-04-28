@@ -33,7 +33,7 @@
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
 #include <algorithm>
-#include <unordered_set>
+#include <google/protobuf/stubs/hash.h>
 #include <google/protobuf/compiler/javamicro/javamicro_message.h>
 #include <google/protobuf/compiler/javamicro/javamicro_enum.h>
 #include <google/protobuf/compiler/javamicro/javamicro_helpers.h>
@@ -76,7 +76,7 @@ const FieldDescriptor** SortFieldsByNumber(const Descriptor* descriptor) {
   for (int i = 0; i < descriptor->field_count(); i++) {
     fields[i] = descriptor->field(i);
   }
-  std::sort(fields, fields + descriptor->field_count(),
+  sort(fields, fields + descriptor->field_count(),
        FieldOrderingByNumber());
   return fields;
 }
@@ -95,7 +95,7 @@ string UniqueFileScopeIdentifier(const Descriptor* descriptor) {
 // (and also to protect against recursion).
 static bool HasRequiredFields(
     const Descriptor* type,
-    std::unordered_set<const Descriptor*>* already_seen) {
+    hash_set<const Descriptor*>* already_seen) {
   if (already_seen->count(type) > 0) {
     // The type is already in cache.  This means that either:
     // a. The type has no required fields.
@@ -130,7 +130,7 @@ static bool HasRequiredFields(
 }
 
 static bool HasRequiredFields(const Descriptor* type) {
-  std::unordered_set<const Descriptor*> already_seen;
+  hash_set<const Descriptor*> already_seen;
   return HasRequiredFields(type, &already_seen);
 }
 
@@ -228,7 +228,7 @@ void MessageGenerator::Generate(io::Printer* printer) {
 
 void MessageGenerator::
 GenerateMessageSerializationMethods(io::Printer* printer) {
-  std::unique_ptr<const FieldDescriptor*[]> sorted_fields(
+  scoped_array<const FieldDescriptor*> sorted_fields(
     SortFieldsByNumber(descriptor_));
 
   if (descriptor_->extension_range_count() != 0) {
@@ -285,7 +285,7 @@ GenerateMessageSerializationMethods(io::Printer* printer) {
 }
 
 void MessageGenerator::GenerateMergeFromMethods(io::Printer* printer) {
-  std::unique_ptr<const FieldDescriptor*[]> sorted_fields(
+  scoped_array<const FieldDescriptor*> sorted_fields(
     SortFieldsByNumber(descriptor_));
 
   if (params_.java_use_vector()) {

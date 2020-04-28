@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	pb "github.com/protocolbuffers/protobuf/examples/tutorial"
+	pb "github.com/google/protobuf/examples/tutorial"
 )
 
 func TestWritePersonWritesPerson(t *testing.T) {
@@ -34,7 +34,7 @@ func TestWritePersonWritesPerson(t *testing.T) {
 
 func TestListPeopleWritesList(t *testing.T) {
 	buf := new(bytes.Buffer)
-	in := pb.AddressBook{People: []*pb.Person{
+	in := pb.AddressBook{[]*pb.Person{
 		{
 			Name:  "John Doe",
 			Id:    101,

@@ -9,6 +9,7 @@ Local Modifications:
  - Initial changes include support for the micro protobuf compiler and the
    assoicated runtime.
  - https://github.com/google/protobuf/pull/2732: const FieldDescriptorCompare
+ - Add NOLINT to "return *default_instance_;" in cpp_message.cc.
 
 Protocol Buffers are a way of encoding structured data in an efficient
 yet extensible format. Google uses Protocol Buffers for almost all

@@ -35,14 +35,13 @@
 
 syntax = "proto2";
 
-package protobuf_unittest;
-
 import "com/google/protobuf/non_nested_extension.proto";
+
+package protobuf_unittest;
 
 
 message MyNestedExtension {
   extend MessageToBeExtended {
     optional MessageToBeExtended recursiveExtension = 2;
-    optional int32 default = 2002;
   }
 }

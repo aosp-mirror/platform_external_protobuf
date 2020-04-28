@@ -32,12 +32,6 @@
 
 #import "GPBMessage_PackagePrivate.h"
 
-// Direct access is use for speed, to avoid even internally declaring things
-// read/write, etc. The warning is enabled in the project to ensure code calling
-// protos can turn on -Wdirect-ivar-access without issues.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdirect-ivar-access"
-
 // Mutable arrays use an internal buffer that can always hold a multiple of this elements.
 #define kChunkSize 16
 #define CapacityFromCount(x) (((x / kChunkSize) + 1) * kChunkSize)
@@ -164,16 +158,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
 //%  [super dealloc];
 //%}
 //%
-//%- (BOOL)isEqual:(id)other {
+//%- (BOOL)isEqual:(GPB##NAME##Array *)other {
 //%  if (self == other) {
 //%    return YES;
 //%  }
 //%  if (![other isKindOfClass:[GPB##NAME##Array class]]) {
 //%    return NO;
 //%  }
-//%  GPB##NAME##Array *otherArray = other;
-//%  return (_count == otherArray->_count
-//%          && memcmp(_values, otherArray->_values, (_count * sizeof(TYPE))) == 0);
+//%  return (_count == other->_count
+//%          && memcmp(_values, other->_values, (_count * sizeof(TYPE))) == 0);
 //%}
 //%
 //%- (NSUInteger)hash {
@@ -194,12 +187,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
 //%  return result;
 //%}
 //%
-//%- (void)enumerate##ACCESSOR_NAME##ValuesWithBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx, BOOL *stop))block {
-//%  [self enumerate##ACCESSOR_NAME##ValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+//%- (void)enumerate##ACCESSOR_NAME##ValuesWithBlock:(void (^)(TYPE value, NSUInteger idx, BOOL *stop))block {
+//%  [self enumerate##ACCESSOR_NAME##ValuesWithOptions:0 usingBlock:block];
 //%}
 //%
 //%- (void)enumerate##ACCESSOR_NAME##ValuesWithOptions:(NSEnumerationOptions)opts
-//%                  ACCESSOR_NAME$S      usingBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx, BOOL *stop))block {
+//%                  ACCESSOR_NAME$S      usingBlock:(void (^)(TYPE value, NSUInteger idx, BOOL *stop))block {
 //%  // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
 //%  BOOL stop = NO;
 //%  if ((opts & NSEnumerationReverse) == 0) {
@@ -375,16 +368,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBInt32Array *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBInt32Array class]]) {
     return NO;
   }
-  GPBInt32Array *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(int32_t))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(int32_t))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -405,12 +397,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(int32_t value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(int32_t value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -623,16 +615,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBUInt32Array *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBUInt32Array class]]) {
     return NO;
   }
-  GPBUInt32Array *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(uint32_t))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(uint32_t))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -653,12 +644,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(uint32_t value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(uint32_t value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(uint32_t value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(uint32_t value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -871,16 +862,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBInt64Array *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBInt64Array class]]) {
     return NO;
   }
-  GPBInt64Array *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(int64_t))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(int64_t))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -901,12 +891,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int64_t value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(int64_t value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(int64_t value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(int64_t value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -1119,16 +1109,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBUInt64Array *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBUInt64Array class]]) {
     return NO;
   }
-  GPBUInt64Array *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(uint64_t))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(uint64_t))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -1149,12 +1138,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(uint64_t value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(uint64_t value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(uint64_t value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(uint64_t value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -1367,16 +1356,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBFloatArray *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBFloatArray class]]) {
     return NO;
   }
-  GPBFloatArray *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(float))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(float))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -1397,12 +1385,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(float value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(float value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(float value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(float value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -1615,16 +1603,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBDoubleArray *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBDoubleArray class]]) {
     return NO;
   }
-  GPBDoubleArray *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(double))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(double))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -1645,12 +1632,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(double value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(double value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(double value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(double value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -1863,16 +1850,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBBoolArray *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBBoolArray class]]) {
     return NO;
   }
-  GPBBoolArray *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(BOOL))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(BOOL))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -1893,12 +1879,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(BOOL value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(BOOL value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(BOOL value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(BOOL value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -2135,16 +2121,15 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   [super dealloc];
 }
 
-- (BOOL)isEqual:(id)other {
+- (BOOL)isEqual:(GPBEnumArray *)other {
   if (self == other) {
     return YES;
   }
   if (![other isKindOfClass:[GPBEnumArray class]]) {
     return NO;
   }
-  GPBEnumArray *otherArray = other;
-  return (_count == otherArray->_count
-          && memcmp(_values, otherArray->_values, (_count * sizeof(int32_t))) == 0);
+  return (_count == other->_count
+          && memcmp(_values, other->_values, (_count * sizeof(int32_t))) == 0);
 }
 
 - (NSUInteger)hash {
@@ -2165,12 +2150,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return result;
 }
 
-- (void)enumerateRawValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateRawValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateRawValuesWithBlock:(void (^)(int32_t value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateRawValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateRawValuesWithOptions:(NSEnumerationOptions)opts
-                           usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block {
+                           usingBlock:(void (^)(int32_t value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   if ((opts & NSEnumerationReverse) == 0) {
@@ -2217,12 +2202,12 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return _values[index];
 }
 
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block {
-  [self enumerateValuesWithOptions:(NSEnumerationOptions)0 usingBlock:block];
+- (void)enumerateValuesWithBlock:(void (^)(int32_t value, NSUInteger idx, BOOL *stop))block {
+  [self enumerateValuesWithOptions:0 usingBlock:block];
 }
 
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block {
+                        usingBlock:(void (^)(int32_t value, NSUInteger idx, BOOL *stop))block {
   // NSEnumerationConcurrent isn't currently supported (and Apple's docs say that is ok).
   BOOL stop = NO;
   GPBEnumValidationFunc func = _validationFunc;
@@ -2519,14 +2504,14 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
 
 - (id)copyWithZone:(NSZone *)zone {
   if (_array == nil) {
-    return [[NSMutableArray allocWithZone:zone] init];
+    _array = [[NSMutableArray alloc] init];
   }
   return [_array copyWithZone:zone];
 }
 
 - (id)mutableCopyWithZone:(NSZone *)zone {
   if (_array == nil) {
-    return [[NSMutableArray allocWithZone:zone] init];
+    _array = [[NSMutableArray alloc] init];
   }
   return [_array mutableCopyWithZone:zone];
 }
@@ -2537,15 +2522,13 @@ static BOOL ArrayDefault_IsValidValue(int32_t value) {
   return [_array countByEnumeratingWithState:state objects:buffer count:len];
 }
 
-- (void)enumerateObjectsUsingBlock:(void (NS_NOESCAPE ^)(id obj, NSUInteger idx, BOOL *stop))block {
+- (void)enumerateObjectsUsingBlock:(void (^)(id obj, NSUInteger idx, BOOL *stop))block {
   [_array enumerateObjectsUsingBlock:block];
 }
 
 - (void)enumerateObjectsWithOptions:(NSEnumerationOptions)opts
-                         usingBlock:(void (NS_NOESCAPE ^)(id obj, NSUInteger idx, BOOL *stop))block {
+                         usingBlock:(void (^)(id obj, NSUInteger idx, BOOL *stop))block {
   [_array enumerateObjectsWithOptions:opts usingBlock:block];
 }
 
 @end
-
-#pragma clang diagnostic pop

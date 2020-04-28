@@ -37,17 +37,13 @@
 
 #include <google/protobuf/descriptor.h>
 
-#include <google/protobuf/port_def.inc>
-
 namespace google {
 namespace protobuf {
-namespace io {
-class Printer;  // printer.h
+  namespace io {
+    class Printer;             // printer.h
+  }
 }
-}  // namespace protobuf
-}  // namespace google
 
-namespace google {
 namespace protobuf {
 namespace compiler {
 namespace java {
@@ -63,13 +59,11 @@ void WriteMethodDocComment(io::Printer* printer,
                            const MethodDescriptor* method);
 
 // Exposed for testing only.
-PROTOC_EXPORT std::string EscapeJavadoc(const std::string& input);
+LIBPROTOC_EXPORT string EscapeJavadoc(const string& input);
 
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
+
 }  // namespace google
-
-#include <google/protobuf/port_undef.inc>
-
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_DOC_COMMENT_H__

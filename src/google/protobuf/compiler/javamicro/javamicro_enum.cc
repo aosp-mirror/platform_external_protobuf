@@ -32,6 +32,7 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
+#include <map>
 #include <string>
 
 #include <google/protobuf/compiler/javamicro/javamicro_params.h>
@@ -69,17 +70,21 @@ EnumGenerator::~EnumGenerator() {}
 void EnumGenerator::Generate(io::Printer* printer) {
   printer->Print("// enum $classname$\n", "classname", descriptor_->name());
   for (int i = 0; i < canonical_values_.size(); i++) {
-    printer->Print("public static final int $name$ = $canonical_value$;\n",
-      "name", canonical_values_[i]->name(),
-      "canonical_value", SimpleItoa(canonical_values_[i]->number()));
+    map<string, string> vars;
+    vars["name"] = canonical_values_[i]->name();
+    vars["canonical_value"] = SimpleItoa(canonical_values_[i]->number());
+    printer->Print(vars,
+      "public static final int $name$ = $canonical_value$;\n");
   }
 
   // -----------------------------------------------------------------
 
   for (int i = 0; i < aliases_.size(); i++) {
-    printer->Print("public static final int $name$ = $canonical_name$;\n",
-      "name", aliases_[i].value->name(),
-      "canonical_name", aliases_[i].canonical_value->name());
+    map<string, string> vars;
+    vars["name"] = aliases_[i].value->name();
+    vars["canonical_name"] = aliases_[i].canonical_value->name();
+    printer->Print(vars,
+      "public static final int $name$ = $canonical_name$;\n");
   }
 
   printer->Print("\n");

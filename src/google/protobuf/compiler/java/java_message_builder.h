@@ -35,25 +35,23 @@
 #ifndef GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_BUILDER_H__
 #define GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_BUILDER_H__
 
-#include <map>
 #include <string>
+#include <map>
 #include <google/protobuf/compiler/java/java_field.h>
 
 namespace google {
 namespace protobuf {
-namespace compiler {
-namespace java {
-class Context;            // context.h
-class ClassNameResolver;  // name_resolver.h
-}  // namespace java
-}  // namespace compiler
-namespace io {
-class Printer;  // printer.h
+  namespace compiler {
+    namespace java {
+      class Context;           // context.h
+      class ClassNameResolver; // name_resolver.h
+    }
+  }
+  namespace io {
+    class Printer;             // printer.h
+  }
 }
-}  // namespace protobuf
-}  // namespace google
 
-namespace google {
 namespace protobuf {
 namespace compiler {
 namespace java {
@@ -83,6 +81,6 @@ class MessageBuilderGenerator {
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
-}  // namespace google
 
+}  // namespace google
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_MESSAGE_BUILDER_H__

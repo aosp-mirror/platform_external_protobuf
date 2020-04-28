@@ -31,8 +31,6 @@
 // Author: kenton@google.com (Kenton Varda)
 
 #include <google/protobuf/stubs/substitute.h>
-
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/stl_util.h>
 
@@ -46,7 +44,7 @@ using internal::SubstituteArg;
 // to Substitute().
 static int CountSubstituteArgs(const SubstituteArg* const* args_array) {
   int count = 0;
-  while (args_array[count] != nullptr && args_array[count]->size() != -1) {
+  while (args_array[count] != NULL && args_array[count]->size() != -1) {
     ++count;
   }
   return count;
@@ -73,7 +71,7 @@ void SubstituteAndAppend(
     const SubstituteArg& arg6, const SubstituteArg& arg7,
     const SubstituteArg& arg8, const SubstituteArg& arg9) {
   const SubstituteArg* const args_array[] = {
-    &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9, nullptr
+    &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9, NULL
   };
 
   // Determine total size needed.
@@ -115,9 +113,7 @@ void SubstituteAndAppend(
   for (int i = 0; format[i] != '\0'; i++) {
     if (format[i] == '$') {
       if (ascii_isdigit(format[i+1])) {
-        unsigned int index = format[i+1] - '0';
-        assert(index < 10);
-        const SubstituteArg* src = args_array[index];
+        const SubstituteArg* src = args_array[format[i+1] - '0'];
         memcpy(target, src->data(), src->size());
         target += src->size();
         ++i;  // Skip next char.

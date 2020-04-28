@@ -42,20 +42,18 @@
 
 namespace google {
 namespace protobuf {
-class FieldDescriptor;  // descriptor.h
-namespace compiler {
-namespace java {
-class Context;            // context.h
-class ClassNameResolver;  // name_resolver.h
-}  // namespace java
-}  // namespace compiler
-namespace io {
-class Printer;  // printer.h
+  class FieldDescriptor;       // descriptor.h
+  namespace compiler {
+    namespace java {
+      class Context;           // context.h
+      class ClassNameResolver; // name_resolver.h
+    }
+  }
+  namespace io {
+    class Printer;             // printer.h
+  }
 }
-}  // namespace protobuf
-}  // namespace google
 
-namespace google {
 namespace protobuf {
 namespace compiler {
 namespace java {
@@ -70,19 +68,18 @@ class ExtensionGenerator {
 
   virtual void Generate(io::Printer* printer) = 0;
 
-  // Returns an estimate of the number of bytes the printed code will compile
-  // to
+  // Returns an estimate of the number of bytes the printed code will compile to
   virtual int GenerateNonNestedInitializationCode(io::Printer* printer) = 0;
 
-  // Returns an estimate of the number of bytes the printed code will compile
-  // to
+  // Returns an estimate of the number of bytes the printed code will compile to
   virtual int GenerateRegistrationCode(io::Printer* printer) = 0;
 
  protected:
-  static void InitTemplateVars(
-      const FieldDescriptor* descriptor, const std::string& scope,
-      bool immutable, ClassNameResolver* name_resolver,
-      std::map<std::string, std::string>* vars_pointer);
+  static void InitTemplateVars(const FieldDescriptor* descriptor,
+                               const string& scope,
+                               bool immutable,
+                               ClassNameResolver* name_resolver,
+                               map<string, string>* vars_pointer);
 
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ExtensionGenerator);
@@ -100,8 +97,9 @@ class ImmutableExtensionGenerator : public ExtensionGenerator {
 
  protected:
   const FieldDescriptor* descriptor_;
+  Context* context_;
   ClassNameResolver* name_resolver_;
-  std::string scope_;
+  string scope_;
 
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImmutableExtensionGenerator);
@@ -110,6 +108,6 @@ class ImmutableExtensionGenerator : public ExtensionGenerator {
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
-}  // namespace google
 
+}  // namespace google
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_EXTENSION_H__

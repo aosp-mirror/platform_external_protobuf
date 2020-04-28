@@ -46,7 +46,6 @@ namespace protobuf {
 class Descriptor;
 class EnumDescriptor;
 class FileDescriptor;
-class FieldDescriptor;
 class ServiceDescriptor;
 
 namespace compiler {
@@ -57,56 +56,32 @@ namespace java {
 //
 // Returns:
 //   The fully-qualified Java class name.
-std::string ClassName(const Descriptor* descriptor);
+string ClassName(const Descriptor* descriptor);
 
 // Requires:
 //   descriptor != NULL
 //
 // Returns:
 //   The fully-qualified Java class name.
-std::string ClassName(const EnumDescriptor* descriptor);
+string ClassName(const EnumDescriptor* descriptor);
 
 // Requires:
 //   descriptor != NULL
 //
 // Returns:
 //   The fully-qualified Java class name.
-std::string ClassName(const FileDescriptor* descriptor);
+string ClassName(const FileDescriptor* descriptor);
 
 // Requires:
 //   descriptor != NULL
 //
 // Returns:
 //   The fully-qualified Java class name.
-std::string ClassName(const ServiceDescriptor* descriptor);
-
-// Requires:
-//   descriptor != NULL
-//
-// Returns:
-//   Java package name.
-std::string FileJavaPackage(const FileDescriptor* descriptor);
-
-// Requires:
-//   descriptor != NULL
-// Returns:
-//   Captialized camel case name field name.
-std::string CapitalizedFieldName(const FieldDescriptor* descriptor);
-
-// Requires:
-//   descriptor != NULL
-// Returns:
-//   Primitive Java type name for the field.
-const char* PrimitiveTypeName(const FieldDescriptor* descriptor);
-
-// Requires:
-//   descriptor != NULL
-// Returns:
-//   Boes primitive Java type name for the field.
-const char* BoxedPrimitiveTypeName(const FieldDescriptor* descriptor);
+string ClassName(const ServiceDescriptor* descriptor);
 
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
 }  // namespace google
+
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_NAMES_H__

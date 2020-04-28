@@ -74,7 +74,7 @@ namespace Google.Protobuf.Reflection
         /// </summary>
         String,
         /// <summary>
-        /// The field type used for groups.
+        /// The field type used for groups (not supported in this implementation).
         /// </summary>
         Group,
         /// <summary>

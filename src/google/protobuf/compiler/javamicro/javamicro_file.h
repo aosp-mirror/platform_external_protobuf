@@ -70,7 +70,7 @@ class FileGenerator {
   // service type).
   void GenerateSiblings(const string& package_dir,
                         OutputDirectory* output_directory,
-                        std::vector<string>* file_list);
+                        vector<string>* file_list);
 
   const string& java_package() { return java_package_; }
   const string& classname()    { return classname_;    }

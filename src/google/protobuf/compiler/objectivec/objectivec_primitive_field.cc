@@ -31,12 +31,14 @@
 #include <map>
 #include <string>
 
-#include <google/protobuf/compiler/objectivec/objectivec_helpers.h>
 #include <google/protobuf/compiler/objectivec/objectivec_primitive_field.h>
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/compiler/objectivec/objectivec_helpers.h>
 #include <google/protobuf/io/printer.h>
-#include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/wire_format.h>
-#include <google/protobuf/wire_format_lite.h>
+#include <google/protobuf/wire_format_lite_inl.h>
+#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/stubs/substitute.h>
 
 namespace google {
 namespace protobuf {
@@ -116,7 +118,7 @@ const char* PrimitiveArrayTypeName(const FieldDescriptor* descriptor) {
 }
 
 void SetPrimitiveVariables(const FieldDescriptor* descriptor,
-                           std::map<string, string>* variables) {
+                           map<string, string>* variables) {
   std::string primitive_name = PrimitiveTypeName(descriptor);
   (*variables)["type"] = primitive_name;
   (*variables)["storage_type"] = primitive_name;
@@ -152,7 +154,7 @@ int PrimitiveFieldGenerator::ExtraRuntimeHasBitsNeeded(void) const {
 void PrimitiveFieldGenerator::SetExtraRuntimeHasBitsBase(int has_base) {
   if (GetObjectiveCType(descriptor_) == OBJECTIVECTYPE_BOOLEAN) {
     // Set into the offset the has bit to use for the actual value.
-    variables_["storage_offset_value"] = StrCat(has_base);
+    variables_["storage_offset_value"] = SimpleItoa(has_base);
     variables_["storage_offset_comment"] =
         "  // Stored in _has_storage_ to save space.";
   }

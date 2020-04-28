@@ -28,16 +28,17 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <cmath>
 #include <limits>
 #include <sstream>
 
 #include <google/protobuf/compiler/code_generator.h>
+#include <google/protobuf/compiler/plugin.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/stubs/mathlimits.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/wire_format.h>
 
@@ -45,101 +46,65 @@
 #include <google/protobuf/compiler/csharp/csharp_helpers.h>
 #include <google/protobuf/compiler/csharp/csharp_names.h>
 
+using google::protobuf::internal::scoped_ptr;
+
 namespace google {
 namespace protobuf {
 namespace compiler {
 namespace csharp {
 
 void FieldGeneratorBase::SetCommonFieldVariables(
-    std::map<string, string>* variables) {
+    map<string, string>* variables) {
   // Note: this will be valid even though the tag emitted for packed and unpacked versions of
   // repeated fields varies by wire format. The wire format is encoded in the bottom 3 bits, which
   // never effects the tag size.
   int tag_size = internal::WireFormat::TagSize(descriptor_->number(), descriptor_->type());
-  int part_tag_size = tag_size;
-  if (descriptor_->type() == FieldDescriptor::TYPE_GROUP) {
-    part_tag_size /= 2;
-  }
   uint tag = internal::WireFormat::MakeTag(descriptor_);
   uint8 tag_array[5];
   io::CodedOutputStream::WriteTagToArray(tag, tag_array);
-  string tag_bytes = StrCat(tag_array[0]);
-  for (int i = 1; i < part_tag_size; i++) {
-    tag_bytes += ", " + StrCat(tag_array[i]);
-  }
-
-  (*variables)["tag"] = StrCat(tag);
-  (*variables)["tag_size"] = StrCat(tag_size);
-  (*variables)["tag_bytes"] = tag_bytes;
-
-  if (descriptor_->type() == FieldDescriptor::Type::TYPE_GROUP) {
-    tag = internal::WireFormatLite::MakeTag(
-        descriptor_->number(),
-        internal::WireFormatLite::WIRETYPE_END_GROUP);
-    io::CodedOutputStream::WriteTagToArray(tag, tag_array);
-    tag_bytes = StrCat(tag_array[0]);
-    for (int i = 1; i < part_tag_size; i++) {
-        tag_bytes += ", " + StrCat(tag_array[i]);
-    }
-
-    variables_["end_tag"] = StrCat(tag);
-    variables_["end_tag_bytes"] = tag_bytes;
+  string tag_bytes = SimpleItoa(tag_array[0]);
+  for (int i = 1; i < tag_size; i++) {
+    tag_bytes += ", " + SimpleItoa(tag_array[i]);
   }
 
   (*variables)["access_level"] = "public";
+  (*variables)["tag"] = SimpleItoa(tag);
+  (*variables)["tag_size"] = SimpleItoa(tag_size);
+  (*variables)["tag_bytes"] = tag_bytes;
 
   (*variables)["property_name"] = property_name();
   (*variables)["type_name"] = type_name();
-  (*variables)["extended_type"] = GetClassName(descriptor_->containing_type());
   (*variables)["name"] = name();
   (*variables)["descriptor_name"] = descriptor_->name();
   (*variables)["default_value"] = default_value();
-  (*variables)["capitalized_type_name"] = capitalized_type_name();
-  (*variables)["number"] = number();
-  if (has_default_value() && !IsProto2(descriptor_->file())) {
+  if (has_default_value()) {
     (*variables)["name_def_message"] =
       (*variables)["name"] + "_ = " + (*variables)["default_value"];
   } else {
     (*variables)["name_def_message"] = (*variables)["name"] + "_";
   }
-  if (IsProto2(descriptor_->file())) {
-    (*variables)["has_property_check"] = "Has" + (*variables)["property_name"];
-    (*variables)["other_has_property_check"] = "other.Has" + (*variables)["property_name"];
-    (*variables)["has_not_property_check"] = "!" + (*variables)["has_property_check"];
-    (*variables)["other_has_not_property_check"] = "!" + (*variables)["other_has_property_check"];
-    if (presenceIndex_ != -1) {
-      string hasBitsNumber = StrCat(presenceIndex_ / 32);
-      string hasBitsMask = StrCat(1 << (presenceIndex_ % 32));
-      (*variables)["has_field_check"] = "(_hasBits" + hasBitsNumber + " & " + hasBitsMask + ") != 0";
-      (*variables)["set_has_field"] = "_hasBits" + hasBitsNumber + " |= " + hasBitsMask;
-      (*variables)["clear_has_field"] = "_hasBits" + hasBitsNumber + " &= ~" + hasBitsMask;
-    }
-  } else {
-    (*variables)["has_property_check"] =
-      (*variables)["property_name"] + " != " + (*variables)["default_value"];
-    (*variables)["other_has_property_check"] = "other." +
-      (*variables)["property_name"] + " != " + (*variables)["default_value"];
-  }
+  (*variables)["capitalized_type_name"] = capitalized_type_name();
+  (*variables)["number"] = number();
+  (*variables)["has_property_check"] =
+    (*variables)["property_name"] + " != " + (*variables)["default_value"];
+  (*variables)["other_has_property_check"] = "other." +
+    (*variables)["property_name"] + " != " + (*variables)["default_value"];
 }
 
 void FieldGeneratorBase::SetCommonOneofFieldVariables(
-    std::map<string, string>* variables) {
+    map<string, string>* variables) {
   (*variables)["oneof_name"] = oneof_name();
-  if (IsProto2(descriptor_->file())) {
-    (*variables)["has_property_check"] = "Has" + property_name();
-  } else {
-    (*variables)["has_property_check"] =
-      oneof_name() + "Case_ == " + oneof_property_name() +
-      "OneofCase." + property_name();
-  }
+  (*variables)["has_property_check"] =
+    oneof_name() + "Case_ == " + oneof_property_name() +
+    "OneofCase." + property_name();
   (*variables)["oneof_property_name"] = oneof_property_name();
 }
 
 FieldGeneratorBase::FieldGeneratorBase(const FieldDescriptor* descriptor,
-                                       int presenceIndex, const Options* options)
+                                       int fieldOrdinal, const Options* options)
     : SourceGeneratorBase(descriptor->file(), options),
       descriptor_(descriptor),
-      presenceIndex_(presenceIndex) {
+      fieldOrdinal_(fieldOrdinal) {
   SetCommonFieldVariables(&variables_);
 }
 
@@ -156,23 +121,15 @@ void FieldGeneratorBase::GenerateCodecCode(io::Printer* printer) {
     // Could fail if we get called here though...
 }
 
-void FieldGeneratorBase::GenerateExtensionCode(io::Printer* printer) {
-  // No-op: only message fields, enum fields, primitives, 
-  // and repeated fields need this default is to not generate any code
-}
-
 void FieldGeneratorBase::AddDeprecatedFlag(io::Printer* printer) {
-  if (descriptor_->options().deprecated()) {
-    printer->Print("[global::System.ObsoleteAttribute]\n");
-  } else if (descriptor_->type() == FieldDescriptor::TYPE_MESSAGE &&
-           descriptor_->message_type()->options().deprecated()) {
-    printer->Print("[global::System.ObsoleteAttribute]\n");
+  if (descriptor_->options().deprecated())
+  {
+    printer->Print("[global::System.ObsoleteAttribute()]\n");
   }
 }
 
 void FieldGeneratorBase::AddPublicMemberAttributes(io::Printer* printer) {
   AddDeprecatedFlag(printer);
-  WriteGeneratedCodeAttributes(printer);
 }
 
 std::string FieldGeneratorBase::oneof_property_name() {
@@ -293,6 +250,36 @@ bool FieldGeneratorBase::has_default_value() {
   }
 }
 
+bool FieldGeneratorBase::is_nullable_type() {
+  switch (descriptor_->type()) {
+    case FieldDescriptor::TYPE_ENUM:
+    case FieldDescriptor::TYPE_DOUBLE:
+    case FieldDescriptor::TYPE_FLOAT:
+    case FieldDescriptor::TYPE_INT64:
+    case FieldDescriptor::TYPE_UINT64:
+    case FieldDescriptor::TYPE_INT32:
+    case FieldDescriptor::TYPE_FIXED64:
+    case FieldDescriptor::TYPE_FIXED32:
+    case FieldDescriptor::TYPE_BOOL:
+    case FieldDescriptor::TYPE_UINT32:
+    case FieldDescriptor::TYPE_SFIXED32:
+    case FieldDescriptor::TYPE_SFIXED64:
+    case FieldDescriptor::TYPE_SINT32:
+    case FieldDescriptor::TYPE_SINT64:
+      return false;
+
+    case FieldDescriptor::TYPE_MESSAGE:
+    case FieldDescriptor::TYPE_GROUP:
+    case FieldDescriptor::TYPE_STRING:
+    case FieldDescriptor::TYPE_BYTES:
+      return true;
+
+    default:
+      GOOGLE_LOG(FATAL)<< "Unknown field type.";
+      return true;
+  }
+}
+
 bool AllPrintableAscii(const std::string& text) {
   for(int i = 0; i < text.size(); i++) {
     if (text[i] < 0x20 || text[i] > 0x7e) {
@@ -302,18 +289,14 @@ bool AllPrintableAscii(const std::string& text) {
   return true;
 }
 
-std::string FieldGeneratorBase::GetStringDefaultValueInternal(const FieldDescriptor* descriptor) {
-    if (descriptor->default_value_string().empty())
-        return "\"\"";
-    else
-        return "global::System.Encoding.UTF8.GetString(global::System.Convert.FromBase64String(\" +" + StringToBase64(descriptor->default_value_string()) + " +\"))";
+std::string FieldGeneratorBase::GetStringDefaultValueInternal() {
+  // No other default values needed for proto3...
+  return "\"\"";
 }
 
-std::string FieldGeneratorBase::GetBytesDefaultValueInternal(const FieldDescriptor* descriptor) {
-    if (descriptor->default_value_string().empty())
-        return "pb::ByteString.Empty";
-    else
-        return "pb::ByteString.FromBase64(\"" + StringToBase64(descriptor->default_value_string()) + "\")";
+std::string FieldGeneratorBase::GetBytesDefaultValueInternal() {
+  // No other default values needed for proto3...
+  return "pb::ByteString.Empty";
 }
 
 std::string FieldGeneratorBase::default_value() {
@@ -323,8 +306,9 @@ std::string FieldGeneratorBase::default_value() {
 std::string FieldGeneratorBase::default_value(const FieldDescriptor* descriptor) {
   switch (descriptor->type()) {
     case FieldDescriptor::TYPE_ENUM:
-      return GetClassName(descriptor->default_value_enum()->type()) + "." +
-        GetEnumValueName(descriptor->default_value_enum()->type()->name(), descriptor->default_value_enum()->name());
+      // All proto3 enums have a default value of 0, and there's an implicit conversion from the constant 0 to
+      // any C# enum. This means we don't need to work out what we actually mapped the enum value name to.
+     return "0";
     case FieldDescriptor::TYPE_MESSAGE:
     case FieldDescriptor::TYPE_GROUP:
       if (IsWrapperType(descriptor)) {
@@ -335,36 +319,36 @@ std::string FieldGeneratorBase::default_value(const FieldDescriptor* descriptor)
       }
     case FieldDescriptor::TYPE_DOUBLE: {
       double value = descriptor->default_value_double();
-      if (value == std::numeric_limits<double>::infinity()) {
+      if (value == numeric_limits<double>::infinity()) {
         return "double.PositiveInfinity";
-      } else if (value == -std::numeric_limits<double>::infinity()) {
+      } else if (value == -numeric_limits<double>::infinity()) {
         return "double.NegativeInfinity";
-      } else if (std::isnan(value)) {
+      } else if (MathLimits<double>::IsNaN(value)) {
         return "double.NaN";
       }
-      return StrCat(value) + "D";
+      return SimpleDtoa(value) + "D";
     }
     case FieldDescriptor::TYPE_FLOAT: {
       float value = descriptor->default_value_float();
-      if (value == std::numeric_limits<float>::infinity()) {
+      if (value == numeric_limits<float>::infinity()) {
         return "float.PositiveInfinity";
-      } else if (value == -std::numeric_limits<float>::infinity()) {
+      } else if (value == -numeric_limits<float>::infinity()) {
         return "float.NegativeInfinity";
-      } else if (std::isnan(value)) {
+      } else if (MathLimits<float>::IsNaN(value)) {
         return "float.NaN";
       }
-      return StrCat(value) + "F";
+      return SimpleFtoa(value) + "F";
     }
     case FieldDescriptor::TYPE_INT64:
-      return StrCat(descriptor->default_value_int64()) + "L";
+      return SimpleItoa(descriptor->default_value_int64()) + "L";
     case FieldDescriptor::TYPE_UINT64:
-      return StrCat(descriptor->default_value_uint64()) + "UL";
+      return SimpleItoa(descriptor->default_value_uint64()) + "UL";
     case FieldDescriptor::TYPE_INT32:
-      return StrCat(descriptor->default_value_int32());
+      return SimpleItoa(descriptor->default_value_int32());
     case FieldDescriptor::TYPE_FIXED64:
-      return StrCat(descriptor->default_value_uint64()) + "UL";
+      return SimpleItoa(descriptor->default_value_uint64()) + "UL";
     case FieldDescriptor::TYPE_FIXED32:
-      return StrCat(descriptor->default_value_uint32());
+      return SimpleItoa(descriptor->default_value_uint32());
     case FieldDescriptor::TYPE_BOOL:
       if (descriptor->default_value_bool()) {
         return "true";
@@ -372,19 +356,19 @@ std::string FieldGeneratorBase::default_value(const FieldDescriptor* descriptor)
         return "false";
       }
     case FieldDescriptor::TYPE_STRING:
-      return GetStringDefaultValueInternal(descriptor);
+      return GetStringDefaultValueInternal();
     case FieldDescriptor::TYPE_BYTES:
-      return GetBytesDefaultValueInternal(descriptor);
+      return GetBytesDefaultValueInternal();
     case FieldDescriptor::TYPE_UINT32:
-      return StrCat(descriptor->default_value_uint32());
+      return SimpleItoa(descriptor->default_value_uint32());
     case FieldDescriptor::TYPE_SFIXED32:
-      return StrCat(descriptor->default_value_int32());
+      return SimpleItoa(descriptor->default_value_int32());
     case FieldDescriptor::TYPE_SFIXED64:
-      return StrCat(descriptor->default_value_int64()) + "L";
+      return SimpleItoa(descriptor->default_value_int64()) + "L";
     case FieldDescriptor::TYPE_SINT32:
-      return StrCat(descriptor->default_value_int32());
+      return SimpleItoa(descriptor->default_value_int32());
     case FieldDescriptor::TYPE_SINT64:
-      return StrCat(descriptor->default_value_int64()) + "L";
+      return SimpleItoa(descriptor->default_value_int64()) + "L";
     default:
       GOOGLE_LOG(FATAL)<< "Unknown field type.";
       return "";
@@ -392,7 +376,7 @@ std::string FieldGeneratorBase::default_value(const FieldDescriptor* descriptor)
 }
 
 std::string FieldGeneratorBase::number() {
-  return StrCat(descriptor_->number());
+  return SimpleItoa(descriptor_->number());
 }
 
 std::string FieldGeneratorBase::capitalized_type_name() {

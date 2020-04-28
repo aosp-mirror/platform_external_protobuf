@@ -40,19 +40,17 @@
 
 namespace google {
 namespace protobuf {
-namespace compiler {
-namespace java {
-class Context;            // context.h
-class ClassNameResolver;  // name_resolver.h
-}  // namespace java
-}  // namespace compiler
-namespace io {
-class Printer;  // printer.h
+  namespace compiler {
+    namespace java {
+      class Context;            // context.h
+      class ClassNameResolver;  // name_resolver.h
+    }
+  }
+  namespace io {
+    class Printer;              // printer.h
+  }
 }
-}  // namespace protobuf
-}  // namespace google
 
-namespace google {
 namespace protobuf {
 namespace compiler {
 namespace java {
@@ -76,13 +74,14 @@ class ServiceGenerator {
 
 class ImmutableServiceGenerator : public ServiceGenerator {
  public:
-  ImmutableServiceGenerator(const ServiceDescriptor* descriptor,
-                            Context* context);
+  explicit ImmutableServiceGenerator(const ServiceDescriptor* descriptor,
+                                     Context* context);
   virtual ~ImmutableServiceGenerator();
 
   virtual void Generate(io::Printer* printer);
 
  private:
+
   // Generate the getDescriptorForType() method.
   void GenerateGetDescriptorForType(io::Printer* printer);
 
@@ -123,9 +122,6 @@ class ImmutableServiceGenerator : public ServiceGenerator {
   void GenerateBlockingMethodSignature(io::Printer* printer,
                                        const MethodDescriptor* method);
 
-  // Return the output type of the method.
-  std::string GetOutput(const MethodDescriptor* method);
-
   Context* context_;
   ClassNameResolver* name_resolver_;
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImmutableServiceGenerator);
@@ -134,6 +130,6 @@ class ImmutableServiceGenerator : public ServiceGenerator {
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
-}  // namespace google
 
 #endif  // NET_PROTO2_COMPILER_JAVA_SERVICE_H__
+}  // namespace google

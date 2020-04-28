@@ -1,15 +1,10 @@
 // See README.txt for information and build instructions.
 
-#include <fstream>
-#include <google/protobuf/util/time_util.h>
 #include <iostream>
+#include <fstream>
 #include <string>
-
 #include "addressbook.pb.h"
-
 using namespace std;
-
-using google::protobuf::util::TimeUtil;
 
 // Iterates though all people in the AddressBook and prints info about them.
 void ListPeople(const tutorial::AddressBook& address_book) {
@@ -35,14 +30,8 @@ void ListPeople(const tutorial::AddressBook& address_book) {
         case tutorial::Person::WORK:
           cout << "  Work phone #: ";
           break;
-        default:
-          cout << "  Unknown phone #: ";
-          break;
       }
       cout << phone_number.number() << endl;
-    }
-    if (person.has_last_updated()) {
-      cout << "  Updated: " << TimeUtil::ToString(person.last_updated()) << endl;
     }
   }
 }

@@ -61,8 +61,9 @@ class ImmutableExtensionLiteGenerator : public ExtensionGenerator {
 
  private:
   const FieldDescriptor* descriptor_;
+  Context* context_;
   ClassNameResolver* name_resolver_;
-  std::string scope_;
+  string scope_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ImmutableExtensionLiteGenerator);
 };
@@ -70,6 +71,6 @@ class ImmutableExtensionLiteGenerator : public ExtensionGenerator {
 }  // namespace java
 }  // namespace compiler
 }  // namespace protobuf
-}  // namespace google
 
+}  // namespace google
 #endif  // GOOGLE_PROTOBUF_COMPILER_JAVA_EXTENSION_LITE_H__

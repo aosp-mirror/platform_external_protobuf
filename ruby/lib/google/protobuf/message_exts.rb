@@ -40,8 +40,8 @@ module Google
       module ClassMethods
       end
 
-      def to_json(options = {})
-        self.class.encode_json(self, options)
+      def to_json
+        self.class.encode_json(self)
       end
 
       def to_proto

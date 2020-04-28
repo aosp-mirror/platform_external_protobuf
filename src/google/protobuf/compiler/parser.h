@@ -40,18 +40,15 @@
 #include <map>
 #include <string>
 #include <utility>
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/io/tokenizer.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/repeated_field.h>
-
-#include <google/protobuf/port_def.inc>
+#include <google/protobuf/io/tokenizer.h>
 
 namespace google {
+namespace protobuf { class Message; }
+
 namespace protobuf {
-
-class Message;
-
 namespace compiler {
 
 // Defined in this file.
@@ -65,7 +62,7 @@ class SourceLocationTable;
 // to a FileDescriptorProto.  It does not resolve import directives or perform
 // many other kinds of validation needed to construct a complete
 // FileDescriptor.
-class PROTOBUF_EXPORT Parser {
+class LIBPROTOBUF_EXPORT Parser {
  public:
   Parser();
   ~Parser();
@@ -74,7 +71,7 @@ class PROTOBUF_EXPORT Parser {
   // it.  Returns true if no errors occurred, false otherwise.
   bool Parse(io::Tokenizer* input, FileDescriptorProto* file);
 
-  // Optional features:
+  // Optional fetaures:
 
   // DEPRECATED:  New code should use the SourceCodeInfo embedded in the
   //   FileDescriptorProto.
@@ -95,7 +92,7 @@ class PROTOBUF_EXPORT Parser {
 
   // Returns the identifier used in the "syntax = " declaration, if one was
   // seen during the last call to Parse(), or the empty string otherwise.
-  const std::string& GetSyntaxIdentifier() { return syntax_identifier_; }
+  const string& GetSyntaxIdentifier() { return syntax_identifier_; }
 
   // If set true, input files will be required to begin with a syntax
   // identifier.  Otherwise, files may omit this.  If a syntax identifier
@@ -165,7 +162,7 @@ class PROTOBUF_EXPORT Parser {
   // where "text" is the expected token text.
   bool Consume(const char* text);
   // Consume a token of type IDENTIFIER and store its text in "output".
-  bool ConsumeIdentifier(std::string* output, const char* error);
+  bool ConsumeIdentifier(string* output, const char* error);
   // Consume an integer and store its value in "output".
   bool ConsumeInteger(int* output, const char* error);
   // Consume a signed integer and store its value in "output".
@@ -177,7 +174,7 @@ class PROTOBUF_EXPORT Parser {
   // tokens of either INTEGER or FLOAT type.
   bool ConsumeNumber(double* output, const char* error);
   // Consume a string literal and store its (unescaped) value in "output".
-  bool ConsumeString(std::string* output, const char* error);
+  bool ConsumeString(string* output, const char* error);
 
   // Consume a token representing the end of the statement.  Comments between
   // this token and the next will be harvested for documentation.  The given
@@ -188,34 +185,30 @@ class PROTOBUF_EXPORT Parser {
   //   have been passed around by const reference, for no particularly good
   //   reason.  We should probably go through and change them all to mutable
   //   pointer to make this more intuitive.
-  bool TryConsumeEndOfDeclaration(const char* text,
-                                  const LocationRecorder* location);
-  bool TryConsumeEndOfDeclarationFinishScope(const char* text,
-                                             const LocationRecorder* location);
+  bool TryConsumeEndOfDeclaration(
+      const char* text, const LocationRecorder* location);
+  bool TryConsumeEndOfDeclarationFinishScope(
+      const char* text, const LocationRecorder* location);
 
-  bool ConsumeEndOfDeclaration(const char* text,
-                               const LocationRecorder* location);
+  bool ConsumeEndOfDeclaration(
+      const char* text, const LocationRecorder* location);
 
   // -----------------------------------------------------------------
   // Error logging helpers
 
   // Invokes error_collector_->AddError(), if error_collector_ is not NULL.
-  void AddError(int line, int column, const std::string& error);
+  void AddError(int line, int column, const string& error);
 
   // Invokes error_collector_->AddError() with the line and column number
   // of the current token.
-  void AddError(const std::string& error);
-
-  // Invokes error_collector_->AddWarning() with the line and column number
-  // of the current token.
-  void AddWarning(const string& warning);
+  void AddError(const string& error);
 
   // Records a location in the SourceCodeInfo.location table (see
   // descriptor.proto).  We use RAII to ensure that the start and end locations
   // are recorded -- the constructor records the start location and the
   // destructor records the end location.  Since the parser is
   // recursive-descent, this works out beautifully.
-  class PROTOBUF_EXPORT LocationRecorder {
+  class LIBPROTOBUF_EXPORT LocationRecorder {
    public:
     // Construct the file's "root" location.
     LocationRecorder(Parser* parser);
@@ -230,10 +223,6 @@ class PROTOBUF_EXPORT Parser {
     // Convenience constructors that call AddPath() one or two times.
     LocationRecorder(const LocationRecorder& parent, int path1);
     LocationRecorder(const LocationRecorder& parent, int path1, int path2);
-
-    // Creates a recorder that generates locations into given source code info.
-    LocationRecorder(const LocationRecorder& parent, int path1,
-                     SourceCodeInfo* source_code_info);
 
     ~LocationRecorder();
 
@@ -258,14 +247,8 @@ class PROTOBUF_EXPORT Parser {
     // was passed to RecordSourceLocationsTo(), if any.  SourceLocationTable
     // is an older way of keeping track of source locations which is still
     // used in some places.
-    void RecordLegacyLocation(
-        const Message* descriptor,
+    void RecordLegacyLocation(const Message* descriptor,
         DescriptorPool::ErrorCollector::ErrorLocation location);
-    void RecordLegacyImportLocation(const Message* descriptor,
-                                    const string& name);
-
-    // Returns the number of path components in the recorder's current location.
-    int CurrentPathSize() const;
 
     // Attaches leading and trailing comments to the location.  The two strings
     // will be swapped into place, so after this is called *leading and
@@ -273,18 +256,17 @@ class PROTOBUF_EXPORT Parser {
     //
     // TODO(kenton):  See comment on TryConsumeEndOfDeclaration(), above, for
     //   why this is const.
-    void AttachComments(std::string* leading, std::string* trailing,
-                        std::vector<std::string>* detached_comments) const;
+    void AttachComments(string* leading, string* trailing,
+                        vector<string>* detached_comments) const;
 
    private:
     // Indexes of parent and current location in the parent
     // SourceCodeInfo.location repeated field. For top-level elements,
     // parent_index_ is -1.
     Parser* parser_;
-    SourceCodeInfo* source_code_info_;
     SourceCodeInfo::Location* location_;
 
-    void Init(const LocationRecorder& parent, SourceCodeInfo* source_code_info);
+    void Init(const LocationRecorder& parent);
   };
 
   // =================================================================
@@ -322,7 +304,7 @@ class PROTOBUF_EXPORT Parser {
   bool ParsePackage(FileDescriptorProto* file,
                     const LocationRecorder& root_location,
                     const FileDescriptorProto* containing_file);
-  bool ParseImport(RepeatedPtrField<std::string>* dependency,
+  bool ParseImport(RepeatedPtrField<string>* dependency,
                    RepeatedField<int32>* public_dependency,
                    RepeatedField<int32>* weak_dependency,
                    const LocationRecorder& root_location,
@@ -389,12 +371,6 @@ class PROTOBUF_EXPORT Parser {
                           const LocationRecorder& parent_location);
   bool ParseReservedNumbers(DescriptorProto* message,
                             const LocationRecorder& parent_location);
-  bool ParseReserved(EnumDescriptorProto* message,
-                     const LocationRecorder& message_location);
-  bool ParseReservedNames(EnumDescriptorProto* message,
-                          const LocationRecorder& parent_location);
-  bool ParseReservedNumbers(EnumDescriptorProto* message,
-                            const LocationRecorder& parent_location);
 
   // Parse an "extend" declaration.  (See also comments for
   // ParseMessageField().)
@@ -409,7 +385,8 @@ class PROTOBUF_EXPORT Parser {
   // oneof_decl->label() since it will have had to parse the label before it
   // knew it was parsing a oneof.
   bool ParseOneof(OneofDescriptorProto* oneof_decl,
-                  DescriptorProto* containing_type, int oneof_index,
+                  DescriptorProto* containing_type,
+                  int oneof_index,
                   const LocationRecorder& oneof_location,
                   const LocationRecorder& containing_type_location,
                   const FileDescriptorProto* containing_file);
@@ -444,10 +421,11 @@ class PROTOBUF_EXPORT Parser {
 
   // Parse a type name and fill in "type" (if it is a primitive) or
   // "type_name" (if it is not) with the type parsed.
-  bool ParseType(FieldDescriptorProto::Type* type, std::string* type_name);
+  bool ParseType(FieldDescriptorProto::Type* type,
+                 string* type_name);
   // Parse a user-defined type and fill in "type_name" with the name.
   // If a primitive type is named, it is treated as an error.
-  bool ParseUserDefinedType(std::string* type_name);
+  bool ParseUserDefinedType(string* type_name);
 
   // Parses field options, i.e. the stuff in square brackets at the end
   // of a field definition.  Also parses default value.
@@ -473,7 +451,8 @@ class PROTOBUF_EXPORT Parser {
   // Parse a single option name/value pair, e.g. "ctype = CORD".  The name
   // identifies a field of the given Message, and the value of that field
   // is set to the parsed value.
-  bool ParseOption(Message* options, const LocationRecorder& options_location,
+  bool ParseOption(Message* options,
+                   const LocationRecorder& options_location,
                    const FileDescriptorProto* containing_file,
                    OptionStyle style);
 
@@ -495,7 +474,7 @@ class PROTOBUF_EXPORT Parser {
   // REQUIRES: LookingAt("{")
   // When finished successfully, we are looking at the first token past
   // the ending brace.
-  bool ParseUninterpretedBlock(std::string* value);
+  bool ParseUninterpretedBlock(string* value);
 
   struct MapField {
     // Whether the field is a map field.
@@ -504,8 +483,8 @@ class PROTOBUF_EXPORT Parser {
     FieldDescriptorProto::Type key_type;
     FieldDescriptorProto::Type value_type;
     // Or the type names string if the types are customized types.
-    std::string key_type_name;
-    std::string value_type_name;
+    string key_type_name;
+    string value_type_name;
 
     MapField() : is_map_field(false) {}
   };
@@ -530,18 +509,18 @@ class PROTOBUF_EXPORT Parser {
   bool had_errors_;
   bool require_syntax_identifier_;
   bool stop_after_syntax_identifier_;
-  std::string syntax_identifier_;
+  string syntax_identifier_;
 
   // Leading doc comments for the next declaration.  These are not complete
   // yet; use ConsumeEndOfDeclaration() to get the complete comments.
-  std::string upcoming_doc_comments_;
+  string upcoming_doc_comments_;
 
   // Detached comments are not connected to any syntax entities. Elements in
   // this vector are paragraphs of comments separated by empty lines. The
   // detached comments will be put into the leading_detached_comments field for
   // the next element (See SourceCodeInfo.Location in descriptor.proto), when
   // ConsumeEndOfDeclaration() is called.
-  std::vector<std::string> upcoming_detached_comments_;
+  vector<string> upcoming_detached_comments_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Parser);
 };
@@ -554,7 +533,7 @@ class PROTOBUF_EXPORT Parser {
 // far more complete information about source locations.  However, as of this
 // writing you still need to use SourceLocationTable when integrating with
 // DescriptorPool.
-class PROTOBUF_EXPORT SourceLocationTable {
+class LIBPROTOBUF_EXPORT SourceLocationTable {
  public:
   SourceLocationTable();
   ~SourceLocationTable();
@@ -565,35 +544,26 @@ class PROTOBUF_EXPORT SourceLocationTable {
   // location" in the ErrorCollector interface).  Returns true if found, false
   // otherwise.
   bool Find(const Message* descriptor,
-            DescriptorPool::ErrorCollector::ErrorLocation location, int* line,
-            int* column) const;
-  bool FindImport(const Message* descriptor, const string& name, int* line,
-                  int* column) const;
+            DescriptorPool::ErrorCollector::ErrorLocation location,
+            int* line, int* column) const;
 
   // Adds a location to the table.
   void Add(const Message* descriptor,
-           DescriptorPool::ErrorCollector::ErrorLocation location, int line,
-           int column);
-  void AddImport(const Message* descriptor, const string& name, int line,
-                 int column);
+           DescriptorPool::ErrorCollector::ErrorLocation location,
+           int line, int column);
 
   // Clears the contents of the table.
   void Clear();
 
  private:
-  typedef std::map<
-      std::pair<const Message*, DescriptorPool::ErrorCollector::ErrorLocation>,
-      std::pair<int, int> >
-      LocationMap;
+  typedef map<
+    pair<const Message*, DescriptorPool::ErrorCollector::ErrorLocation>,
+    pair<int, int> > LocationMap;
   LocationMap location_map_;
-  std::map<std::pair<const Message*, string>, std::pair<int, int> >
-      import_location_map_;
 };
 
 }  // namespace compiler
 }  // namespace protobuf
+
 }  // namespace google
-
-#include <google/protobuf/port_undef.inc>
-
 #endif  // GOOGLE_PROTOBUF_COMPILER_PARSER_H__

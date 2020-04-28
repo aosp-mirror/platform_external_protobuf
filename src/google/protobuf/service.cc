@@ -42,4 +42,5 @@ RpcChannel::~RpcChannel() {}
 RpcController::~RpcController() {}
 
 }  // namespace protobuf
+
 }  // namespace google

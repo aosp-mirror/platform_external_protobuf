@@ -50,7 +50,7 @@ class File {
 
   // Read an entire file to a string.  Return true if successful, false
   // otherwise.
-  static bool ReadFileToString(const string& name, string* output, bool text_mode = false);
+  static bool ReadFileToString(const string& name, string* output);
 
   // Same as above, but crash on failure.
   static void ReadFileToStringOrDie(const string& name, string* output);
@@ -83,11 +83,6 @@ class File {
   static bool GetContents(
       const string& name, string* output, bool /*is_default*/) {
     return ReadFileToString(name, output);
-  }
-
-  static bool GetContentsAsText(
-      const string& name, string* output, bool /*is_default*/) {
-    return ReadFileToString(name, output, true);
   }
 
   static bool SetContents(

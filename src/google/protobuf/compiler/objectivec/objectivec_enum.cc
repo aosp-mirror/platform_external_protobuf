@@ -35,7 +35,6 @@
 #include <google/protobuf/compiler/objectivec/objectivec_helpers.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/stubs/strutil.h>
-#include <algorithm> // std::find()
 
 namespace google {
 namespace protobuf {
@@ -45,17 +44,6 @@ namespace objectivec {
 EnumGenerator::EnumGenerator(const EnumDescriptor* descriptor)
     : descriptor_(descriptor),
       name_(EnumName(descriptor_)) {
-  // Track the names for the enum values, and if an alias overlaps a base
-  // value, skip making a name for it. Likewise if two alias overlap, the
-  // first one wins.
-  // The one gap in this logic is if two base values overlap, but for that
-  // to happen you have to have "Foo" and "FOO" or "FOO_BAR" and "FooBar",
-  // and if an enum has that, it is already going to be confusing and a
-  // compile error is just fine.
-  // The values are still tracked to support the reflection apis and
-  // TextFormat handing since they are different there.
-  std::set<std::string> value_names;
-
   for (int i = 0; i < descriptor_->value_count(); i++) {
     const EnumValueDescriptor* value = descriptor_->value(i);
     const EnumValueDescriptor* canonical_value =
@@ -63,14 +51,6 @@ EnumGenerator::EnumGenerator(const EnumDescriptor* descriptor)
 
     if (value == canonical_value) {
       base_values_.push_back(value);
-      value_names.insert(EnumValueName(value));
-    } else {
-      string value_name(EnumValueName(value));
-      if (value_names.find(value_name) != value_names.end()) {
-        alias_values_to_skip_.insert(value);
-      } else {
-        value_names.insert(value_name);
-      }
     }
     all_values_.push_back(value);
   }
@@ -82,7 +62,7 @@ void EnumGenerator::GenerateHeader(io::Printer* printer) {
   string enum_comments;
   SourceLocation location;
   if (descriptor_->GetSourceLocation(&location)) {
-    enum_comments = BuildCommentsString(location, true);
+    enum_comments = BuildCommentsString(location);
   } else {
     enum_comments = "";
   }
@@ -92,44 +72,25 @@ void EnumGenerator::GenerateHeader(io::Printer* printer) {
       "\n",
       "name", name_);
 
-  // Swift 5 included SE0192 "Handling Future Enum Cases"
-  //   https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md
-  // Since a .proto file can get new values added to an enum at any time, they
-  // are effectively "non-frozen". Even in a proto3 syntax file where there is
-  // support for the unknown value, an edit to the file can always add a new
-  // value moving something from unknown to known. Since Swift is now ABI
-  // stable, it also means a binary could contain Swift compiled against one
-  // version of the .pbobjc.h file, but finally linked against an enum with
-  // more cases. So the Swift code will always have to treat ObjC Proto Enums
-  // as "non-frozen". The default behavior in SE0192 is for all objc enums to
-  // be "non-frozen" unless marked as otherwise, so this means this generation
-  // doesn't have to bother with the `enum_extensibility` attribute, as the
-  // default will be what is needed.
-
   printer->Print("$comments$typedef$deprecated_attribute$ GPB_ENUM($name$) {\n",
                  "comments", enum_comments,
-                 "deprecated_attribute", GetOptionalDeprecatedAttribute(descriptor_, descriptor_->file()),
+                 "deprecated_attribute", GetOptionalDeprecatedAttribute(descriptor_),
                  "name", name_);
   printer->Indent();
 
   if (HasPreservingUnknownEnumSemantics(descriptor_->file())) {
     // Include the unknown value.
     printer->Print(
-      "/**\n"
-      " * Value used if any message's field encounters a value that is not defined\n"
-      " * by this enum. The message will also have C functions to get/set the rawValue\n"
-      " * of the field.\n"
-      " **/\n"
+      "/// Value used if any message's field encounters a value that is not defined\n"
+      "/// by this enum. The message will also have C functions to get/set the rawValue\n"
+      "/// of the field.\n"
       "$name$_GPBUnrecognizedEnumeratorValue = kGPBUnrecognizedEnumeratorValue,\n",
       "name", name_);
   }
   for (int i = 0; i < all_values_.size(); i++) {
-    if (alias_values_to_skip_.find(all_values_[i]) != alias_values_to_skip_.end()) {
-      continue;
-    }
     SourceLocation location;
     if (all_values_[i]->GetSourceLocation(&location)) {
-      string comments = BuildCommentsString(location, true).c_str();
+      string comments = BuildCommentsString(location).c_str();
       if (comments.length() > 0) {
         if (i > 0) {
           printer->Print("\n");
@@ -142,7 +103,7 @@ void EnumGenerator::GenerateHeader(io::Printer* printer) {
         "$name$$deprecated_attribute$ = $value$,\n",
         "name", EnumValueName(all_values_[i]),
         "deprecated_attribute", GetOptionalDeprecatedAttribute(all_values_[i]),
-        "value", StrCat(all_values_[i]->number()));
+        "value", SimpleItoa(all_values_[i]->number()));
   }
   printer->Outdent();
   printer->Print(
@@ -150,10 +111,8 @@ void EnumGenerator::GenerateHeader(io::Printer* printer) {
       "\n"
       "GPBEnumDescriptor *$name$_EnumDescriptor(void);\n"
       "\n"
-      "/**\n"
-      " * Checks to see if the given value is defined by the enum or was not known at\n"
-      " * the time this source was generated.\n"
-      " **/\n"
+      "/// Checks to see if the given value is defined by the enum or was not known at\n"
+      "/// the time this source was generated.\n"
       "BOOL $name$_IsValidValue(int32_t value);\n"
       "\n",
       "name", name_);
@@ -186,7 +145,7 @@ void EnumGenerator::GenerateSource(io::Printer* printer) {
 
   printer->Print(
       "GPBEnumDescriptor *$name$_EnumDescriptor(void) {\n"
-      "  static _Atomic(GPBEnumDescriptor*) descriptor = nil;\n"
+      "  static GPBEnumDescriptor *descriptor = NULL;\n"
       "  if (!descriptor) {\n",
       "name", name_);
 
@@ -229,8 +188,7 @@ void EnumGenerator::GenerateSource(io::Printer* printer) {
         "extraTextFormatInfo", CEscape(text_format_decode_data.Data()));
     }
     printer->Print(
-      "    GPBEnumDescriptor *expected = nil;\n"
-      "    if (!atomic_compare_exchange_strong(&descriptor, &expected, worker)) {\n"
+      "    if (!OSAtomicCompareAndSwapPtrBarrier(nil, worker, (void * volatile *)&descriptor)) {\n"
       "      [worker release];\n"
       "    }\n"
       "  }\n"
