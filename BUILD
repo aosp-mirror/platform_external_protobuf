@@ -23,7 +23,7 @@ config_setting(
 # ZLIB configuration
 ################################################################################
 
-ZLIB_DEPS = ["@zlib//:zlib"]
+ZLIB_DEPS = ["@zlib_repo//:zlib"]
 
 ################################################################################
 # Protobuf Runtime Library
@@ -141,7 +141,7 @@ cc_library(
     ],
     hdrs = glob(["src/google/protobuf/**/*.h", "src/google/protobuf/**/*.inc"]),
     copts = COPTS,
-    includes = ["src/"],
+    includes = ["src/", "config/"],
     linkopts = LINK_OPTS,
     visibility = ["//visibility:public"],
 )
