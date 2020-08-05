@@ -114,9 +114,9 @@ cc_library {
     },
     apex_available: [
         "//apex_available:platform",
-        "com.android.adbd",
-        "test_com.android.adbd",
+        "//apex_available:anyapex",
     ],
+    min_sdk_version: "29",
 }
 
 // C++ lite library for the platform and host.
@@ -233,80 +233,6 @@ cc_library {
 
     srcs: [
         "src/google/protobuf/compiler/code_generator.cc",
-        "src/google/protobuf/compiler/plugin.cc",
-        "src/google/protobuf/compiler/plugin.pb.cc",
-    ],
-
-    local_include_dirs: [
-        "config",
-    ],
-    export_include_dirs: [
-        "src",
-        "config",
-    ],
-
-    target: {
-        windows: {
-            enabled: true,
-            // defined by the global cflags, but redefined by protobuf
-            cflags: ["-UWIN32_LEAN_AND_MEAN"],
-        },
-    },
-
-    rtti: true,
-}
-
-cc_library_host_static {
-    name: "libprotoc-kythe",
-    defaults: ["protobuf-cflags-defaults"],
-    srcs: [
-        "src/google/protobuf/compiler/code_generator.cc",
-        "src/google/protobuf/compiler/cpp/cpp_helpers.cc",
-        "src/google/protobuf/compiler/cpp/cpp_enum.cc",
-        "src/google/protobuf/compiler/cpp/cpp_enum_field.cc",
-        "src/google/protobuf/compiler/cpp/cpp_extension.cc",
-        "src/google/protobuf/compiler/cpp/cpp_field.cc",
-        "src/google/protobuf/compiler/cpp/cpp_file.cc",
-        "src/google/protobuf/compiler/cpp/cpp_generator.cc",
-        "src/google/protobuf/compiler/cpp/cpp_map_field.cc",
-        "src/google/protobuf/compiler/cpp/cpp_message.cc",
-        "src/google/protobuf/compiler/cpp/cpp_message_field.cc",
-        "src/google/protobuf/compiler/cpp/cpp_padding_optimizer.cc",
-        "src/google/protobuf/compiler/cpp/cpp_primitive_field.cc",
-        "src/google/protobuf/compiler/cpp/cpp_service.cc",
-        "src/google/protobuf/compiler/cpp/cpp_string_field.cc",
-        "src/google/protobuf/compiler/plugin.cc",
-        "src/google/protobuf/compiler/plugin.pb.cc",
-    ],
-    local_include_dirs: [
-        "src",
-    ],
-    visibility: ["//external/kythe"],
-}
-
-// Android Protocol buffer compiler, aprotoc (host executable)
-// used by the build systems as $(PROTOC) defined in
-// build/core/config.mk
-// =======================================================
-cc_binary_host {
-    name: "aprotoc",
-    defaults: ["protobuf-cflags-defaults"],
-
-    target: {
-        windows: {
-            enabled: true,
-            // defined by the global cflags, but redefined by protobuf
-            cflags: ["-UWIN32_LEAN_AND_MEAN"],
-        },
-    },
-
-    // Statically link libc++ because we copy aprotoc to unbundled projects where
-    // libc++.so may not be available.
-    stl: "libc++_static",
-
-    srcs: [
-        "src/google/protobuf/compiler/main.cc",
-        "src/google/protobuf/compiler/code_generator.cc",
         "src/google/protobuf/compiler/command_line_interface.cc",
         "src/google/protobuf/compiler/cpp/cpp_enum.cc",
         "src/google/protobuf/compiler/cpp/cpp_enum_field.cc",
@@ -389,9 +315,45 @@ cc_binary_host {
         "src/google/protobuf/compiler/zip_writer.cc",
     ],
 
-    local_include_dirs: [
+    export_include_dirs: [
         "android",
         "src",
+        "config",
+    ],
+
+    target: {
+        windows: {
+            enabled: true,
+            // defined by the global cflags, but redefined by protobuf
+            cflags: ["-UWIN32_LEAN_AND_MEAN"],
+        },
+    },
+
+    rtti: true,
+}
+
+// Android Protocol buffer compiler, aprotoc (host executable)
+// used by the build systems as $(PROTOC) defined in
+// build/core/config.mk
+// =======================================================
+cc_binary_host {
+    name: "aprotoc",
+    defaults: ["protobuf-cflags-defaults"],
+
+    target: {
+        windows: {
+            enabled: true,
+            // defined by the global cflags, but redefined by protobuf
+            cflags: ["-UWIN32_LEAN_AND_MEAN"],
+        },
+    },
+
+    // Statically link libc++ because we copy aprotoc to unbundled projects where
+    // libc++.so may not be available.
+    stl: "libc++_static",
+
+    srcs: [
+        "src/google/protobuf/compiler/main.cc",
     ],
 
     static_libs: [
@@ -447,6 +409,12 @@ java_library_static {
     },
 
     java_version: "1.7",
+
+    apex_available: [
+        "//apex_available:platform",
+        // TODO(b/151068271) switch this to //apex_available:anyapex
+        "com.android.wifi",
+    ],
 }
 
 // Java nano library (compatibility for old host-side users)
@@ -468,6 +436,12 @@ java_library_static {
     sdk_version: "8",
 
     srcs: ["javamicro/src/main/java/com/google/protobuf/micro/**/*.java"],
+
+    apex_available: [
+        "//apex_available:platform",
+        // TODO(b/151068271) switch this to //apex_available:anyapex
+        "com.android.bluetooth.updatable",
+    ],
 }
 
 // Java micro library (compatibility for old host-side users)
@@ -580,6 +554,12 @@ java_library_static {
     },
 
     java_version: "1.7",
+
+    apex_available: [
+        "//apex_available:platform",
+        // TODO(b/151068271) switch below to //apex_available:anyapex
+        "com.android.bluetooth.updatable",
+    ],
 }
 
 // Java lite library (compatibility for old host-side users)
