@@ -23,7 +23,7 @@ config_setting(
 # ZLIB configuration
 ################################################################################
 
-ZLIB_DEPS = ["@zlib_repo//:zlib"]
+ZLIB_DEPS = ["@zlib//:zlib"]
 
 ################################################################################
 # Protobuf Runtime Library
@@ -49,7 +49,7 @@ MSVC_COPTS = [
 ]
 
 COPTS = select({
-    ":msvc": MSVC_COPTS,
+    ":msvc" : MSVC_COPTS,
     "//conditions:default": [
         "-DHAVE_PTHREAD",
         "-DHAVE_ZLIB",
@@ -59,9 +59,6 @@ COPTS = select({
         # Prevents ISO C++ const string assignment warnings for pyext sources.
         "-Wno-write-strings",
     ],
-}) + select({
-    ":android": ["-std=c++11"],
-    "//conditions:default": [],
 })
 
 load(":compiler_config_setting.bzl", "create_compiler_config_setting")
@@ -144,7 +141,7 @@ cc_library(
     ],
     hdrs = glob(["src/google/protobuf/**/*.h", "src/google/protobuf/**/*.inc"]),
     copts = COPTS,
-    includes = ["src/", "config/"],
+    includes = ["src/"],
     linkopts = LINK_OPTS,
     visibility = ["//visibility:public"],
 )
