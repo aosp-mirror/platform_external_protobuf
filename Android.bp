@@ -109,7 +109,6 @@ cc_library {
     host_supported: true,
     recovery_available: true,
     vendor_available: true,
-    vendor_ramdisk_available: true,
     product_available: true,
     double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
