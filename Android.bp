@@ -79,8 +79,13 @@ cc_defaults {
         android: {
             shared_libs: ["liblog"],
         },
+
+        // This suffix for vendor and product must be updated
+	// when a new version is imported.
         vendor: {
-            // This suffix must be updated when a new version is imported.
+            suffix: "-3.9.1",
+        },
+        product: {
             suffix: "-3.9.1",
         },
     },
@@ -104,6 +109,8 @@ cc_library {
     host_supported: true,
     recovery_available: true,
     vendor_available: true,
+    vendor_ramdisk_available: true,
+    product_available: true,
     double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
@@ -211,6 +218,7 @@ cc_library {
     defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
     vendor_available: true,
+    product_available: true,
     // TODO(b/153609531): remove when no longer needed.
     native_bridge_supported: true,
     target: {
@@ -223,6 +231,10 @@ cc_library {
             enabled: true,
         },
     },
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.virt",
+    ],
 }
 
 // Compiler library for the host
