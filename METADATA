@@ -14,5 +14,5 @@ third_party {
   # Also update the suffix in Android.bp when updating the version.
   version: "v3.9.1"
   last_upgrade_date { year: 2019 month: 8 day: 23 }
-  license_type: PERMISSIVE
+  license_type: NOTICE
 }
