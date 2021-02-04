@@ -14,5 +14,6 @@ third_party {
   # Also update the suffix in Android.bp when updating the version.
   version: "v3.9.1"
   last_upgrade_date { year: 2019 month: 8 day: 23 }
-  license_type: NOTICE
+  # would be NOTICE save for GPL in java/core/src/stubs/sun/misc/Unsafe.java
+  license_type: RESTRICTED
 }
