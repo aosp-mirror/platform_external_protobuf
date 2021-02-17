@@ -576,6 +576,7 @@ java_library_static {
         "com.android.bluetooth.updatable",
         "com.android.tethering",
         "com.android.wifi",
+        "com.android.extservices",
     ],
 }
 
