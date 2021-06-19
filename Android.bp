@@ -140,6 +140,7 @@ cc_library_static {
 cc_library {
     name: "libprotobuf-cpp-lite",
     host_supported: true,
+    ramdisk_available: true,
     recovery_available: true,
     vendor_available: true,
     vendor_ramdisk_available: true,
