@@ -14,6 +14,39 @@
 //
 //
 
+package {
+    default_applicable_licenses: ["external_protobuf_license"],
+}
+
+// Added automatically by a large-scale-change that took the approach of
+// 'apply every license found to every target'. While this makes sure we respect
+// every license restriction, it may not be entirely correct.
+//
+// e.g. GPL in an MIT project might only apply to the contrib/ directory.
+//
+// Please consider splitting the single license below into multiple licenses,
+// taking care not to lose any license_kind information, and overriding the
+// default license using the 'licenses: [...]' property on targets as needed.
+//
+// For unused files, consider creating a 'fileGroup' with "//visibility:private"
+// to attach the license to, and including a comment whether the files may be
+// used in the current project.
+// See: http://go/android-license-faq
+license {
+    name: "external_protobuf_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+        "SPDX-license-identifier-BSD",
+        "SPDX-license-identifier-GPL-2.0",
+        "SPDX-license-identifier-MIT",
+        "legacy_unencumbered",
+    ],
+    license_text: [
+        "LICENSE",
+    ],
+}
+
 cc_defaults {
     name: "protobuf-cflags-defaults",
     clang_cflags: [
@@ -79,8 +112,13 @@ cc_defaults {
         android: {
             shared_libs: ["liblog"],
         },
+
+        // This suffix for vendor and product must be updated
+	// when a new version is imported.
         vendor: {
-            // This suffix must be updated when a new version is imported.
+            suffix: "-3.9.1",
+        },
+        product: {
             suffix: "-3.9.1",
         },
     },
@@ -104,6 +142,8 @@ cc_library {
     host_supported: true,
     recovery_available: true,
     vendor_available: true,
+    vendor_ramdisk_available: true,
+    product_available: true,
     double_loadable: true,
     defaults: ["libprotobuf-cpp-lite-defaults"],
 
@@ -211,6 +251,7 @@ cc_library {
     defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
     vendor_available: true,
+    product_available: true,
     // TODO(b/153609531): remove when no longer needed.
     native_bridge_supported: true,
     target: {
@@ -223,6 +264,11 @@ cc_library {
             enabled: true,
         },
     },
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.appsearch",
+        "com.android.virt",
+    ],
 }
 
 // Compiler library for the host
@@ -415,6 +461,7 @@ java_library_static {
     apex_available: [
         "//apex_available:platform",
         // TODO(b/151068271) switch this to //apex_available:anyapex
+        "com.android.tethering",
         "com.android.wifi",
     ],
 }
@@ -564,6 +611,7 @@ java_library_static {
         "com.android.bluetooth.updatable",
         "com.android.tethering",
         "com.android.wifi",
+        "com.android.extservices",
     ],
 }
 
