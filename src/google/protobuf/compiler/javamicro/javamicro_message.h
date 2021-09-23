@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -28,34 +28,37 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Author: kenton@google.com (Kenton Varda)
-//  Based on original Protocol Buffers design by
-//  Sanjay Ghemawat, Jeff Dean, and others.
-//
-// A proto file which uses optimize_for = CODE_SIZE.
+syntax = "proto2";
 
-import "google/protobuf/unittest.proto";
+package protobuf_unittest_selfreferential_options;
+option csharp_namespace = "UnitTest.Issues.TestProtos.SelfreferentialOptions";
 
-package protobuf_unittest;
+import "google/protobuf/descriptor.proto";
 
-option optimize_for = CODE_SIZE;
+message FooOptions {
+  // Custom field option used in definition of the extension message.
+  optional int32 int_opt = 1 [(foo_options) = {
+    int_opt: 1
+    [foo_int_opt]: 2
+    [foo_foo_opt]: {
+      int_opt: 3
+    }
+  }];
 
-message TestOptimizedForSize {
-  optional int32 i = 1;
-  optional ForeignMessage msg = 19;
+  // Custom field option used in definition of the custom option's message.
+  optional int32 foo = 2 [(foo_options) = {foo: 1234}];
 
   extensions 1000 to max;
-
-  extend TestOptimizedForSize {
-    optional int32 test_extension = 1234;
-    optional TestRequiredOptimizedForSize test_extension2 = 1235;
-  }
 }
 
-message TestRequiredOptimizedForSize {
-  required int32 x = 1;
+extend google.protobuf.FieldOptions {
+  // Custom field option used on the definition of that field option.
+  optional int32 bar_options = 1000 [(bar_options) = 1234];
+
+  optional FooOptions foo_options = 1001;
 }
 
-message TestOptionalOptimizedForSize {
-  optional TestRequiredOptimizedForSize o = 1;
+extend FooOptions {
+   optional int32 foo_int_opt = 1000;
+   optional FooOptions foo_foo_opt = 1001;
 }
