@@ -1,6 +1,11 @@
 // Protocol Buffers - Google's data interchange format
+<<<<<<<< HEAD:javanano/src/device/main/java/com/google/protobuf/nano/android/ParcelableMessageNano.java
 // Copyright 2014 Google Inc.  All rights reserved.
 // http://code.google.com/p/protobuf/
+========
+// Copyright 2008 Google Inc.  All rights reserved.
+// https://developers.google.com/protocol-buffers/
+>>>>>>>> aosp/upstream-master:php/ext/google/protobuf/names.h
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -28,6 +33,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+<<<<<<<< HEAD:javanano/src/device/main/java/com/google/protobuf/nano/android/ParcelableMessageNano.java
 package com.google.protobuf.nano.android;
 
 import android.os.Parcel;
@@ -50,3 +56,15 @@ public abstract class ParcelableMessageNano extends MessageNano implements Parce
         ParcelableMessageNanoCreator.writeToParcel(getClass(), this, out);
     }
 }
+========
+#ifndef PHP_PROTOBUF_NAMES_H_
+#define PHP_PROTOBUF_NAMES_H_
+
+#include "php-upb.h"
+
+// Translates a protobuf symbol name (eg. foo.bar.Baz) into a PHP class name
+// (eg. \Foo\Bar\Baz).
+char *GetPhpClassname(const upb_filedef *file, const char *fullname);
+
+#endif  // PHP_PROTOBUF_NAMES_H_
+>>>>>>>> aosp/upstream-master:php/ext/google/protobuf/names.h

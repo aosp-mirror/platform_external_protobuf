@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -28,6 +28,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+<<<<<<<< HEAD:src/google/protobuf/compiler/javamicro/javamicro_generator.h
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
@@ -74,3 +75,38 @@ class LIBPROTOC_EXPORT JavaMicroGenerator : public CodeGenerator {
 
 #endif  // GOOGLE_PROTOBUF_COMPILER_CPP_MESSAGE_LAYOUT_HELPER_H__
 >>>>>>> github/3.7.x:src/google/protobuf/compiler/cpp/cpp_message_layout_helper.h
+========
+#ifndef RUBY_PROTOBUF_REPEATED_FIELD_H_
+#define RUBY_PROTOBUF_REPEATED_FIELD_H_
+
+#include <ruby/ruby.h>
+
+#include "protobuf.h"
+#include "ruby-upb.h"
+
+// Returns a Ruby wrapper object for the given upb_array, which will be created
+// if one does not exist already.
+VALUE RepeatedField_GetRubyWrapper(upb_array* msg, TypeInfo type_info,
+                                   VALUE arena);
+
+// Gets the underlying upb_array for this Ruby RepeatedField object, which must
+// have a type that matches |f|. If this is not a repeated field or the type
+// doesn't match, raises an exception.
+const upb_array* RepeatedField_GetUpbArray(VALUE value, const upb_fielddef* f,
+                                           upb_arena* arena);
+
+// Implements #inspect for this repeated field by appending its contents to |b|.
+void RepeatedField_Inspect(StringBuilder* b, const upb_array* array,
+                           TypeInfo info);
+
+// Returns a deep copy of this RepeatedField object.
+VALUE RepeatedField_deep_copy(VALUE obj);
+
+// Ruby class of Google::Protobuf::RepeatedField.
+extern VALUE cRepeatedField;
+
+// Call at startup to register all types in this module.
+void RepeatedField_register(VALUE module);
+
+#endif  // RUBY_PROTOBUF_REPEATED_FIELD_H_
+>>>>>>>> aosp/upstream-master:ruby/ext/google/protobuf_c/repeated_field.h
