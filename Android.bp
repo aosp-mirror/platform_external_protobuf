@@ -613,6 +613,7 @@ java_library_static {
         "com.android.tethering",
         "com.android.wifi",
         "com.android.extservices",
+        "com.android.nearby",
     ],
 }
 
