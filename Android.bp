@@ -614,6 +614,7 @@ java_library_static {
         "com.android.wifi",
         "com.android.extservices",
         "com.android.nearby",
+        "com.android.car.framework",
     ],
 }
 
