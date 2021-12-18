@@ -490,7 +490,7 @@ java_library_static {
     apex_available: [
         "//apex_available:platform",
         // TODO(b/151068271) switch this to //apex_available:anyapex
-        "com.android.bluetooth.updatable",
+        "com.android.bluetooth",
     ],
 }
 
@@ -609,7 +609,7 @@ java_library_static {
         "//apex_available:platform",
         // TODO(b/151068271) switch below to //apex_available:anyapex
         "com.android.permission",
-        "com.android.bluetooth.updatable",
+        "com.android.bluetooth",
         "com.android.tethering",
         "com.android.wifi",
         "com.android.extservices",
