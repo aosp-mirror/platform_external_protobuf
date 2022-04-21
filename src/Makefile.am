@@ -18,7 +18,7 @@ else
 PTHREAD_DEF =
 endif
 
-PROTOBUF_VERSION = 28:3:0
+PROTOBUF_VERSION = 30:3:0
 
 if GCC
 # Turn on all warnings except for sign comparison (we ignore sign comparison
@@ -100,6 +100,7 @@ nobase_include_HEADERS =                                         \
   google/protobuf/duration.pb.h                                  \
   google/protobuf/dynamic_message.h                              \
   google/protobuf/empty.pb.h                                     \
+  google/protobuf/explicitly_constructed.h                       \
   google/protobuf/extension_set.h                                \
   google/protobuf/extension_set_inl.h                            \
   google/protobuf/field_access_listener.h                        \
@@ -144,6 +145,7 @@ nobase_include_HEADERS =                                         \
   google/protobuf/reflection.h                                   \
   google/protobuf/reflection_ops.h                               \
   google/protobuf/repeated_field.h                               \
+  google/protobuf/repeated_ptr_field.h                           \
   google/protobuf/service.h                                      \
   google/protobuf/source_context.pb.h                            \
   google/protobuf/struct.pb.h                                    \
@@ -209,6 +211,7 @@ libprotobuf_lite_la_SOURCES =                                  \
   google/protobuf/message_lite.cc                              \
   google/protobuf/parse_context.cc                             \
   google/protobuf/repeated_field.cc                            \
+  google/protobuf/repeated_ptr_field.cc                        \
   google/protobuf/string_member_robber.h                       \
   google/protobuf/stubs/bytestream.cc                          \
   google/protobuf/stubs/common.cc                              \
@@ -541,6 +544,7 @@ EXTRA_DIST =                                                   \
   google/protobuf/compiler/ruby/ruby_generated_code.proto      \
   google/protobuf/compiler/ruby/ruby_generated_code_pb.rb      \
   google/protobuf/compiler/ruby/ruby_generated_code_proto2.proto \
+  google/protobuf/compiler/ruby/ruby_generated_code_proto2_import.proto \
   google/protobuf/compiler/ruby/ruby_generated_code_proto2_pb.rb \
   google/protobuf/compiler/ruby/ruby_generated_pkg_explicit.proto \
   google/protobuf/compiler/ruby/ruby_generated_pkg_explicit_legacy.proto \

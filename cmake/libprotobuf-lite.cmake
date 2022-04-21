@@ -19,6 +19,7 @@ set(libprotobuf_lite_files
   ${protobuf_source_dir}/src/google/protobuf/message_lite.cc
   ${protobuf_source_dir}/src/google/protobuf/parse_context.cc
   ${protobuf_source_dir}/src/google/protobuf/repeated_field.cc
+  ${protobuf_source_dir}/src/google/protobuf/repeated_ptr_field.cc
   ${protobuf_source_dir}/src/google/protobuf/stubs/bytestream.cc
   ${protobuf_source_dir}/src/google/protobuf/stubs/common.cc
   ${protobuf_source_dir}/src/google/protobuf/stubs/int128.cc
@@ -37,6 +38,7 @@ set(libprotobuf_lite_includes
   ${protobuf_source_dir}/src/google/protobuf/arena.h
   ${protobuf_source_dir}/src/google/protobuf/arena_impl.h
   ${protobuf_source_dir}/src/google/protobuf/arenastring.h
+  ${protobuf_source_dir}/src/google/protobuf/explicitly_constructed.h
   ${protobuf_source_dir}/src/google/protobuf/extension_set.h
   ${protobuf_source_dir}/src/google/protobuf/extension_set_inl.h
   ${protobuf_source_dir}/src/google/protobuf/generated_enum_util.h
@@ -64,6 +66,7 @@ set(libprotobuf_lite_includes
   ${protobuf_source_dir}/src/google/protobuf/parse_context.h
   ${protobuf_source_dir}/src/google/protobuf/port.h
   ${protobuf_source_dir}/src/google/protobuf/repeated_field.h
+  ${protobuf_source_dir}/src/google/protobuf/repeated_ptr_field.h
   ${protobuf_source_dir}/src/google/protobuf/stubs/bytestream.h
   ${protobuf_source_dir}/src/google/protobuf/stubs/callback.h
   ${protobuf_source_dir}/src/google/protobuf/stubs/casts.h

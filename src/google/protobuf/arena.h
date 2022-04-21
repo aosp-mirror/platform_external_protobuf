@@ -37,9 +37,6 @@
 #include <limits>
 #include <type_traits>
 #include <utility>
-#ifdef max
-#undef max  // Visual Studio defines this macro
-#endif
 #if defined(_MSC_VER) && !defined(_LIBCPP_STD_VER) && !_HAS_EXCEPTIONS
 // Work around bugs in MSVC <typeinfo> header when _HAS_EXCEPTIONS=0.
 #include <exception>
@@ -65,13 +62,6 @@ namespace google {
 namespace protobuf {
 
 struct ArenaOptions;  // defined below
-
-}  // namespace protobuf
-}  // namespace google
-
-namespace google {
-namespace protobuf {
-
 class Arena;    // defined below
 class Message;  // defined in message.h
 class MessageLite;
