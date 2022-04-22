@@ -3625,7 +3625,23 @@ void Generator::GenerateFile(const GeneratorOptions& options,
     if (options.import_style == GeneratorOptions::kImportCommonJsStrict) {
       printer->Print("var proto = {};\n\n");
     } else {
-      printer->Print("var global = Function('return this')();\n\n");
+      // To get the global object we call a function with .call(null), this will set "this" inside the
+      // function to the global object.
+      // This does not work if we are running in strict mode ("use strict"),
+      // so we fallback to the following things (in order from first to last):
+      // - window: defined in browsers
+      // - global: defined in most server side environments like NodeJS
+      // - self: defined inside Web Workers (WorkerGlobalScope)
+      // - Function('return this')(): this will work on most platforms, but it may be blocked by things like CSP.
+      //   Function('') is almost the same as eval('')
+      printer->Print(
+          "var global = (function() {\n"
+          "  if (this) { return this; }\n"
+          "  if (typeof window !== 'undefined') { return window; }\n"
+          "  if (typeof global !== 'undefined') { return global; }\n"
+          "  if (typeof self !== 'undefined') { return self; }\n"
+          "  return Function('return this')();\n"
+          "}.call(null));\n\n");
     }
 
     for (int i = 0; i < file->dependency_count(); i++) {

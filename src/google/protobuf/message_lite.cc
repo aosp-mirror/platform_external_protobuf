@@ -118,9 +118,10 @@ inline StringPiece as_string_view(const void* data, int size) {
 }
 
 // Returns true of all required fields are present / have values.
-inline bool CheckFieldPresence(const internal::ParseContext& /*ctx*/,
+inline bool CheckFieldPresence(const internal::ParseContext& ctx,
                                const MessageLite& msg,
                                MessageLite::ParseFlags parse_flags) {
+  (void)ctx;  // Parameter is used by Google-internal code.
   if (PROTOBUF_PREDICT_FALSE((parse_flags & MessageLite::kMergePartial) != 0)) {
     return true;
   }
@@ -194,14 +195,6 @@ template bool MergeFromImpl<true>(BoundedZCIS input, MessageLite* msg,
                                   MessageLite::ParseFlags parse_flags);
 
 }  // namespace internal
-
-MessageLite* MessageLite::New(Arena* arena) const {
-  MessageLite* message = New();
-  if (arena != nullptr) {
-    arena->Own(message);
-  }
-  return message;
-}
 
 class ZeroCopyCodedInputStream : public io::ZeroCopyInputStream {
  public:

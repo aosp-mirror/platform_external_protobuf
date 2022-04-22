@@ -50,6 +50,7 @@
 #include <google/protobuf/repeated_field.h>
 #include <google/protobuf/unknown_field_set.h>
 #include <google/protobuf/wire_format.h>
+#include <google/protobuf/stubs/casts.h>
 #include <google/protobuf/stubs/strutil.h>
 
 
@@ -995,6 +996,8 @@ void Reflection::SwapFieldsImpl(
   GOOGLE_DCHECK(!unsafe_shallow_swap || message1->GetArenaForAllocation() ==
                                      message2->GetArenaForAllocation());
 
+  const Message* prototype =
+      message_factory_->GetPrototype(message1->GetDescriptor());
   for (const auto* field : fields) {
     CheckInvalidAccess(schema_, field);
     if (field->is_extension()) {
@@ -1003,7 +1006,7 @@ void Reflection::SwapFieldsImpl(
             MutableExtensionSet(message2), field->number());
       } else {
         MutableExtensionSet(message1)->SwapExtension(
-            MutableExtensionSet(message2), field->number());
+            prototype, MutableExtensionSet(message2), field->number());
       }
     } else {
       if (schema_.InRealOneof(field)) {
@@ -1611,7 +1614,8 @@ std::string Reflection::GetString(const Message& message,
 
 const std::string& Reflection::GetStringReference(const Message& message,
                                                   const FieldDescriptor* field,
-                                                  std::string* /*scratch*/) const {
+                                                  std::string* scratch) const {
+  (void)scratch;  // Parameter is used by Google-internal code.
   USAGE_CHECK_ALL(GetStringReference, SINGULAR, STRING);
   if (field->is_extension()) {
     return GetExtensionSet(message).GetString(field->number(),
@@ -1699,7 +1703,8 @@ std::string Reflection::GetRepeatedString(const Message& message,
 
 const std::string& Reflection::GetRepeatedStringReference(
     const Message& message, const FieldDescriptor* field, int index,
-    std::string* /*scratch*/) const {
+    std::string* scratch) const {
+  (void)scratch;  // Parameter is used by Google-internal code.
   USAGE_CHECK_ALL(GetRepeatedStringReference, REPEATED, STRING);
   if (field->is_extension()) {
     return GetExtensionSet(message).GetRepeatedString(field->number(), index);
@@ -2237,8 +2242,9 @@ void Reflection::UnsafeArenaAddAllocatedMessage(Message* message,
 void* Reflection::MutableRawRepeatedField(Message* message,
                                           const FieldDescriptor* field,
                                           FieldDescriptor::CppType cpptype,
-                                          int /*ctype*/,
+                                          int ctype,
                                           const Descriptor* desc) const {
+  (void)ctype;  // Parameter is used by Google-internal code.
   USAGE_CHECK_REPEATED("MutableRawRepeatedField");
   CheckInvalidAccess(schema_, field);
 
@@ -2319,7 +2325,7 @@ bool Reflection::InsertOrLookupMapValue(Message* message,
                                         MapValueRef* val) const {
   USAGE_CHECK(IsMapFieldInApi(field), "InsertOrLookupMapValue",
               "Field is not a map field.");
-  val->SetType(field->message_type()->FindFieldByName("value")->cpp_type());
+  val->SetType(field->message_type()->map_value()->cpp_type());
   return MutableRaw<MapFieldBase>(message, field)
       ->InsertOrLookupMapValue(key, val);
 }
@@ -2329,7 +2335,7 @@ bool Reflection::LookupMapValue(const Message& message,
                                 MapValueConstRef* val) const {
   USAGE_CHECK(IsMapFieldInApi(field), "LookupMapValue",
               "Field is not a map field.");
-  val->SetType(field->message_type()->FindFieldByName("value")->cpp_type());
+  val->SetType(field->message_type()->map_value()->cpp_type());
   return GetRaw<MapFieldBase>(message, field).LookupMapValue(key, val);
 }
 
@@ -2516,9 +2522,13 @@ bool Reflection::HasBit(const Message& message,
       case FieldDescriptor::CPPTYPE_UINT64:
         return GetRaw<uint64_t>(message, field) != 0;
       case FieldDescriptor::CPPTYPE_FLOAT:
-        return GetRaw<float>(message, field) != 0.0;
+        static_assert(sizeof(uint32_t) == sizeof(float),
+                      "Code assumes uint32_t and float are the same size.");
+        return GetRaw<uint32_t>(message, field) != 0;
       case FieldDescriptor::CPPTYPE_DOUBLE:
-        return GetRaw<double>(message, field) != 0.0;
+        static_assert(sizeof(uint64_t) == sizeof(double),
+                      "Code assumes uint64_t and double are the same size.");
+        return GetRaw<uint64_t>(message, field) != 0;
       case FieldDescriptor::CPPTYPE_ENUM:
         return GetRaw<int>(message, field) != 0;
       case FieldDescriptor::CPPTYPE_MESSAGE:
@@ -2656,7 +2666,8 @@ HANDLE_TYPE(bool, FieldDescriptor::CPPTYPE_BOOL, -1);
 
 void* Reflection::MutableRawRepeatedString(Message* message,
                                            const FieldDescriptor* field,
-                                           bool /*is_string*/) const {
+                                           bool is_string) const {
+  (void)is_string;  // Parameter is used by Google-internal code.
   return MutableRawRepeatedField(message, field,
                                  FieldDescriptor::CPPTYPE_STRING,
                                  FieldOptions::STRING, nullptr);

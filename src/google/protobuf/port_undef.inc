@@ -63,7 +63,7 @@
 #undef PROTOBUF_FALLTHROUGH_INTENDED
 #undef PROTOBUF_EXPORT
 #undef PROTOC_EXPORT
-#undef PROTOBUF_MUST_USE_RESULT
+#undef PROTOBUF_NODISCARD
 #undef PROTOBUF_FORCE_COPY_IN_RELEASE
 #undef PROTOBUF_FORCE_COPY_IN_SWAP
 #undef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -140,6 +140,6 @@
 #endif
 
 // Pop the warning(push) from port_def.inc
-#if _MSC_VER
+#ifdef _MSC_VER
 #pragma warning(pop)
 #endif
