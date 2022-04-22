@@ -61,7 +61,7 @@ set(libprotoc_files
   ${protobuf_source_dir}/src/google/protobuf/compiler/java/java_shared_code_generator.cc
   ${protobuf_source_dir}/src/google/protobuf/compiler/java/java_string_field.cc
   ${protobuf_source_dir}/src/google/protobuf/compiler/java/java_string_field_lite.cc
-  ${protobuf_source_dir}/src/google/protobuf/compiler/js/js_generator.cc
+  # ${protobuf_source_dir}/src/google/protobuf/compiler/js/js_generator.cc # DLL export issue under MSVC
   ${protobuf_source_dir}/src/google/protobuf/compiler/js/well_known_types_embed.cc
   ${protobuf_source_dir}/src/google/protobuf/compiler/objectivec/objectivec_enum.cc
   ${protobuf_source_dir}/src/google/protobuf/compiler/objectivec/objectivec_enum_field.cc
@@ -99,7 +99,7 @@ set(libprotoc_headers
   ${protobuf_source_dir}/src/google/protobuf/compiler/java/java_generator.h
   ${protobuf_source_dir}/src/google/protobuf/compiler/java/java_kotlin_generator.h
   ${protobuf_source_dir}/src/google/protobuf/compiler/java/java_names.h
-  ${protobuf_source_dir}/src/google/protobuf/compiler/js/js_generator.h
+  # ${protobuf_source_dir}/src/google/protobuf/compiler/js/js_generator.h # DLL export issue under MSVC
   ${protobuf_source_dir}/src/google/protobuf/compiler/objectivec/objectivec_generator.h
   ${protobuf_source_dir}/src/google/protobuf/compiler/objectivec/objectivec_helpers.h
   ${protobuf_source_dir}/src/google/protobuf/compiler/parser.h
