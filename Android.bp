@@ -140,6 +140,7 @@ cc_library_static {
 cc_library {
     name: "libprotobuf-cpp-lite",
     host_supported: true,
+    ramdisk_available: true,
     recovery_available: true,
     vendor_available: true,
     vendor_ramdisk_available: true,
@@ -266,8 +267,11 @@ cc_library {
     },
     apex_available: [
         "//apex_available:platform",
+        "com.android.bluetooth",
+        "com.android.appsearch",
         "com.android.virt",
     ],
+    min_sdk_version: "29",
 }
 
 // Compiler library for the host
@@ -488,7 +492,7 @@ java_library_static {
     apex_available: [
         "//apex_available:platform",
         // TODO(b/151068271) switch this to //apex_available:anyapex
-        "com.android.bluetooth.updatable",
+        "com.android.bluetooth",
     ],
 }
 
@@ -607,10 +611,12 @@ java_library_static {
         "//apex_available:platform",
         // TODO(b/151068271) switch below to //apex_available:anyapex
         "com.android.permission",
-        "com.android.bluetooth.updatable",
+        "com.android.bluetooth",
         "com.android.tethering",
         "com.android.wifi",
         "com.android.extservices",
+        "com.android.car.framework",
+        "com.android.uwb",
     ],
 }
 
