@@ -49,10 +49,7 @@ license {
 
 cc_defaults {
     name: "protobuf-cflags-defaults",
-    clang_cflags: [
-        "-Wno-unused-const-variable",
-        "-Wno-error=user-defined-warnings",
-    ],
+
     cflags: [
         "-Wall",
         "-Werror",
@@ -60,6 +57,8 @@ cc_defaults {
         "-Wno-sign-compare",
         "-Wno-unused-parameter",
         "-Wno-sign-promo",
+        "-Wno-unused-const-variable",
+        "-Wno-error=user-defined-warnings",
     ],
 
     target: {
@@ -114,7 +113,7 @@ cc_defaults {
         },
 
         // This suffix for vendor and product must be updated
-	// when a new version is imported.
+        // when a new version is imported.
         vendor: {
             suffix: "-3.9.1",
         },
