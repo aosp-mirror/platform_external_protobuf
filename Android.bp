@@ -47,6 +47,17 @@ license {
     ],
 }
 
+// This filegroup causes the BUILD.bazel in this folder to be appended
+// to the bp2build generated version of this Android.bp file.
+// This is used to import a manual conversion of libprotobuf-python.
+filegroup {
+    name: "external-protobuf-placeholder-to-import-BUILD.bazel",
+    srcs: [],
+    bazel_module: {
+        label: "//external/protobuf:external-protobuf-placeholder-to-import-BUILD.bazel",
+    },
+}
+
 cc_defaults {
     name: "protobuf-cflags-defaults",
 
