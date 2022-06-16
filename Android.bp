@@ -133,6 +133,11 @@ cc_library_static {
     sdk_version: "9",
 
     stl: "c++_static",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.adservices",
+    ],
+    min_sdk_version: "33",
 }
 
 // C++ lite library for the platform and host.
