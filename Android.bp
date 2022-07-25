@@ -622,6 +622,8 @@ java_library_static {
         "com.android.extservices",
         "com.android.car.framework",
         "com.android.uwb",
+        "com.android.cellbroadcast",
+        "com.android.adservices",
     ],
 }
 
