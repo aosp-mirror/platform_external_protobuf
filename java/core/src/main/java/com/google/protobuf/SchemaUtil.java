@@ -41,6 +41,7 @@ import java.util.RandomAccess;
 
 /** Helper methods used by schemas. */
 @ExperimentalApi
+@CheckReturnValue
 final class SchemaUtil {
   private static final Class<?> GENERATED_MESSAGE_CLASS = getGeneratedMessageClass();
   private static final UnknownFieldSchema<?, ?> PROTO2_UNKNOWN_FIELD_SET_SCHEMA =
@@ -63,18 +64,18 @@ final class SchemaUtil {
         && GENERATED_MESSAGE_CLASS != null
         && !GENERATED_MESSAGE_CLASS.isAssignableFrom(messageType)) {
       throw new IllegalArgumentException(
-          "Message classes must extend GeneratedMessage or GeneratedMessageLite");
+          "Message classes must extend GeneratedMessageV3 or GeneratedMessageLite");
     }
   }
 
   public static void writeDouble(int fieldNumber, double value, Writer writer) throws IOException {
-    if (Double.compare(value, 0.0) != 0) {
+    if (Double.doubleToRawLongBits(value) != 0) {
       writer.writeDouble(fieldNumber, value);
     }
   }
 
   public static void writeFloat(int fieldNumber, float value, Writer writer) throws IOException {
-    if (Float.compare(value, 0.0f) != 0) {
+    if (Float.floatToRawIntBits(value) != 0) {
       writer.writeFloat(fieldNumber, value);
     }
   }
@@ -767,7 +768,7 @@ final class SchemaUtil {
    * logic in the JDK</a>.
    *
    * @param lo the lowest fieldNumber contained within the message.
-   * @param hi the higest fieldNumber contained within the message.
+   * @param hi the highest fieldNumber contained within the message.
    * @param numFields the total number of fields in the message.
    * @return {@code true} if tableswitch should be used, rather than lookupswitch.
    */
@@ -980,6 +981,7 @@ final class SchemaUtil {
   }
 
   /** Stores an unrecognized enum value as an unknown value. */
+  @CanIgnoreReturnValue
   static <UT, UB> UB storeUnknownEnum(
       int number, int enumValue, UB unknownFields, UnknownFieldSchema<UT, UB> unknownFieldSchema) {
     if (unknownFields == null) {

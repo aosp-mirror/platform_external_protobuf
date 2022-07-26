@@ -39,19 +39,21 @@ import java.io.IOException;
  * Helper functions to decode protobuf wire format from a byte array.
  *
  * <p>Note that these functions don't do boundary check on the byte array but instead rely on Java
- * VM to check it. That means parsing rountines utilizing these functions must catch
+ * VM to check it. That means parsing routines utilizing these functions must catch
  * IndexOutOfBoundsException and convert it to protobuf's InvalidProtocolBufferException when
  * crossing protobuf public API boundaries.
  */
+@CheckReturnValue
 final class ArrayDecoders {
+
+  private ArrayDecoders() {
+  }
+
   /**
    * A helper used to return multiple values in a Java function. Java doesn't natively support
    * returning multiple values in a function. Creating a new Object to hold the return values will
    * be too expensive. Instead, we pass a Registers instance to functions that want to return
    * multiple values and let the function set the return value in this Registers instance instead.
-   *
-   * <p>TODO(xiaofeng): This could be merged into CodedInputStream or CodedInputStreamReader which
-   * is already being passed through all the parsing rountines.
    */
   static final class Registers {
     public int int1;
@@ -548,7 +550,6 @@ final class ArrayDecoders {
   }
 
   /** Decodes a packed sint64 field. Returns the position after all read values. */
-  @SuppressWarnings("unchecked")
   static int decodePackedSInt64List(
       byte[] data, int position, ProtobufList<?> list, Registers registers) throws IOException {
     final LongArrayList output = (LongArrayList) list;
@@ -873,7 +874,7 @@ final class ArrayDecoders {
       }
     } else {
       Object value = null;
-      // Enum is a special case becasue unknown enum values will be put into UnknownFieldSetLite.
+      // Enum is a special case because unknown enum values will be put into UnknownFieldSetLite.
       if (extension.getLiteType() == WireFormat.FieldType.ENUM) {
         position = decodeVarint32(data, position, registers);
         Object enumValue = extension.descriptor.getEnumType().findValueByNumber(registers.int1);

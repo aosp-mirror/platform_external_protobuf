@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@CheckReturnValue
 @SuppressWarnings("unchecked")
 final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
 
@@ -193,7 +194,7 @@ final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
       extensions.setField(extension.descriptor, value);
     } else {
       Object value = null;
-      // Enum is a special case becasue unknown enum values will be put into UnknownFieldSetLite.
+      // Enum is a special case because unknown enum values will be put into UnknownFieldSetLite.
       if (extension.getLiteType() == WireFormat.FieldType.ENUM) {
         int number = reader.readInt32();
         Object enumValue = extension.descriptor.getEnumType().findValueByNumber(number);
