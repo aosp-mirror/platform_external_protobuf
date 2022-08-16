@@ -624,6 +624,9 @@ java_library_static {
         "com.android.bluetooth",
         "com.android.tethering",
         "com.android.wifi",
+        "com.android.extservices",
+        "com.android.car.framework",
+        "com.android.uwb",
     ],
 }
 
