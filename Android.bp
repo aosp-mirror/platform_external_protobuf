@@ -667,7 +667,7 @@ java_library_host {
     ],
     static_libs: [
         "error_prone_annotations",
-        "gson",
+        "gson-prebuilt-jar",
         "guava-21.0",
         "libprotobuf-java-full",
     ],
