@@ -18,11 +18,6 @@
 package(default_visibility = ["//visibility:public"])
 load("//build/bazel/rules/python:py_proto.bzl", "py_proto_library")
 
-filegroup(
-    name = "external-protobuf-placeholder-to-import-BUILD.bazel",
-    srcs = [],
-)
-
 py_library(
     name = "libprotobuf-python",
     srcs = glob(["python/google/**/*.py"]) + [":libprotobuf-python-copy-protos"],
