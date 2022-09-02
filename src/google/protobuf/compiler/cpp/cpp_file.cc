@@ -959,7 +959,7 @@ void FileGenerator::GenerateInitForSCC(const SCC* scc, io::Printer* printer) {
   format(
       "$dllexport_decl $::$proto_ns$::internal::SCCInfo<$1$> $2$ =\n"
       "    "
-      "{{ATOMIC_VAR_INIT(::$proto_ns$::internal::SCCInfoBase::kUninitialized), "
+      "{{{::$proto_ns$::internal::SCCInfoBase::kUninitialized}, "
       "$1$, InitDefaults$2$}, {",
       scc->children.size(),  // 1
       SccInfoSymbol(scc, options_));
