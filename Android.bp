@@ -618,6 +618,7 @@ java_library_static {
         "com.android.uwb",
         "com.android.cellbroadcast",
         "com.android.adservices",
+        "com.android.ondevicepersonalization",
     ],
 }
 
