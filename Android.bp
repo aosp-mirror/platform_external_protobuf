@@ -266,7 +266,7 @@ cc_library {
     },
     apex_available: [
         "//apex_available:platform",
-        "com.android.bluetooth",
+        "com.android.btservices",
         "com.android.appsearch",
         "com.android.virt",
     ],
@@ -489,7 +489,7 @@ java_library_static {
 
     apex_available: [
         "//apex_available:platform",
-        "com.android.bluetooth",
+        "com.android.btservices",
     ],
 }
 
