@@ -677,14 +677,6 @@ python_library {
         ":libprotobuf-internal-python-srcs",
         ":libprotobuf-internal-protos",
     ],
-    version: {
-        py2: {
-            enabled: true,
-        },
-        py3: {
-            enabled: true,
-        },
-    },
     libs: [
         "py-six",
     ],
