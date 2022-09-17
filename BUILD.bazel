@@ -15,7 +15,6 @@
 # This BUILD.bazel file is a handcrafted addition to the one generated
 # from Android.bp. The BUILD file in this folder is unused, it's from
 # the protocol-buffers github repo.
-package(default_visibility = ["//visibility:public"])
 load("//build/bazel/rules/python:py_proto.bzl", "py_proto_library")
 
 py_library(
