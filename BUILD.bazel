@@ -15,13 +15,7 @@
 # This BUILD.bazel file is a handcrafted addition to the one generated
 # from Android.bp. The BUILD file in this folder is unused, it's from
 # the protocol-buffers github repo.
-package(default_visibility = ["//visibility:public"])
 load("//build/bazel/rules/python:py_proto.bzl", "py_proto_library")
-
-filegroup(
-    name = "external-protobuf-placeholder-to-import-BUILD.bazel",
-    srcs = [],
-)
 
 py_library(
     name = "libprotobuf-python",
@@ -53,16 +47,16 @@ genrule(
     name = "libprotobuf-python-copy-protos",
     srcs = [":libprotobuf-python-proto-gen"],
     outs = ["python/" + f + "_pb2.py" for f in proto_filenames],
-    cmd = "cp -rf $(BINDIR)/external/protobuf/_virtual_imports/libprotobuf-python-proto/google $(BINDIR)/external/protobuf/python/"
+    cmd = "cp -rf $(BINDIR)/external/protobuf/_virtual_imports/libprotobuf-proto/google $(BINDIR)/external/protobuf/python/"
 )
 
 py_proto_library(
     name = "libprotobuf-python-proto-gen",
-    deps = [":libprotobuf-python-proto"],
+    deps = [":libprotobuf-proto"],
 )
 
 proto_library(
-    name = "libprotobuf-python-proto",
+    name = "libprotobuf-proto",
     srcs = ["src/" + f + ".proto" for f in proto_filenames],
     strip_import_prefix = "src",
 )
