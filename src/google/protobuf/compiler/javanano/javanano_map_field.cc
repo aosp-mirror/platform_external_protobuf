@@ -42,7 +42,7 @@ namespace javanano {
 
 namespace {
 
-string TypeName(const Params& params, const FieldDescriptor* field,
+std::string TypeName(const Params& params, const FieldDescriptor* field,
                 bool boxed) {
   JavaType java_type = GetJavaType(field);
   switch (java_type) {
@@ -84,7 +84,7 @@ const FieldDescriptor* ValueField(const FieldDescriptor* descriptor) {
 }
 
 void SetMapVariables(const Params& params,
-    const FieldDescriptor* descriptor, std::map<string, string>* variables) {
+    const FieldDescriptor* descriptor, std::map<std::string, std::string>* variables) {
   const FieldDescriptor* key = KeyField(descriptor);
   const FieldDescriptor* value = ValueField(descriptor);
   (*variables)["name"] =
