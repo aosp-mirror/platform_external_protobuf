@@ -48,12 +48,12 @@ namespace javanano {
 
 namespace {
 
-string TrimString(const string& s) {
-  string::size_type start = s.find_first_not_of(" \n\r\t");
-  if (start == string::npos) {
+std::string TrimString(const std::string& s) {
+  std::string::size_type start = s.find_first_not_of(" \n\r\t");
+  if (start == std::string::npos) {
     return "";
   }
-  string::size_type end = s.find_last_not_of(" \n\r\t") + 1;
+  std::string::size_type end = s.find_last_not_of(" \n\r\t") + 1;
   return s.substr(start, end - start);
 }
 
@@ -67,7 +67,7 @@ void UpdateParamsRecursively(Params& params,
       file->name(), file->options().java_outer_classname());
   }
   if (file->options().has_java_package()) {
-    string result = file->options().java_package();
+    std::string result = file->options().java_package();
     if (!result.empty()) {
       result += ".";
     }
@@ -91,10 +91,10 @@ JavaNanoGenerator::JavaNanoGenerator() {}
 JavaNanoGenerator::~JavaNanoGenerator() {}
 
 bool JavaNanoGenerator::Generate(const FileDescriptor* file,
-                             const string& parameter,
+                             const std::string& parameter,
                              GeneratorContext* output_directory,
-                             string* error) const {
-  std::vector<std::pair<string, string> > options;
+                             std::string* error) const {
+  std::vector<std::pair<std::string, std::string> > options;
 
   ParseGeneratorParameter(parameter, &options);
 
@@ -103,7 +103,7 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
 
   // Name a file where we will write a list of generated file names, one
   // per line.
-  string output_list_file;
+  std::string output_list_file;
   Params params(file->name());
 
   // Update per file params
@@ -111,12 +111,12 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
 
   // Replace any existing options with ones from command line
   for (int i = 0; i < options.size(); i++) {
-    string option_name = TrimString(options[i].first);
-    string option_value = TrimString(options[i].second);
+    std::string option_name = TrimString(options[i].first);
+    std::string option_value = TrimString(options[i].second);
     if (option_name == "output_list_file") {
       output_list_file = option_value;
     } else if (option_name == "java_package") {
-      std::vector<string> parts;
+      std::vector<std::string> parts;
       SplitStringUsing(option_value, "|", &parts);
       if (parts.size() != 2) {
         *error = "Bad java_package, expecting filename|PackageName found '"
@@ -125,7 +125,7 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
       }
       params.set_java_package(parts[0], parts[1]);
     } else if (option_name == "java_outer_classname") {
-      std::vector<string> parts;
+      std::vector<std::string> parts;
       SplitStringUsing(option_value, "|", &parts);
       if (parts.size() != 2) {
         *error = "Bad java_outer_classname, "
@@ -187,14 +187,14 @@ bool JavaNanoGenerator::Generate(const FileDescriptor* file,
     return false;
   }
 
-  string package_dir =
+  std::string package_dir =
     StringReplace(file_generator.java_package(), ".", "/", true);
   if (!package_dir.empty()) package_dir += "/";
 
-  std::vector<string> all_files;
+  std::vector<std::string> all_files;
 
   if (IsOuterClassNeeded(params, file)) {
-    string java_filename = package_dir;
+    std::string java_filename = package_dir;
     java_filename += file_generator.classname();
     java_filename += ".java";
     all_files.push_back(java_filename);

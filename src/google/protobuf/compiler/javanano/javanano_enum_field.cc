@@ -52,7 +52,7 @@ namespace {
 // TODO(kenton):  Factor out a "SetCommonFieldVariables()" to get rid of
 //   repeat code between this and the other field types.
 void SetEnumVariables(const Params& params,
-    const FieldDescriptor* descriptor, std::map<string, string>* variables) {
+    const FieldDescriptor* descriptor, std::map<std::string, std::string>* variables) {
   (*variables)["name"] =
     RenameJavaKeywords(UnderscoresToCamelCase(descriptor));
   (*variables)["capitalized_name"] =
@@ -83,8 +83,8 @@ void SetEnumVariables(const Params& params,
 }
 
 void LoadEnumValues(const Params& params,
-    const EnumDescriptor* enum_descriptor, std::vector<string>* canonical_values) {
-  string enum_class_name = ClassName(params, enum_descriptor);
+    const EnumDescriptor* enum_descriptor, std::vector<std::string>* canonical_values) {
+  std::string enum_class_name = ClassName(params, enum_descriptor);
   for (int i = 0; i < enum_descriptor->value_count(); i++) {
     const EnumValueDescriptor* value = enum_descriptor->value(i);
     const EnumValueDescriptor* canonical_value =
@@ -97,7 +97,7 @@ void LoadEnumValues(const Params& params,
 }
 
 void PrintCaseLabels(
-    io::Printer* printer, const std::vector<string>& canonical_values) {
+    io::Printer* printer, const std::vector<std::string>& canonical_values) {
   for (int i = 0; i < canonical_values.size(); i++) {
     printer->Print(
       "  case $value$:\n",
