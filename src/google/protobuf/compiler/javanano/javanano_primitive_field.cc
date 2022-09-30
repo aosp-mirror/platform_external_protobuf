@@ -155,7 +155,7 @@ int FixedSize(FieldDescriptor::Type type) {
   return -1;
 }
 
-bool AllAscii(const string& text) {
+bool AllAscii(const std::string& text) {
   for (int i = 0; i < text.size(); i++) {
     if ((text[i] & 0x80) != 0) {
       return false;
@@ -166,7 +166,7 @@ bool AllAscii(const string& text) {
 
 
 void SetPrimitiveVariables(const FieldDescriptor* descriptor, const Params params,
-                           std::map<string, string>* variables) {
+                           std::map<std::string, std::string>* variables) {
   (*variables)["name"] =
     RenameJavaKeywords(UnderscoresToCamelCase(descriptor));
   (*variables)["capitalized_name"] =
