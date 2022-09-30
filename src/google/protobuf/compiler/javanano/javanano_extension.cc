@@ -78,17 +78,17 @@ const char* GetTypeConstantName(const FieldDescriptor::Type type) {
 }  // namespace
 
 void SetVariables(const FieldDescriptor* descriptor, const Params params,
-                  std::map<string, string>* variables) {
+                  std::map<std::string, std::string>* variables) {
   (*variables)["extends"] = ClassName(params, descriptor->containing_type());
   (*variables)["name"] = RenameJavaKeywords(UnderscoresToCamelCase(descriptor));
   bool repeated = descriptor->is_repeated();
   (*variables)["repeated"] = repeated ? "Repeated" : "";
   (*variables)["type"] = GetTypeConstantName(descriptor->type());
   JavaType java_type = GetJavaType(descriptor->type());
-  string tag = SimpleItoa(WireFormat::MakeTag(descriptor));
+  std::string tag = SimpleItoa(WireFormat::MakeTag(descriptor));
   if (java_type == JAVATYPE_MESSAGE) {
     (*variables)["ext_type"] = "MessageTyped";
-    string message_type = ClassName(params, descriptor->message_type());
+    std::string message_type = ClassName(params, descriptor->message_type());
     if (repeated) {
       message_type += "[]";
     }
@@ -108,13 +108,13 @@ void SetVariables(const FieldDescriptor* descriptor, const Params params,
         (*variables)["tag_params"] = tag + ", " + tag + ", 0";
       } else if (descriptor->options().packed()) {
         // Packable and packed: tag == packedTag
-        string non_packed_tag = SimpleItoa(WireFormatLite::MakeTag(
+        std::string non_packed_tag = SimpleItoa(WireFormatLite::MakeTag(
             descriptor->number(),
             WireFormat::WireTypeForFieldType(descriptor->type())));
         (*variables)["tag_params"] = tag + ", " + non_packed_tag + ", " + tag;
       } else {
         // Packable and not packed: tag == nonPackedTag
-        string packed_tag = SimpleItoa(WireFormatLite::MakeTag(
+        std::string packed_tag = SimpleItoa(WireFormatLite::MakeTag(
             descriptor->number(), WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
         (*variables)["tag_params"] = tag + ", " + tag + ", " + packed_tag;
       }
@@ -147,4 +147,3 @@ void ExtensionGenerator::Generate(io::Printer* printer) const {
 }  // namespace compiler
 }  // namespace protobuf
 }  // namespace google
-
