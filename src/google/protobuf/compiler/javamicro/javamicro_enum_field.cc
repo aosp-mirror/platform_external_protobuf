@@ -52,7 +52,7 @@ namespace {
 // TODO(kenton):  Factor out a "SetCommonFieldVariables()" to get rid of
 //   repeat code between this and the other field types.
 void SetEnumVariables(const Params& params,
-    const FieldDescriptor* descriptor, std::map<string, string>* variables) {
+    const FieldDescriptor* descriptor, std::map<std::string, std::string>* variables) {
   (*variables)["name"] =
     UnderscoresToCamelCase(descriptor);
   (*variables)["capitalized_name"] =
@@ -129,7 +129,7 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
     "}\n");
 }
 
-string EnumFieldGenerator::GetBoxedType() const {
+std::string EnumFieldGenerator::GetBoxedType() const {
   return ClassName(params_, descriptor_->enum_type());
 }
 
@@ -323,7 +323,7 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
   printer->Print("}\n");
 }
 
-string RepeatedEnumFieldGenerator::GetBoxedType() const {
+std::string RepeatedEnumFieldGenerator::GetBoxedType() const {
   return ClassName(params_, descriptor_->enum_type());
 }
 

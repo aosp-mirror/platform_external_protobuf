@@ -93,7 +93,7 @@ FileGenerator::FileGenerator(const FileDescriptor* file, const Params& params)
 
 FileGenerator::~FileGenerator() {}
 
-bool FileGenerator::Validate(string* error) {
+bool FileGenerator::Validate(std::string* error) {
   // Check for extensions
   FileDescriptorProto file_proto;
   file_->CopyTo(&file_proto);
@@ -212,13 +212,13 @@ void FileGenerator::Generate(io::Printer* printer) {
 }
 
 template<typename GeneratorClass, typename DescriptorClass>
-static void GenerateSibling(const string& package_dir,
-                            const string& java_package,
+static void GenerateSibling(const std::string& package_dir,
+                            const std::string& java_package,
                             const DescriptorClass* descriptor,
                             GeneratorContext* output_directory,
-                            std::vector<string>* file_list,
+                            std::vector<std::string>* file_list,
                             const Params& params) {
-  string filename = package_dir + descriptor->name() + ".java";
+  std::string filename = package_dir + descriptor->name() + ".java";
   file_list->push_back(filename);
 
   std::unique_ptr<io::ZeroCopyOutputStream> output(
@@ -237,9 +237,9 @@ static void GenerateSibling(const string& package_dir,
   GeneratorClass(descriptor, params).Generate(&printer);
 }
 
-void FileGenerator::GenerateSiblings(const string& package_dir,
+void FileGenerator::GenerateSiblings(const std::string& package_dir,
                                      GeneratorContext* output_directory,
-                                     std::vector<string>* file_list) {
+                                     std::vector<std::string>* file_list) {
   if (params_.java_multiple_files(file_->name())) {
     for (int i = 0; i < file_->message_type_count(); i++) {
       GenerateSibling<MessageGenerator>(package_dir, java_package_,
