@@ -182,7 +182,7 @@ bool IsFastStringHandling(const FieldDescriptor* descriptor,
 }
 
 void SetPrimitiveVariables(const FieldDescriptor* descriptor, const Params params,
-                           std::map<string, string>* variables) {
+                           std::map<std::string, std::string>* variables) {
   (*variables)["name"] =
     UnderscoresToCamelCase(descriptor);
   (*variables)["capitalized_name"] =
@@ -323,7 +323,7 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
   }
 }
 
-string PrimitiveFieldGenerator::GetBoxedType() const {
+std::string PrimitiveFieldGenerator::GetBoxedType() const {
   return BoxedPrimitiveTypeName(GetJavaType(descriptor_));
 }
 
@@ -666,7 +666,7 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
   printer->Print("}\n");
 }
 
-string RepeatedPrimitiveFieldGenerator::GetBoxedType() const {
+std::string RepeatedPrimitiveFieldGenerator::GetBoxedType() const {
   return BoxedPrimitiveTypeName(GetJavaType(descriptor_));
 }
 
