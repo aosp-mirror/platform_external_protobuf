@@ -51,7 +51,7 @@ namespace {
 // TODO(kenton):  Factor out a "SetCommonFieldVariables()" to get rid of
 //   repeat code between this and the other field types.
 void SetMessageVariables(const Params& params,
-    const FieldDescriptor* descriptor, std::map<string, string>* variables) {
+    const FieldDescriptor* descriptor, std::map<std::string, std::string>* variables) {
   (*variables)["name"] =
     UnderscoresToCamelCase(descriptor);
   (*variables)["capitalized_name"] =
@@ -144,7 +144,7 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
     "}\n");
 }
 
-string MessageFieldGenerator::GetBoxedType() const {
+std::string MessageFieldGenerator::GetBoxedType() const {
   return ClassName(params_, descriptor_->message_type());
 }
 
@@ -292,7 +292,7 @@ GenerateSerializedSizeCode(io::Printer* printer) const {
   }
 }
 
-string RepeatedMessageFieldGenerator::GetBoxedType() const {
+std::string RepeatedMessageFieldGenerator::GetBoxedType() const {
   return ClassName(params_, descriptor_->message_type());
 }
 
