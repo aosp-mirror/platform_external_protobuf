@@ -55,7 +55,7 @@ namespace {
 
 const char* kDefaultPackage = "";
 
-const string& FieldName(const FieldDescriptor* field) {
+const std::string& FieldName(const FieldDescriptor* field) {
   // Groups are hacky:  The name of the field is just the lower-cased name
   // of the group type.  In Java, though, we would like to retain the original
   // capitalization of the type name.
@@ -66,8 +66,8 @@ const string& FieldName(const FieldDescriptor* field) {
   }
 }
 
-string UnderscoresToCamelCaseImpl(const string& input, bool cap_next_letter) {
-  string result;
+std::string UnderscoresToCamelCaseImpl(const std::string& input, bool cap_next_letter) {
+  std::string result;
   // Note:  I distrust ctype.h due to locales.
   for (int i = 0; i < input.size(); i++) {
     if ('a' <= input[i] && input[i] <= 'z') {
@@ -99,19 +99,19 @@ string UnderscoresToCamelCaseImpl(const string& input, bool cap_next_letter) {
 
 }  // namespace
 
-string UnderscoresToCamelCase(const FieldDescriptor* field) {
+std::string UnderscoresToCamelCase(const FieldDescriptor* field) {
   return UnderscoresToCamelCaseImpl(FieldName(field), false);
 }
 
-string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field) {
+std::string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field) {
   return UnderscoresToCamelCaseImpl(FieldName(field), true);
 }
 
-string UnderscoresToCamelCase(const MethodDescriptor* method) {
+std::string UnderscoresToCamelCase(const MethodDescriptor* method) {
   return UnderscoresToCamelCaseImpl(method->name(), false);
 }
 
-string StripProto(const string& filename) {
+std::string StripProto(const std::string& filename) {
   if (HasSuffixString(filename, ".protodevel")) {
     return StripSuffixString(filename, ".protodevel");
   } else {
@@ -119,15 +119,15 @@ string StripProto(const string& filename) {
   }
 }
 
-string FileClassName(const Params& params, const FileDescriptor* file) {
+std::string FileClassName(const Params& params, const FileDescriptor* file) {
   if (params.has_java_outer_classname(file->name())) {
     return params.java_outer_classname(file->name());
   } else {
     // Use the filename itself with underscores removed
     // and a CamelCase style name.
-    string basename;
-    string::size_type last_slash = file->name().find_last_of('/');
-    if (last_slash == string::npos) {
+    std::string basename;
+    std::string::size_type last_slash = file->name().find_last_of('/');
+    if (last_slash == std::string::npos) {
       basename = file->name();
     } else {
       basename = file->name().substr(last_slash + 1);
@@ -136,11 +136,11 @@ string FileClassName(const Params& params, const FileDescriptor* file) {
   }
 }
 
-string FileJavaPackage(const Params& params, const FileDescriptor* file) {
+std::string FileJavaPackage(const Params& params, const FileDescriptor* file) {
   if (params.has_java_package(file->name())) {
     return params.java_package(file->name());
   } else {
-    string result = kDefaultPackage;
+    std::string result = kDefaultPackage;
     if (!file->package().empty()) {
       if (!result.empty()) result += '.';
       result += file->package();
@@ -158,9 +158,9 @@ bool IsOuterClassNeeded(const Params& params, const FileDescriptor* file) {
   return !params.java_multiple_files(file->name());
 }
 
-string ToJavaName(const Params& params, const string& name, bool is_class,
+std::string ToJavaName(const Params& params, const std::string& name, bool is_class,
     const Descriptor* parent, const FileDescriptor* file) {
-  string result;
+  std::string result;
   if (parent != NULL) {
     result.append(ClassName(params, parent));
   } else if (is_class && params.java_multiple_files(file->name())) {
@@ -173,14 +173,14 @@ string ToJavaName(const Params& params, const string& name, bool is_class,
   return result;
 }
 
-string ClassName(const Params& params, const FileDescriptor* descriptor) {
-  string result = FileJavaPackage(params, descriptor);
+std::string ClassName(const Params& params, const FileDescriptor* descriptor) {
+  std::string result = FileJavaPackage(params, descriptor);
   if (!result.empty()) result += '.';
   result += FileClassName(params, descriptor);
   return result;
 }
 
-string ClassName(const Params& params, const EnumDescriptor* descriptor) {
+std::string ClassName(const Params& params, const EnumDescriptor* descriptor) {
   // An enum's class name is the enclosing message's class name or the outer
   // class name.
   const Descriptor* parent = descriptor->containing_type();
@@ -191,8 +191,8 @@ string ClassName(const Params& params, const EnumDescriptor* descriptor) {
   }
 }
 
-string FieldConstantName(const FieldDescriptor *field) {
-  string name = field->name() + "_FIELD_NUMBER";
+std::string FieldConstantName(const FieldDescriptor *field) {
+  std::string name = field->name() + "_FIELD_NUMBER";
   UpperString(&name);
   return name;
 }
@@ -263,7 +263,7 @@ const char* BoxedPrimitiveTypeName(JavaType type) {
   return NULL;
 }
 
-bool AllAscii(const string& text) {
+bool AllAscii(const std::string& text) {
   for (int i = 0; i < text.size(); i++) {
     if ((text[i] & 0x80) != 0) {
       return false;
@@ -272,7 +272,7 @@ bool AllAscii(const string& text) {
   return true;
 }
 
-string DefaultValue(const Params& params, const FieldDescriptor* field) {
+std::string DefaultValue(const Params& params, const FieldDescriptor* field) {
   // Switch on cpp_type since we need to know which default_value_* method
   // of FieldDescriptor to call.
   switch (field->cpp_type()) {
