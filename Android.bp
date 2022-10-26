@@ -435,7 +435,10 @@ cc_test {
 java_defaults {
     name: "libprotobuf_errorprone_defaults",
     errorprone: {
-        javacflags: ["-Xep:MissingOverride:OFF"], // b/73499927
+        javacflags: [
+            "-Xep:MissingOverride:OFF", // b/73499927
+            "-Xep:IgnoredPureGetter:WARN",
+        ],
     },
 }
 
@@ -506,6 +509,7 @@ java_library_static {
     name: "libprotobuf-java-lite",
     host_supported: true,
     sdk_version: "core_current",
+    defaults: ["libprotobuf_errorprone_defaults"],
 
     srcs: [
         "java/core/src/main/java/com/google/protobuf/AbstractMessageLite.java",
