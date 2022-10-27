@@ -23,8 +23,7 @@ TEST(vendor_suffix, suffix) {
 
     std::sort(libs.begin(), libs.end());
 
-    std::string version = android::base::StringPrintf("-%d.%d.%d",
-       GOOGLE_PROTOBUF_VERSION / 1000000,
+    std::string version = android::base::StringPrintf("-%d.%d",
        GOOGLE_PROTOBUF_VERSION / 1000 % 1000,
        GOOGLE_PROTOBUF_VERSION % 1000);
 
