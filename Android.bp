@@ -479,15 +479,6 @@ java_library_static {
     ],
 }
 
-// Java nano library (compatibility for old host-side users)
-// =======================================================
-java_library_host {
-    name: "host-libprotobuf-java-nano",
-    static_libs: ["libprotobuf-java-nano"],
-
-    java_version: "1.7",
-}
-
 // Java micro library
 // =======================================================
 java_library_static {
@@ -503,13 +494,6 @@ java_library_static {
         "//apex_available:platform",
         "com.android.btservices",
     ],
-}
-
-// Java micro library (compatibility for old host-side users)
-// =======================================================
-java_library_host {
-    name: "host-libprotobuf-java-micro",
-    static_libs: ["libprotobuf-java-micro"],
 }
 
 // Java lite library
