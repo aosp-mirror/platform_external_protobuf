@@ -52,22 +52,22 @@ extern const char kThinSeparator[];
 
 // Converts the field's name to camel-case, e.g. "foo_bar_baz" becomes
 // "fooBarBaz" or "FooBarBaz", respectively.
-string UnderscoresToCamelCase(const FieldDescriptor* field);
-string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field);
+std::string UnderscoresToCamelCase(const FieldDescriptor* field);
+std::string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field);
 
 // Similar, but for method names.  (Typically, this merely has the effect
 // of lower-casing the first letter of the name.)
-string UnderscoresToCamelCase(const MethodDescriptor* method);
+std::string UnderscoresToCamelCase(const MethodDescriptor* method);
 
 // Strips ".proto" or ".protodevel" from the end of a filename.
-string StripProto(const string& filename);
+std::string StripProto(const std::string& filename);
 
 // Gets the unqualified class name for the file.  Each .proto file becomes a
 // single Java class, with all its contents nested in that class.
-string FileClassName(const Params& params, const FileDescriptor* file);
+std::string FileClassName(const Params& params, const FileDescriptor* file);
 
 // Returns the file's Java package name.
-string FileJavaPackage(const Params& params, const FileDescriptor* file);
+std::string FileJavaPackage(const Params& params, const FileDescriptor* file);
 
 // Returns whether the Java outer class is needed, i.e. whether the option
 // java_multiple_files is false, or the proto file contains any file-scope
@@ -80,30 +80,30 @@ bool IsOuterClassNeeded(const Params& params, const FileDescriptor* file);
 // outer class name should be included in the return value depends on factors
 // inferrable from the given arguments, including is_class which indicates
 // whether the entity translates to a Java class.
-string ToJavaName(const Params& params, const string& name, bool is_class,
+std::string ToJavaName(const Params& params, const std::string& name, bool is_class,
     const Descriptor* parent, const FileDescriptor* file);
 
 // These return the fully-qualified class name corresponding to the given
 // descriptor.
-inline string ClassName(const Params& params, const Descriptor* descriptor) {
+inline std::string ClassName(const Params& params, const Descriptor* descriptor) {
   return ToJavaName(params, descriptor->name(), true,
                     descriptor->containing_type(), descriptor->file());
 }
-string ClassName(const Params& params, const EnumDescriptor* descriptor);
-inline string ClassName(const Params& params,
+std::string ClassName(const Params& params, const EnumDescriptor* descriptor);
+inline std::string ClassName(const Params& params,
     const ServiceDescriptor* descriptor) {
   return ToJavaName(params, descriptor->name(), true, NULL, descriptor->file());
 }
-inline string ExtensionIdentifierName(const Params& params,
+inline std::string ExtensionIdentifierName(const Params& params,
     const FieldDescriptor* descriptor) {
   return ToJavaName(params, descriptor->name(), false,
                     descriptor->extension_scope(), descriptor->file());
 }
-string ClassName(const Params& params, const FileDescriptor* descriptor);
+std::string ClassName(const Params& params, const FileDescriptor* descriptor);
 
 // Get the unqualified name that should be used for a field's field
 // number constant.
-string FieldConstantName(const FieldDescriptor *field);
+std::string FieldConstantName(const FieldDescriptor *field);
 
 enum JavaType {
   JAVATYPE_INT,
@@ -128,7 +128,7 @@ inline JavaType GetJavaType(const FieldDescriptor* field) {
 // types.
 const char* BoxedPrimitiveTypeName(JavaType type);
 
-string DefaultValue(const Params& params, const FieldDescriptor* field);
+std::string DefaultValue(const Params& params, const FieldDescriptor* field);
 
 }  // namespace javamicro
 }  // namespace compiler
