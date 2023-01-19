@@ -717,6 +717,14 @@ filegroup {
     path: "src",
 }
 
+filegroup {
+    name: "libprotobuf-internal-descriptor-proto",
+    srcs: [
+        "src/google/protobuf/descriptor.proto",
+    ],
+    path: "src",
+}
+
 // To test java proto params build rules.
 // =======================================================
 java_test {
