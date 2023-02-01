@@ -54,7 +54,7 @@ const char kThinSeparator[] =
 
 class RenameKeywords {
  private:
-  std::unordered_set<string> java_keywords_set_;
+  std::unordered_set<std::string> java_keywords_set_;
 
  public:
   RenameKeywords() {
@@ -80,8 +80,8 @@ class RenameKeywords {
   // Used to rename the a field name if it's a java keyword.  Specifically
   // this is used to rename the ["name"] or ["capitalized_name"] field params.
   // (http://docs.oracle.com/javase/tutorial/java/nutsandbolts/_keywords.html)
-  string RenameJavaKeywordsImpl(const string& input) {
-    string result = input;
+  std::string RenameJavaKeywordsImpl(const std::string& input) {
+    std::string result = input;
 
     if (java_keywords_set_.find(result) != java_keywords_set_.end()) {
       result += "_";
@@ -98,7 +98,7 @@ namespace {
 
 const char* kDefaultPackage = "";
 
-const string& FieldName(const FieldDescriptor* field) {
+const std::string& FieldName(const FieldDescriptor* field) {
   // Groups are hacky:  The name of the field is just the lower-cased name
   // of the group type.  In Java, though, we would like to retain the original
   // capitalization of the type name.
@@ -109,8 +109,8 @@ const string& FieldName(const FieldDescriptor* field) {
   }
 }
 
-string UnderscoresToCamelCaseImpl(const string& input, bool cap_next_letter) {
-  string result;
+std::string UnderscoresToCamelCaseImpl(const std::string& input, bool cap_next_letter) {
+  std::string result;
   // Note:  I distrust ctype.h due to locales.
   for (int i = 0; i < input.size(); i++) {
     if ('a' <= input[i] && input[i] <= 'z') {
@@ -142,31 +142,31 @@ string UnderscoresToCamelCaseImpl(const string& input, bool cap_next_letter) {
 
 }  // namespace
 
-string UnderscoresToCamelCase(const FieldDescriptor* field) {
+std::string UnderscoresToCamelCase(const FieldDescriptor* field) {
   return UnderscoresToCamelCaseImpl(FieldName(field), false);
 }
 
-string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field) {
+std::string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field) {
   return UnderscoresToCamelCaseImpl(FieldName(field), true);
 }
 
-string UnderscoresToCamelCase(const MethodDescriptor* method) {
+std::string UnderscoresToCamelCase(const MethodDescriptor* method) {
   return UnderscoresToCamelCaseImpl(method->name(), false);
 }
 
-string UnderscoresToCamelCase(const OneofDescriptor* oneof) {
+std::string UnderscoresToCamelCase(const OneofDescriptor* oneof) {
   return UnderscoresToCamelCaseImpl(oneof->name(), false);
 }
 
-string UnderscoresToCapitalizedCamelCase(const OneofDescriptor* oneof) {
+std::string UnderscoresToCapitalizedCamelCase(const OneofDescriptor* oneof) {
   return UnderscoresToCamelCaseImpl(oneof->name(), true);
 }
 
-string RenameJavaKeywords(const string& input) {
+std::string RenameJavaKeywords(const std::string& input) {
   return sRenameKeywords.RenameJavaKeywordsImpl(input);
 }
 
-string StripProto(const string& filename) {
+std::string StripProto(const std::string& filename) {
   if (HasSuffixString(filename, ".protodevel")) {
     return StripSuffixString(filename, ".protodevel");
   } else {
@@ -174,15 +174,15 @@ string StripProto(const string& filename) {
   }
 }
 
-string FileClassName(const Params& params, const FileDescriptor* file) {
+std::string FileClassName(const Params& params, const FileDescriptor* file) {
   if (params.has_java_outer_classname(file->name())) {
     return params.java_outer_classname(file->name());
   } else {
     // Use the filename itself with underscores removed
     // and a CamelCase style name.
-    string basename;
-    string::size_type last_slash = file->name().find_last_of('/');
-    if (last_slash == string::npos) {
+    std::string basename;
+    std::string::size_type last_slash = file->name().find_last_of('/');
+    if (last_slash == std::string::npos) {
       basename = file->name();
     } else {
       basename = file->name().substr(last_slash + 1);
@@ -191,11 +191,11 @@ string FileClassName(const Params& params, const FileDescriptor* file) {
   }
 }
 
-string FileJavaPackage(const Params& params, const FileDescriptor* file) {
+std::string FileJavaPackage(const Params& params, const FileDescriptor* file) {
   if (params.has_java_package(file->name())) {
     return params.java_package(file->name());
   } else {
-    string result = kDefaultPackage;
+    std::string result = kDefaultPackage;
     if (!file->package().empty()) {
       if (!result.empty()) result += '.';
       result += file->package();
@@ -230,9 +230,9 @@ bool IsOuterClassNeeded(const Params& params, const FileDescriptor* file) {
   return false;
 }
 
-string ToJavaName(const Params& params, const string& name, bool is_class,
+std::string ToJavaName(const Params& params, const std::string& name, bool is_class,
     const Descriptor* parent, const FileDescriptor* file) {
-  string result;
+  std::string result;
   if (parent != NULL) {
     result.append(ClassName(params, parent));
   } else if (is_class && params.java_multiple_files(file->name())) {
@@ -245,14 +245,14 @@ string ToJavaName(const Params& params, const string& name, bool is_class,
   return result;
 }
 
-string ClassName(const Params& params, const FileDescriptor* descriptor) {
-  string result = FileJavaPackage(params, descriptor);
+std::string ClassName(const Params& params, const FileDescriptor* descriptor) {
+  std::string result = FileJavaPackage(params, descriptor);
   if (!result.empty()) result += '.';
   result += FileClassName(params, descriptor);
   return result;
 }
 
-string ClassName(const Params& params, const EnumDescriptor* descriptor) {
+std::string ClassName(const Params& params, const EnumDescriptor* descriptor) {
   const Descriptor* parent = descriptor->containing_type();
   // When using Java enum style, an enum's class name contains the enum name.
   // Use the standard ToJavaName translation.
@@ -268,26 +268,26 @@ string ClassName(const Params& params, const EnumDescriptor* descriptor) {
   }
 }
 
-string FieldConstantName(const FieldDescriptor *field) {
-  string name = field->name() + "_FIELD_NUMBER";
+std::string FieldConstantName(const FieldDescriptor *field) {
+  std::string name = field->name() + "_FIELD_NUMBER";
   UpperString(&name);
   return name;
 }
 
-string FieldDefaultConstantName(const FieldDescriptor *field) {
+std::string FieldDefaultConstantName(const FieldDescriptor *field) {
   return "_" + RenameJavaKeywords(UnderscoresToCamelCase(field)) + "Default";
 }
 
 void PrintFieldComment(io::Printer* printer, const FieldDescriptor* field) {
   // We don't want to print group bodies so we cut off after the first line
   // (the second line for extensions).
-  string def = field->DebugString();
-  string::size_type first_line_end = def.find_first_of('\n');
+  std::string def = field->DebugString();
+  std::string::size_type first_line_end = def.find_first_of('\n');
   printer->Print("// $def$\n",
     "def", def.substr(0, first_line_end));
   if (field->is_extension()) {
-    string::size_type second_line_start = first_line_end + 1;
-    string::size_type second_line_length =
+    std::string::size_type second_line_start = first_line_end + 1;
+    std::string::size_type second_line_length =
         def.find('\n', second_line_start) - second_line_start;
     printer->Print("// $def$\n",
       "def", def.substr(second_line_start, second_line_length));
@@ -340,7 +340,7 @@ JavaType GetJavaType(FieldDescriptor::Type field_type) {
   return JAVATYPE_INT;
 }
 
-string PrimitiveTypeName(JavaType type) {
+std::string PrimitiveTypeName(JavaType type) {
   switch (type) {
     case JAVATYPE_INT    : return "int";
     case JAVATYPE_LONG   : return "long";
@@ -360,7 +360,7 @@ string PrimitiveTypeName(JavaType type) {
   return "";
 }
 
-string BoxedPrimitiveTypeName(JavaType type) {
+std::string BoxedPrimitiveTypeName(JavaType type) {
   switch (type) {
     case JAVATYPE_INT    : return "java.lang.Integer";
     case JAVATYPE_LONG   : return "java.lang.Long";
@@ -380,7 +380,7 @@ string BoxedPrimitiveTypeName(JavaType type) {
   return "";
 }
 
-string EmptyArrayName(const Params& params, const FieldDescriptor* field) {
+std::string EmptyArrayName(const Params& params, const FieldDescriptor* field) {
   switch (GetJavaType(field)) {
     case JAVATYPE_INT    : return "com.google.protobuf.nano.WireFormatNano.EMPTY_INT_ARRAY";
     case JAVATYPE_LONG   : return "com.google.protobuf.nano.WireFormatNano.EMPTY_LONG_ARRAY";
@@ -400,7 +400,7 @@ string EmptyArrayName(const Params& params, const FieldDescriptor* field) {
   return "";
 }
 
-string DefaultValue(const Params& params, const FieldDescriptor* field) {
+std::string DefaultValue(const Params& params, const FieldDescriptor* field) {
   if (field->label() == FieldDescriptor::LABEL_REPEATED) {
     return EmptyArrayName(params, field);
   }
@@ -518,56 +518,56 @@ static const char* kBitMasks[] = {
   "0x80000000",
 };
 
-string GetBitFieldName(int index) {
-  string var_name = "bitField";
+std::string GetBitFieldName(int index) {
+  std::string var_name = "bitField";
   var_name += SimpleItoa(index);
   var_name += "_";
   return var_name;
 }
 
-string GetBitFieldNameForBit(int bit_index) {
+std::string GetBitFieldNameForBit(int bit_index) {
   return GetBitFieldName(bit_index / 32);
 }
 
-string GenerateGetBit(int bit_index) {
-  string var_name = GetBitFieldNameForBit(bit_index);
+std::string GenerateGetBit(int bit_index) {
+  std::string var_name = GetBitFieldNameForBit(bit_index);
   int bit_in_var_index = bit_index % 32;
 
-  string mask = kBitMasks[bit_in_var_index];
-  string result = "((" + var_name + " & " + mask + ") != 0)";
+  std::string mask = kBitMasks[bit_in_var_index];
+  std::string result = "((" + var_name + " & " + mask + ") != 0)";
   return result;
 }
 
-string GenerateSetBit(int bit_index) {
-  string var_name = GetBitFieldNameForBit(bit_index);
+std::string GenerateSetBit(int bit_index) {
+  std::string var_name = GetBitFieldNameForBit(bit_index);
   int bit_in_var_index = bit_index % 32;
 
-  string mask = kBitMasks[bit_in_var_index];
-  string result = var_name + " |= " + mask;
+  std::string mask = kBitMasks[bit_in_var_index];
+  std::string result = var_name + " |= " + mask;
   return result;
 }
 
-string GenerateClearBit(int bit_index) {
-  string var_name = GetBitFieldNameForBit(bit_index);
+std::string GenerateClearBit(int bit_index) {
+  std::string var_name = GetBitFieldNameForBit(bit_index);
   int bit_in_var_index = bit_index % 32;
 
-  string mask = kBitMasks[bit_in_var_index];
-  string result = var_name + " = (" + var_name + " & ~" + mask + ")";
+  std::string mask = kBitMasks[bit_in_var_index];
+  std::string result = var_name + " = (" + var_name + " & ~" + mask + ")";
   return result;
 }
 
-string GenerateDifferentBit(int bit_index) {
-  string var_name = GetBitFieldNameForBit(bit_index);
+std::string GenerateDifferentBit(int bit_index) {
+  std::string var_name = GetBitFieldNameForBit(bit_index);
   int bit_in_var_index = bit_index % 32;
 
-  string mask = kBitMasks[bit_in_var_index];
-  string result = "((" + var_name + " & " + mask
+  std::string mask = kBitMasks[bit_in_var_index];
+  std::string result = "((" + var_name + " & " + mask
       + ") != (other." + var_name + " & " + mask + "))";
   return result;
 }
 
-void SetBitOperationVariables(const string name,
-    int bitIndex, std::map<string, string>* variables) {
+void SetBitOperationVariables(const std::string name,
+    int bitIndex, std::map<std::string, std::string>* variables) {
   (*variables)["get_" + name] = GenerateGetBit(bitIndex);
   (*variables)["set_" + name] = GenerateSetBit(bitIndex);
   (*variables)["clear_" + name] = GenerateClearBit(bitIndex);
