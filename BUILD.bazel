@@ -1,0 +1,62 @@
+# Copyright (C) 2022 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This BUILD.bazel file is a handcrafted addition to the one generated
+# from Android.bp. The BUILD file in this folder is unused, it's from
+# the protocol-buffers github repo.
+load("//build/bazel/rules/python:py_proto.bzl", "py_proto_library")
+
+py_library(
+    name = "libprotobuf-python",
+    srcs = glob(["python/google/**/*.py"]) + [":libprotobuf-python-copy-protos"],
+    imports = ["python"],
+    deps = ["//external/python/six:py-six"],
+)
+
+proto_filenames = [
+    "google/protobuf/descriptor",
+    "google/protobuf/any",
+    "google/protobuf/source_context",
+    "google/protobuf/type",
+    "google/protobuf/compiler/plugin",
+    "google/protobuf/api",
+    "google/protobuf/duration",
+    "google/protobuf/empty",
+    "google/protobuf/field_mask",
+    "google/protobuf/struct",
+    "google/protobuf/timestamp",
+    "google/protobuf/wrappers",
+]
+
+# Copy protobufs to the python/ folder. They must be in the same folder
+# as other source files in the same package, adding more folders to
+# the PYTHONPATH won't help because the interpreter stops once it sees
+# the first folder matching the package name of an import.
+genrule(
+    name = "libprotobuf-python-copy-protos",
+    srcs = [":libprotobuf-python-proto-gen"],
+    outs = ["python/" + f + "_pb2.py" for f in proto_filenames],
+    cmd = "cp -rf $(BINDIR)/external/protobuf/_virtual_imports/libprotobuf-proto/google $(BINDIR)/external/protobuf/python/"
+)
+
+py_proto_library(
+    name = "libprotobuf-python-proto-gen",
+    deps = [":libprotobuf-proto"],
+)
+
+proto_library(
+    name = "libprotobuf-proto",
+    srcs = ["src/" + f + ".proto" for f in proto_filenames],
+    strip_import_prefix = "src",
+)
