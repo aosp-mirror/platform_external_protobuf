@@ -654,6 +654,8 @@ java_library_host {
         "guava-android-annotation-stubs",
         "libprotobuf-java-full",
     ],
+    // b/267831518: Pin tradefed and dependencies to Java 11.
+    java_version: "11",
 }
 
 // Java full library (compatibility for old host-side users)
