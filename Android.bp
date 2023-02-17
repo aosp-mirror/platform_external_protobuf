@@ -132,6 +132,7 @@ cc_library_static {
     apex_available: [
         "//apex_available:platform",
         "com.android.adservices",
+        "com.android.extservices",
     ],
     min_sdk_version: "33",
 }
