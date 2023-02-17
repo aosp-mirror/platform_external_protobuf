@@ -138,7 +138,7 @@ cc_library_static {
         "com.android.adservices",
         "com.android.extservices",
     ],
-    min_sdk_version: "33",
+    min_sdk_version: "30",
 }
 
 // C++ lite library for the platform and host.
