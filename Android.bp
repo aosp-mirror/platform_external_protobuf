@@ -11,39 +11,33 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
-//
 
 package {
     default_applicable_licenses: ["external_protobuf_license"],
 }
 
-// Added automatically by a large-scale-change that took the approach of
-// 'apply every license found to every target'. While this makes sure we respect
-// every license restriction, it may not be entirely correct.
-//
-// e.g. GPL in an MIT project might only apply to the contrib/ directory.
-//
-// Please consider splitting the single license below into multiple licenses,
-// taking care not to lose any license_kind information, and overriding the
-// default license using the 'licenses: [...]' property on targets as needed.
-//
-// For unused files, consider creating a 'fileGroup' with "//visibility:private"
-// to attach the license to, and including a comment whether the files may be
-// used in the current project.
-// See: http://go/android-license-faq
+// Protobuf itself is BSD. Android build scripts are Apache 2.0.
+// Code in third_party/utf8_range and conformance/third_party/jsoncpp
+// is MIT licensed, which is covered by their separate Android.bp files.
 license {
     name: "external_protobuf_license",
     visibility: [":__subpackages__"],
     license_kinds: [
         "SPDX-license-identifier-Apache-2.0",
         "SPDX-license-identifier-BSD",
-        "SPDX-license-identifier-GPL-2.0-with-classpath-exception",
-        "SPDX-license-identifier-MIT",
-        "legacy_unencumbered",
     ],
     license_text: [
         "LICENSE",
+    ],
+}
+
+// Applies only to java/core/src/stubs/sun/misc/Unsafe.java, which is copied
+// from GNU Classpath to work around a compilation issue.
+license {
+    name: "external_protobuf_libcore_private_stubs_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-GPL-2.0-with-classpath-exception",
     ],
 }
 
@@ -138,8 +132,9 @@ cc_library_static {
     apex_available: [
         "//apex_available:platform",
         "com.android.adservices",
+        "com.android.extservices",
     ],
-    min_sdk_version: "33",
+    min_sdk_version: "30",
 }
 
 // C++ lite library for the platform and host.
@@ -672,6 +667,7 @@ java_library {
     srcs: ["java/core/src/stubs/**/*.java"],
     sdk_version: "core_current",
     installable: false,
+    licenses: ["external_protobuf_libcore_private_stubs_license"],
 }
 
 // Python library
