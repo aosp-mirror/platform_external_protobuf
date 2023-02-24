@@ -1,12 +1,8 @@
 #!/bin/bash
 #
-# Build and runs tests for the protobuf project. We use this script to run
+# Build and run tests for the protobuf project. We use this script to run
 # tests on kokoro (Ubuntu and MacOS). It can run locally as well but you
-# will need to make sure the required compilers/tools are available.
-
-# For when some other test needs the C++ main build, including protoc and
-# libprotobuf.
-LAST_RELEASED=3.9.0
+# need to make sure the required compilers/tools are available.
 
 internal_build_cpp() {
   if [ -f src/protoc ]; then
@@ -27,17 +23,6 @@ build_cpp() {
   internal_build_cpp
   make check -j$(nproc) || (cat src/test-suite.log; false)
   cd conformance && make test_cpp && cd ..
-
-  # The benchmark code depends on cmake, so test if it is installed before
-  # trying to do the build.
-  if [[ $(type cmake 2>/dev/null) ]]; then
-    # Verify benchmarking code can build successfully.
-    cd benchmarks && make cpp-benchmark && cd ..
-  else
-    echo ""
-    echo "WARNING: Skipping validation of the bench marking code, cmake isn't installed."
-    echo ""
-  fi
 }
 
 build_cpp_tcmalloc() {
@@ -61,7 +46,7 @@ build_cpp_distcheck() {
   make dist
 
   # List all files that should be included in the distribution package.
-  git ls-files | grep "^\(java\|python\|objectivec\|csharp\|js\|ruby\|php\|cmake\|examples\|src/google/protobuf/.*\.proto\)" |\
+  git ls-files | grep "^\(java\|python\|objectivec\|csharp\|ruby\|php\|cmake\|examples\|src/google/protobuf/.*\.proto\)" |\
     grep -v ".gitignore" | grep -v "java/lite/proguard.pgcfg" |\
     grep -v "python/compatibility_tests" | grep -v "python/docs" | grep -v "python/.repo-metadata.json" |\
     grep -v "python/protobuf_distutils" | grep -v "csharp/compatibility_tests" > dist.lst
@@ -116,12 +101,12 @@ build_dist_install() {
 
   # Try to install Java
   pushd java
-  use_java jdk8
+  use_java jdk11
   $MVN install
   popd
 
   # Try to install Python
-  virtualenv --no-site-packages venv
+  python3 -m venv venv
   source venv/bin/activate
   pushd python
   python3 setup.py clean build sdist
@@ -162,9 +147,14 @@ build_csharp() {
 
   # Run csharp compatibility test between 3.0.0 and the current version.
   csharp/compatibility_tests/v3.0.0/test.sh 3.0.0
-
-  # Run csharp compatibility test between last released and the current version.
-  csharp/compatibility_tests/v3.0.0/test.sh $LAST_RELEASED
+  
+  # Regression test for https://github.com/protocolbuffers/protobuf/issues/9526
+  # - all line endings in .proto and .cs (and .csproj) files should be LF.
+  if git ls-files --eol csharp | grep -E '\.cs|\.proto' | grep -v w/lf
+  then
+    echo "The files listed above have mixed or CRLF line endings; please change to LF."
+    exit 1
+  fi
 }
 
 build_golang() {
@@ -189,6 +179,14 @@ build_golang() {
 use_java() {
   version=$1
   case "$version" in
+    jdk17)
+      export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
+      export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+      ;;
+    jdk11)
+      export PATH=/usr/lib/jvm/java-11-openjdk-amd64/bin:$PATH
+      export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+      ;;
     jdk8)
       export PATH=/usr/lib/jvm/java-8-openjdk-amd64/bin:$PATH
       export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -222,7 +220,7 @@ internal_build_java() {
   cp -r java $dir
   cd $dir && $MVN clean
   # Skip tests here - callers will decide what tests they want to run
-  $MVN install -pl core -Dmaven.test.skip=true
+  $MVN install -Dmaven.test.skip=true
 }
 
 build_java() {
@@ -260,15 +258,32 @@ build_java_jdk7() {
   use_java jdk7
   build_java_with_conformance_tests
 }
+
 build_java_oracle7() {
   use_java oracle7
   build_java oracle7
 }
+
+build_java_jdk8() {
+  use_java jdk8
+  build_java_with_conformance_tests
+}
+
+build_java_jdk11() {
+  use_java jdk11
+  build_java
+}
+
+build_java_jdk17() {
+  use_java jdk17
+  build_java
+}
+
 build_java_linkage_monitor() {
   # Linkage Monitor checks compatibility with other Google libraries
   # https://github.com/GoogleCloudPlatform/cloud-opensource-java/tree/master/linkage-monitor
 
-  use_java jdk8
+  use_java jdk11
   internal_build_cpp
 
   # Linkage Monitor uses $HOME/.m2 local repository
@@ -323,19 +338,10 @@ build_objectivec_tvos_release() {
   build_objectivec_tvos --skip-xcode-debug
 }
 
-build_objectivec_cocoapods_integration() {
-  objectivec/Tests/CocoaPods/run_tests.sh
-}
-
 build_python() {
   internal_build_cpp
   cd python
-  if [ $(uname -s) == "Linux" ]; then
-    envlist=py\{35,36\}-python
-  else
-    envlist=py\{36\}-python
-  fi
-  python -m tox -e $envlist
+  tox --skip-missing-interpreters
   cd ..
 }
 
@@ -343,24 +349,8 @@ build_python_version() {
   internal_build_cpp
   cd python
   envlist=$1
-  python -m tox -e $envlist
+  tox -e $envlist
   cd ..
-}
-
-build_python33() {
-  build_python_version py33-python
-}
-
-build_python34() {
-  build_python_version py34-python
-}
-
-build_python35() {
-  build_python_version py35-python
-}
-
-build_python36() {
-  build_python_version py36-python
 }
 
 build_python37() {
@@ -384,12 +374,7 @@ build_python_cpp() {
   export LD_LIBRARY_PATH=../src/.libs # for Linux
   export DYLD_LIBRARY_PATH=../src/.libs # for OS X
   cd python
-  if [ $(uname -s) == "Linux" ]; then
-    envlist=py\{35,36\}-cpp
-  else
-    envlist=py\{36\}-cpp
-  fi
-  tox -e $envlist
+  tox --skip-missing-interpreters
   cd ..
 }
 
@@ -401,22 +386,6 @@ build_python_cpp_version() {
   envlist=$1
   tox -e $envlist
   cd ..
-}
-
-build_python33_cpp() {
-  build_python_cpp_version py33-cpp
-}
-
-build_python34_cpp() {
-  build_python_cpp_version py34-cpp
-}
-
-build_python35_cpp() {
-  build_python_cpp_version py35-cpp
-}
-
-build_python36_cpp() {
-  build_python_cpp_version py36-cpp
 }
 
 build_python37_cpp() {
@@ -434,7 +403,6 @@ build_python39_cpp() {
 build_python310_cpp() {
   build_python_cpp_version py310-cpp
 }
-
 
 build_ruby23() {
   internal_build_cpp  # For conformance tests.
@@ -460,30 +428,21 @@ build_ruby30() {
   internal_build_cpp  # For conformance tests.
   cd ruby && bash travis-test.sh ruby-3.0.2 && cd ..
 }
+build_ruby31() {
+  internal_build_cpp  # For conformance tests.
+  cd ruby && bash travis-test.sh ruby-3.1.0 && cd ..
+}
 
 build_jruby92() {
   internal_build_cpp                # For conformance tests.
   internal_build_java jdk8 && cd .. # For Maven protobuf jar with local changes
-  cd ruby && bash travis-test.sh jruby-9.2.19.0 && cd ..
+  cd ruby && bash travis-test.sh jruby-9.2.20.1 && cd ..
 }
 
 build_jruby93() {
   internal_build_cpp                # For conformance tests.
   internal_build_java jdk8 && cd .. # For Maven protobuf jar with local changes
-  cd ruby && bash travis-test.sh jruby-9.3.0.0 && cd ..
-}
-
-build_javascript() {
-  internal_build_cpp
-  NODE_VERSION=node-v12.16.3-darwin-x64
-  NODE_TGZ="$NODE_VERSION.tar.gz"
-  pushd /tmp
-  curl -OL https://nodejs.org/dist/v12.16.3/$NODE_TGZ
-  tar zxvf $NODE_TGZ
-  export PATH=$PATH:`pwd`/$NODE_VERSION/bin
-  popd
-  cd js && npm install && npm test && cd ..
-  cd conformance && make test_nodejs && cd ..
+  cd ruby && bash travis-test.sh jruby-9.3.4.0 && cd ..
 }
 
 use_php() {
@@ -496,6 +455,8 @@ build_php() {
   use_php $1
   pushd php
   rm -rf vendor
+  php -v
+  php -m
   composer update
   composer test
   popd
@@ -505,6 +466,8 @@ build_php() {
 test_php_c() {
   pushd php
   rm -rf vendor
+  php -v
+  php -m
   composer update
   composer test_c
   popd
@@ -562,7 +525,6 @@ build_php7.3_mac() {
 
 build_php_compatibility() {
   internal_build_cpp
-  php/tests/compatibility_test.sh $LAST_RELEASED
 }
 
 build_php_multirequest() {
@@ -572,7 +534,9 @@ build_php_multirequest() {
 
 build_php8.0_all() {
   build_php 8.0
+  build_php 8.1
   build_php_c 8.0
+  build_php_c 8.1
 }
 
 build_php_all_32() {
@@ -607,6 +571,9 @@ Usage: $0 { cpp |
             csharp |
             java_jdk7 |
             java_oracle7 |
+            java_jdk8 |
+            java_jdk11 |
+            java_jdk17 |
             java_linkage_monitor |
             objectivec_ios |
             objectivec_ios_debug |
@@ -615,7 +582,6 @@ Usage: $0 { cpp |
             objectivec_tvos |
             objectivec_tvos_debug |
             objectivec_tvos_release |
-            objectivec_cocoapods_integration |
             python |
             python_cpp |
             python_compatibility |
@@ -625,6 +591,7 @@ Usage: $0 { cpp |
             ruby26 |
             ruby27 |
             ruby30 |
+            ruby31 |
             jruby92 |
             jruby93 |
             ruby_all |
@@ -633,7 +600,7 @@ Usage: $0 { cpp |
             php7.0_mac |
             php7.3_mac |
             dist_install |
-            benchmark)
+            benchmark }
 "
   exit 1
 fi
