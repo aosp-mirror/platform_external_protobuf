@@ -1,0 +1,16 @@
+package {
+    default_applicable_licenses: ["external_protobuf_third_party_utf8_range_license"],
+}
+
+license {
+    name: "external_protobuf_third_party_utf8_range_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-MIT"],
+    license_text: ["LICENSE"],
+}
+
+filegroup {
+    name: "external_protobuf_third_party_utf8_range_files",
+    srcs: ["*"],
+    visibility: ["//visibility:private"],
+}
