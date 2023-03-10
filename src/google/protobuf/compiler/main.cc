@@ -101,11 +101,6 @@ int ProtobufMain(int argc, char* argv[]) {
   objectivec::ObjectiveCGenerator objc_generator;
   cli.RegisterGenerator("--objc_out", "--objc_opt", &objc_generator,
                         "Generate Objective-C header and source.");
-
-  // JavaScript
-  js::Generator js_generator;
-  cli.RegisterGenerator("--js_out", "--js_opt", &js_generator,
-                        "Generate JavaScript source.");
 #endif
 
   return cli.Run(argc, argv);
