@@ -331,6 +331,18 @@ size_t SpaceUsedInValues(const Map* map) {
 
 inline size_t SpaceUsedInValues(const void*) { return 0; }
 
+// Multiply two numbers where overflow is expected.
+template <typename N>
+N MultiplyWithOverflow(N a, N b) {
+#if __has_builtin(__builtin_mul_overflow)
+  N res;
+  (void)__builtin_mul_overflow(a, b, &res);
+  return res;
+#else
+  return a * b;
+#endif
+}
+
 }  // namespace internal
 
 // This is the class for Map's internal value_type. Instead of using
@@ -1099,7 +1111,8 @@ class Map {
       // the hash value. The constant kPhi (suggested by Knuth) is roughly
       // (sqrt(5) - 1) / 2 * 2^64.
       constexpr uint64_t kPhi = uint64_t{0x9e3779b97f4a7c15};
-      return ((kPhi * h) >> 32) & (num_buckets_ - 1);
+      return (internal::MultiplyWithOverflow(kPhi, h) >> 32) &
+            (num_buckets_ - 1);
     }
 
     // Return a power of two no less than max(kMinTableSize, n).
