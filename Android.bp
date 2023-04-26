@@ -112,10 +112,10 @@ cc_defaults {
         // This suffix for vendor and product must be updated
         // when a new version is imported.
         vendor: {
-            suffix: "-21.7",
+            suffix: "-21.12",
         },
         product: {
-            suffix: "-21.7",
+            suffix: "-21.12",
         },
     },
 }
@@ -373,6 +373,9 @@ cc_library {
         "android",
         "src",
         "config",
+    ],
+    cflags: [
+        "-Wno-unused-private-field",
     ],
 
     target: {
