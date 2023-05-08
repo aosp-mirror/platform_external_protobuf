@@ -607,6 +607,10 @@ java_library_static {
         "//apex_available:platform",
         "//apex_available:anyapex",
     ],
+
+    optimize: {
+        proguard_flags_files: ["java/lite/proguard.pgcfg"],
+    }
 }
 
 // Java lite library (compatibility for old host-side users)
