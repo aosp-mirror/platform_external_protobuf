@@ -275,6 +275,18 @@ cc_library {
     min_sdk_version: "29",
 }
 
+cc_test_library {
+    name: "libprotobuf-cpp-full-test",
+    defaults: ["libprotobuf-cpp-full-defaults"],
+    host_supported: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.os.statsd",
+        "test_com.android.os.statsd",
+    ],
+    min_sdk_version: "29",
+}
+
 // Compiler library for the host
 // =======================================================
 cc_library {
