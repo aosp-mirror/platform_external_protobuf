@@ -112,10 +112,10 @@ cc_defaults {
         // This suffix for vendor and product must be updated
         // when a new version is imported.
         vendor: {
-            suffix: "-21.7",
+            suffix: "-21.12",
         },
         product: {
-            suffix: "-21.7",
+            suffix: "-21.12",
         },
     },
 }
@@ -274,6 +274,18 @@ cc_library {
     min_sdk_version: "29",
 }
 
+cc_test_library {
+    name: "libprotobuf-cpp-full-test",
+    defaults: ["libprotobuf-cpp-full-defaults"],
+    host_supported: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.os.statsd",
+        "test_com.android.os.statsd",
+    ],
+    min_sdk_version: "29",
+}
+
 // Compiler library for the host
 // =======================================================
 cc_library {
@@ -372,6 +384,9 @@ cc_library {
         "android",
         "src",
         "config",
+    ],
+    cflags: [
+        "-Wno-unused-private-field",
     ],
 
     target: {
@@ -604,6 +619,10 @@ java_library_static {
         "//apex_available:platform",
         "//apex_available:anyapex",
     ],
+
+    optimize: {
+        proguard_flags_files: ["java/lite/proguard.pgcfg"],
+    }
 }
 
 // Java lite library (compatibility for old host-side users)
