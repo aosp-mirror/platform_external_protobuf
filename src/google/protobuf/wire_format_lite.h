@@ -864,8 +864,14 @@ inline uint32_t WireFormatLite::ZigZagEncode32(int32_t n) {
 }
 
 inline int32_t WireFormatLite::ZigZagDecode32(uint32_t n) {
+#if __has_builtin(__builtin_add_overflow)
+  uint32_t xor_mask;
+  __builtin_add_overflow(~(n & 1), 1, &xor_mask);
+  return static_cast<int32_t>((n >> 1) ^ xor_mask);
+#else
   // Note:  Using unsigned types prevent undefined behavior
   return static_cast<int32_t>((n >> 1) ^ (~(n & 1) + 1));
+#endif
 }
 
 inline uint64_t WireFormatLite::ZigZagEncode64(int64_t n) {
@@ -875,8 +881,14 @@ inline uint64_t WireFormatLite::ZigZagEncode64(int64_t n) {
 }
 
 inline int64_t WireFormatLite::ZigZagDecode64(uint64_t n) {
+#if __has_builtin(__builtin_add_overflow)
+  uint64_t xor_mask;
+  __builtin_add_overflow(~(n & 1), 1, &xor_mask);
+  return static_cast<int64_t>((n >> 1) ^ xor_mask);
+#else
   // Note:  Using unsigned types prevent undefined behavior
   return static_cast<int64_t>((n >> 1) ^ (~(n & 1) + 1));
+#endif
 }
 
 // String is for UTF-8 text only, but, even so, ReadString() can simply
