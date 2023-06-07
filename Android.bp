@@ -161,14 +161,6 @@ cc_library {
     min_sdk_version: "29",
 }
 
-// C++ lite library for the platform and host.
-// =======================================================
-cc_library_static {
-    name: "libprotobuf-cpp-lite_static",
-    host_supported: true,
-    defaults: ["libprotobuf-cpp-lite-defaults"],
-}
-
 // C++ full library
 // =======================================================
 cc_defaults {
