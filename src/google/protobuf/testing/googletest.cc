@@ -31,6 +31,7 @@
 // Author: kenton@google.com (Kenton Varda)
 // emulates google3/testing/base/public/googletest.cc
 
+#include <android-base/file.h>
 #include <google/protobuf/testing/googletest.h>
 #include <google/protobuf/testing/file.h>
 #include <google/protobuf/io/io_win32.h>
@@ -71,38 +72,7 @@ using google::protobuf::io::win32::open;
 #endif
 
 std::string TestSourceDir() {
-#ifndef GOOGLE_THIRD_PARTY_PROTOBUF
-#ifdef GOOGLE_PROTOBUF_TEST_SOURCE_PATH
-  return GOOGLE_PROTOBUF_TEST_SOURCE_PATH;
-#else
-#ifndef _MSC_VER
-  // automake sets the "srcdir" environment variable.
-  char* result = getenv("srcdir");
-  if (result != NULL) {
-    return result;
-  }
-#endif  // _MSC_VER
-
-  // Look for the "src" directory.
-  std::string prefix = ".";
-
-  // Keep looking further up the directory tree until we find
-  // src/.../descriptor.cc. It is important to look for a particular file,
-  // keeping in mind that with Bazel builds the directory structure under
-  // bazel-bin/ looks similar to the main directory tree in the Git repo.
-  while (!File::Exists(prefix + "/src/google/protobuf/descriptor.cc")) {
-    if (!File::Exists(prefix)) {
-      GOOGLE_LOG(FATAL)
-        << "Could not find protobuf source code.  Please run tests from "
-           "somewhere within the protobuf source package.";
-    }
-    prefix += "/..";
-  }
-  return prefix + "/src";
-#endif  // GOOGLE_PROTOBUF_TEST_SOURCE_PATH
-#else
-  return "third_party/protobuf/src";
-#endif  // GOOGLE_THIRD_PARTY_PROTOBUF
+  return android::base::GetExecutableDirectory() + "/src";
 }
 
 namespace {
