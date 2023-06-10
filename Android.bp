@@ -842,7 +842,6 @@ cc_test {
         "libgmock",
         "libprotobuf-cpp-lite",
     ],
-    whole_static_libs: ["libgtest_main"],
 }
 
 cc_test {
@@ -909,7 +908,6 @@ cc_test {
         "libbase",
         "libgmock",
     ],
-    whole_static_libs: ["libgtest_main"],
     shared_libs: ["libprotobuf-cpp-full"],
 }
 
@@ -936,7 +934,6 @@ cc_test {
         "libbase",
         "libgmock",
     ],
-    whole_static_libs: ["libgtest_main"],
     shared_libs: ["libprotobuf-cpp-full"],
 }
 
