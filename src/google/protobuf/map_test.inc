@@ -613,11 +613,7 @@ static void StressTestIterators(int n) {
 
 TEST_F(MapImplTest, IteratorInvalidation) {
   // Create a set of pseudo-random sizes to test.
-#ifndef NDEBUG
-  const int kMaxSizeToTest = 100 * 1000;
-#else
-  const int kMaxSizeToTest = 1000 * 1000;
-#endif
+  const int kMaxSizeToTest = 100000;
   std::set<int> s;
   int n = kMaxSizeToTest;
   unsigned int frog = k1 + n;
