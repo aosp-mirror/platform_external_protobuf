@@ -73,7 +73,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
       "// enum $classname$\n",
       "classname", descriptor_->name());
 
-  const string classname = RenameJavaKeywords(descriptor_->name());
+  const std::string classname = RenameJavaKeywords(descriptor_->name());
 
   // Start of container interface
   // If generating intdefs, we use the container interface as the intdef if
@@ -89,7 +89,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
       "@android.support.annotation.IntDef({\n");
     printer->Indent();
     for (int i = 0; i < canonical_values_.size(); i++) {
-      const string constant_name =
+      const std::string constant_name =
           RenameJavaKeywords(canonical_values_[i]->name());
       if (use_shell_class) {
         printer->Print("$classname$.$name$,\n",

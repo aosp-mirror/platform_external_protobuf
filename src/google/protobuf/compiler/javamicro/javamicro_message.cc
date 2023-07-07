@@ -56,7 +56,7 @@ namespace {
 void PrintFieldComment(io::Printer* printer, const FieldDescriptor* field) {
   // Print the field's proto-syntax definition as a comment.  We don't want to
   // print group bodies so we cut off after the first line.
-  string def = field->DebugString();
+  std::string def = field->DebugString();
   printer->Print("// $def$\n",
     "def", def.substr(0, def.find_first_of('\n')));
 }
@@ -84,7 +84,7 @@ const FieldDescriptor** SortFieldsByNumber(const Descriptor* descriptor) {
 // Get an identifier that uniquely identifies this type within the file.
 // This is used to declare static variables related to this type at the
 // outermost file scope.
-string UniqueFileScopeIdentifier(const Descriptor* descriptor) {
+std::string UniqueFileScopeIdentifier(const Descriptor* descriptor) {
   return "static_" + StringReplace(descriptor->full_name(), ".", "_", true);
 }
 
@@ -170,7 +170,7 @@ void MessageGenerator::GenerateStaticVariableInitializers(
 }
 
 void MessageGenerator::Generate(io::Printer* printer) {
-  const string& file_name = descriptor_->file()->name();
+  const std::string& file_name = descriptor_->file()->name();
   bool is_own_file =
     params_.java_multiple_files(file_name)
       && descriptor_->containing_type() == NULL;
