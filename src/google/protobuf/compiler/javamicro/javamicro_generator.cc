@@ -73,10 +73,10 @@ JavaMicroGenerator::JavaMicroGenerator() {}
 JavaMicroGenerator::~JavaMicroGenerator() {}
 
 bool JavaMicroGenerator::Generate(const FileDescriptor* file,
-                             const string& parameter,
+                             const std::string& parameter,
                              OutputDirectory* output_directory,
-                             string* error) const {
-  std::vector<std::pair<string, string> > options;
+                             std::string* error) const {
+  std::vector<std::pair<std::string, std::string> > options;
 
 //  GOOGLE_LOG(INFO) << "wink: JavaMicroGenerator::Generate INFO";
 //  GOOGLE_LOG(WARNING) << "wink: JavaMicroGenerator::Generate WARNING";
@@ -90,7 +90,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
 
   // Name a file where we will write a list of generated file names, one
   // per line.
-  string output_list_file;
+  std::string output_list_file;
   Params params(file->name());
 
   // Update per file params
@@ -113,7 +113,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
         return false;
       }
     } else if (options[i].first == "java_package") {
-        std::vector<string> parts;
+        std::vector<std::string> parts;
         SplitStringUsing(options[i].second, "|", &parts);
         if (parts.size() != 2) {
           *error = "Bad java_package, expecting filename|PackageName found '"
@@ -122,7 +122,7 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
         }
         params.set_java_package(parts[0], parts[1]);
     } else if (options[i].first == "java_outer_classname") {
-        std::vector<string> parts;
+        std::vector<std::string> parts;
         SplitStringUsing(options[i].second, "|", &parts);
         if (parts.size() != 2) {
           *error = "Bad java_outer_classname, "
@@ -167,14 +167,14 @@ bool JavaMicroGenerator::Generate(const FileDescriptor* file,
     return false;
   }
 
-  string package_dir =
+  std::string package_dir =
     StringReplace(file_generator.java_package(), ".", "/", true);
   if (!package_dir.empty()) package_dir += "/";
 
-  std::vector<string> all_files;
+  std::vector<std::string> all_files;
 
   if (IsOuterClassNeeded(params, file)) {
-    string java_filename = package_dir;
+    std::string java_filename = package_dir;
     java_filename += file_generator.classname();
     java_filename += ".java";
     all_files.push_back(java_filename);
