@@ -56,11 +56,11 @@ class PrimitiveFieldGenerator : public FieldGenerator {
   void GenerateSerializationCode(io::Printer* printer) const;
   void GenerateSerializedSizeCode(io::Printer* printer) const;
 
-  string GetBoxedType() const;
+  std::string GetBoxedType() const;
 
  private:
   const FieldDescriptor* descriptor_;
-  std::map<string, string> variables_;
+  std::map<std::string, std::string> variables_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(PrimitiveFieldGenerator);
 };
@@ -77,11 +77,11 @@ class RepeatedPrimitiveFieldGenerator : public FieldGenerator {
   void GenerateSerializationCode(io::Printer* printer) const;
   void GenerateSerializedSizeCode(io::Printer* printer) const;
 
-  string GetBoxedType() const;
+  std::string GetBoxedType() const;
 
  private:
   const FieldDescriptor* descriptor_;
-  std::map<string, string> variables_;
+  std::map<std::string, std::string> variables_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(RepeatedPrimitiveFieldGenerator);
 };
