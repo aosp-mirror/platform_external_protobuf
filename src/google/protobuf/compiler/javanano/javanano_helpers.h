@@ -53,28 +53,28 @@ extern const char kThinSeparator[];
 
 // Converts the field's name to camel-case, e.g. "foo_bar_baz" becomes
 // "fooBarBaz" or "FooBarBaz", respectively.
-string UnderscoresToCamelCase(const FieldDescriptor* field);
-string UnderscoresToCamelCase(const OneofDescriptor* oneof);
-string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field);
-string UnderscoresToCapitalizedCamelCase(const OneofDescriptor* oneof);
+std::string UnderscoresToCamelCase(const FieldDescriptor* field);
+std::string UnderscoresToCamelCase(const OneofDescriptor* oneof);
+std::string UnderscoresToCapitalizedCamelCase(const FieldDescriptor* field);
+std::string UnderscoresToCapitalizedCamelCase(const OneofDescriptor* oneof);
 
 // Appends an "_" to the end of a field where the name is a reserved java
 // keyword.  For example int32 public = 1 will generate int public_.
-string RenameJavaKeywords(const string& input);
+std::string RenameJavaKeywords(const std::string& input);
 
 // Similar, but for method names.  (Typically, this merely has the effect
 // of lower-casing the first letter of the name.)
-string UnderscoresToCamelCase(const MethodDescriptor* method);
+std::string UnderscoresToCamelCase(const MethodDescriptor* method);
 
 // Strips ".proto" or ".protodevel" from the end of a filename.
-string StripProto(const string& filename);
+std::string StripProto(const std::string& filename);
 
 // Gets the unqualified class name for the file.  Each .proto file becomes a
 // single Java class, with all its contents nested in that class.
-string FileClassName(const Params& params, const FileDescriptor* file);
+std::string FileClassName(const Params& params, const FileDescriptor* file);
 
 // Returns the file's Java package name.
-string FileJavaPackage(const Params& params, const FileDescriptor* file);
+std::string FileJavaPackage(const Params& params, const FileDescriptor* file);
 
 // Returns whether the Java outer class is needed, i.e. whether the option
 // java_multiple_files is false, or the proto file contains any file-scope
@@ -87,32 +87,32 @@ bool IsOuterClassNeeded(const Params& params, const FileDescriptor* file);
 // outer class name should be included in the return value depends on factors
 // inferrable from the given arguments, including is_class which indicates
 // whether the entity translates to a Java class.
-string ToJavaName(const Params& params, const string& name, bool is_class,
+std::string ToJavaName(const Params& params, const std::string& name, bool is_class,
     const Descriptor* parent, const FileDescriptor* file);
 
 // These return the fully-qualified class name corresponding to the given
 // descriptor.
-inline string ClassName(const Params& params, const Descriptor* descriptor) {
+inline std::string ClassName(const Params& params, const Descriptor* descriptor) {
   return ToJavaName(params, descriptor->name(), true,
                     descriptor->containing_type(), descriptor->file());
 }
-string ClassName(const Params& params, const EnumDescriptor* descriptor);
-inline string ClassName(const Params& params,
+std::string ClassName(const Params& params, const EnumDescriptor* descriptor);
+inline std::string ClassName(const Params& params,
     const ServiceDescriptor* descriptor) {
   return ToJavaName(params, descriptor->name(), true, NULL, descriptor->file());
 }
-inline string ExtensionIdentifierName(const Params& params,
+inline std::string ExtensionIdentifierName(const Params& params,
     const FieldDescriptor* descriptor) {
   return ToJavaName(params, descriptor->name(), false,
                     descriptor->extension_scope(), descriptor->file());
 }
-string ClassName(const Params& params, const FileDescriptor* descriptor);
+std::string ClassName(const Params& params, const FileDescriptor* descriptor);
 
 // Get the unqualified name that should be used for a field's field
 // number constant.
-string FieldConstantName(const FieldDescriptor *field);
+std::string FieldConstantName(const FieldDescriptor *field);
 
-string FieldDefaultConstantName(const FieldDescriptor *field);
+std::string FieldDefaultConstantName(const FieldDescriptor *field);
 
 // Print the field's proto-syntax definition as a comment.
 void PrintFieldComment(io::Printer* printer, const FieldDescriptor* field);
@@ -135,53 +135,53 @@ inline JavaType GetJavaType(const FieldDescriptor* field) {
   return GetJavaType(field->type());
 }
 
-string PrimitiveTypeName(JavaType type);
+std::string PrimitiveTypeName(JavaType type);
 
 // Get the fully-qualified class name for a boxed primitive type, e.g.
 // "java.lang.Integer" for JAVATYPE_INT.  Returns NULL for enum and message
 // types.
-string BoxedPrimitiveTypeName(JavaType type);
+std::string BoxedPrimitiveTypeName(JavaType type);
 
-string EmptyArrayName(const Params& params, const FieldDescriptor* field);
+std::string EmptyArrayName(const Params& params, const FieldDescriptor* field);
 
-string DefaultValue(const Params& params, const FieldDescriptor* field);
+std::string DefaultValue(const Params& params, const FieldDescriptor* field);
 
 
 // Methods for shared bitfields.
 
 // Gets the name of the shared bitfield for the given field index.
-string GetBitFieldName(int index);
+std::string GetBitFieldName(int index);
 
 // Gets the name of the shared bitfield for the given bit index.
 // Effectively, GetBitFieldName(bit_index / 32)
-string GetBitFieldNameForBit(int bit_index);
+std::string GetBitFieldNameForBit(int bit_index);
 
 // Generates the java code for the expression that returns whether the bit at
 // the given bit index is set.
 // Example: "((bitField1_ & 0x04000000) != 0)"
-string GenerateGetBit(int bit_index);
+std::string GenerateGetBit(int bit_index);
 
 // Generates the java code for the expression that sets the bit at the given
 // bit index.
 // Example: "bitField1_ |= 0x04000000"
-string GenerateSetBit(int bit_index);
+std::string GenerateSetBit(int bit_index);
 
 // Generates the java code for the expression that clears the bit at the given
 // bit index.
 // Example: "bitField1_ = (bitField1_ & ~0x04000000)"
-string GenerateClearBit(int bit_index);
+std::string GenerateClearBit(int bit_index);
 
 // Generates the java code for the expression that returns whether the bit at
 // the given bit index contains different values in the current object and
 // another object accessible via the variable 'other'.
 // Example: "((bitField1_ & 0x04000000) != (other.bitField1_ & 0x04000000))"
-string GenerateDifferentBit(int bit_index);
+std::string GenerateDifferentBit(int bit_index);
 
 // Sets the 'get_*', 'set_*', 'clear_*' and 'different_*' variables, where * is
 // the given name of the bit, to the appropriate Java expressions for the given
 // bit index.
-void SetBitOperationVariables(const string name,
-    int bitIndex, std::map<string, string>* variables);
+void SetBitOperationVariables(const std::string name,
+    int bitIndex, std::map<std::string, std::string>* variables);
 
 inline bool IsMapEntry(const Descriptor* descriptor) {
   // TODO(liujisi): Add an option to turn on maps for proto2 syntax as well.
