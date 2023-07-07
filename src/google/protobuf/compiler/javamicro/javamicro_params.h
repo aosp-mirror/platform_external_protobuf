@@ -48,11 +48,11 @@ enum eMultipleFiles { JAVAMICRO_MUL_UNSET, JAVAMICRO_MUL_FALSE, JAVAMICRO_MUL_TR
 // Parameters for used by the generators
 class Params {
  public:
-  typedef std::map<string, string> NameMap;
-  typedef std::set<string> NameSet;
+  typedef std::map<std::string, std::string> NameMap;
+  typedef std::set<std::string> NameSet;
  private:
-  string empty_;
-  string base_name_;
+  std::string empty_;
+  std::string base_name_;
   eOptimization optimization_;
   eMultipleFiles override_java_multiple_files_;
   bool java_use_vector_;
@@ -61,7 +61,7 @@ class Params {
   NameSet java_multiple_files_;
 
  public:
-  Params(const string & base_name) :
+  Params(const std::string & base_name) :
     empty_(""),
     base_name_(base_name),
     optimization_(JAVAMICRO_OPT_DEFAULT),
@@ -69,19 +69,19 @@ class Params {
     java_use_vector_(false) {
   }
 
-  const string& base_name() const {
+  const std::string& base_name() const {
     return base_name_;
   }
 
-  bool has_java_package(const string& file_name) const {
+  bool has_java_package(const std::string& file_name) const {
     return java_packages_.find(file_name)
                         != java_packages_.end();
   }
-  void set_java_package(const string& file_name,
-      const string& java_package) {
+  void set_java_package(const std::string& file_name,
+      const std::string& java_package) {
     java_packages_[file_name] = java_package;
   }
-  const string& java_package(const string& file_name) const {
+  const std::string& java_package(const std::string& file_name) const {
     NameMap::const_iterator itr;
 
     itr = java_packages_.find(file_name);
@@ -95,15 +95,15 @@ class Params {
     return java_packages_;
   }
 
-  bool has_java_outer_classname(const string& file_name) const {
+  bool has_java_outer_classname(const std::string& file_name) const {
     return java_outer_classnames_.find(file_name)
                         != java_outer_classnames_.end();
   }
-  void set_java_outer_classname(const string& file_name,
-      const string& java_outer_classname) {
+  void set_java_outer_classname(const std::string& file_name,
+      const std::string& java_outer_classname) {
     java_outer_classnames_[file_name] = java_outer_classname;
   }
-  const string& java_outer_classname(const string& file_name) const {
+  const std::string& java_outer_classname(const std::string& file_name) const {
     NameMap::const_iterator itr;
 
     itr = java_outer_classnames_.find(file_name);
@@ -135,14 +135,14 @@ class Params {
     override_java_multiple_files_ = JAVAMICRO_MUL_UNSET;
   }
 
-  void set_java_multiple_files(const string& file_name, bool value) {
+  void set_java_multiple_files(const std::string& file_name, bool value) {
     if (value) {
       java_multiple_files_.insert(file_name);
     } else {
       java_multiple_files_.erase(file_name);
     }
   }
-  bool java_multiple_files(const string& file_name) const {
+  bool java_multiple_files(const std::string& file_name) const {
     switch (override_java_multiple_files_) {
       case JAVAMICRO_MUL_FALSE:
         return false;
