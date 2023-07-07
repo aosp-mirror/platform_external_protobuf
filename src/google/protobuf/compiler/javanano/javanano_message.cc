@@ -114,7 +114,7 @@ void MessageGenerator::Generate(io::Printer* printer) {
         "'store_unknown_fields' generator option is 'true'\n";
   }
 
-  const string& file_name = descriptor_->file()->name();
+  const std::string& file_name = descriptor_->file()->name();
   bool is_own_file =
     params_.java_multiple_files(file_name)
       && descriptor_->containing_type() == NULL;
@@ -182,7 +182,7 @@ void MessageGenerator::Generate(io::Printer* printer) {
   }
 
   // oneof
-  std::map<string, string> vars;
+  std::map<std::string, std::string> vars;
   vars["message_name"] = descriptor_->name();
   for (int i = 0; i < descriptor_->oneof_decl_count(); i++) {
     const OneofDescriptor* oneof_desc = descriptor_->oneof_decl(i);
