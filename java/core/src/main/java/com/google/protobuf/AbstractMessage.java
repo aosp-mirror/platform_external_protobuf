@@ -94,13 +94,13 @@ public abstract class AbstractMessage
     return MessageReflection.delimitWithCommas(findInitializationErrors());
   }
 
-  /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+  // TODO(jieluo): Clear it when all subclasses have implemented this method.
   @Override
   public boolean hasOneof(OneofDescriptor oneof) {
     throw new UnsupportedOperationException("hasOneof() is not implemented.");
   }
 
-  /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+  // TODO(jieluo): Clear it when all subclasses have implemented this method.
   @Override
   public FieldDescriptor getOneofFieldDescriptor(OneofDescriptor oneof) {
     throw new UnsupportedOperationException("getOneofFieldDescriptor() is not implemented.");
@@ -424,25 +424,20 @@ public abstract class AbstractMessage
         throws IOException {
       boolean discardUnknown = input.shouldDiscardUnknownFields();
       final UnknownFieldSet.Builder unknownFields =
-          discardUnknown ? null : UnknownFieldSet.newBuilder(getUnknownFields());
-      while (true) {
-        final int tag = input.readTag();
-        if (tag == 0) {
-          break;
-        }
-
-        MessageReflection.BuilderAdapter builderAdapter =
-            new MessageReflection.BuilderAdapter(this);
-        if (!MessageReflection.mergeFieldFrom(
-            input, unknownFields, extensionRegistry, getDescriptorForType(), builderAdapter, tag)) {
-          // end group tag
-          break;
-        }
-      }
+          discardUnknown ? null : getUnknownFieldSetBuilder();
+      MessageReflection.mergeMessageFrom(this, unknownFields, input, extensionRegistry);
       if (unknownFields != null) {
-        setUnknownFields(unknownFields.build());
+        setUnknownFieldSetBuilder(unknownFields);
       }
       return (BuilderType) this;
+    }
+
+    protected UnknownFieldSet.Builder getUnknownFieldSetBuilder() {
+      return UnknownFieldSet.newBuilder(getUnknownFields());
+    }
+
+    protected void setUnknownFieldSetBuilder(final UnknownFieldSet.Builder builder) {
+      setUnknownFields(builder.build());
     }
 
     @Override
