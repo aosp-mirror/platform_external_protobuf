@@ -95,13 +95,13 @@ class PROTOBUF_EXPORT CriticalSectionLock {
 // In MSVC std::mutex does not have a constexpr constructor.
 // This wrapper makes the constructor constexpr.
 template <typename T>
-class CallOnceInitializedMutex {
+class GOOGLE_PROTOBUF_CAPABILITY("mutex") CallOnceInitializedMutex {
  public:
   constexpr CallOnceInitializedMutex() : flag_{}, buf_{} {}
   ~CallOnceInitializedMutex() { get().~T(); }
 
-  void lock() { get().lock(); }
-  void unlock() { get().unlock(); }
+  void lock() GOOGLE_PROTOBUF_ACQUIRE() { get().lock(); }
+  void unlock() GOOGLE_PROTOBUF_RELEASE() { get().unlock(); }
 
  private:
   T& get() {

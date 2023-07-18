@@ -83,8 +83,7 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
               "AllFields",
               "DescriptorForType",
               "InitializationErrorString",
-              // TODO(b/219045204): re-enable
-              // "UnknownFields",
+              "UnknownFields",
               // obsolete. kept for backwards compatibility of generated code
               "CachedSize"));
 
@@ -150,7 +149,7 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
    * <p>This class is thread-safe.
    */
   // <p>The code is adapted from the C++ implementation:
-  // https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/compiler/java/java_helpers.h
+  // https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/compiler/java/java_helpers.h
   static class IsInitializedCheckAnalyzer {
 
     private final Map<Descriptor, Boolean> resultCache =
@@ -428,8 +427,8 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
     boolean enforceUtf8 = true;
     for (int i = 0; i < fieldDescriptors.size(); ++i) {
       FieldDescriptor fd = fieldDescriptors.get(i);
-      if (fd.getContainingOneof() != null) {
-        // Build a oneof member field.
+      if (fd.getContainingOneof() != null && !fd.getContainingOneof().isSynthetic()) {
+        // Build a oneof member field. But only if it is a real oneof, not a proto3 optional
         builder.withField(buildOneofMember(messageType, fd, oneofState, enforceUtf8, null));
         continue;
       }
