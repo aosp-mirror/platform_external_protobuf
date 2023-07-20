@@ -194,7 +194,13 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
   }
   bool EndedAtLimit() const { return last_tag_minus_1_ == 0; }
   bool EndedAtEndOfStream() const { return last_tag_minus_1_ == 1; }
-  void SetLastTag(uint32_t tag) { last_tag_minus_1_ = tag - 1; }
+  void SetLastTag(uint32_t tag) {
+#if __has_builtin(__builtin_sub_overflow)
+    __builtin_sub_overflow(tag, 1, &last_tag_minus_1_);
+#else
+    last_tag_minus_1_ = tag - 1;
+#endif
+  }
   void SetEndOfStream() { last_tag_minus_1_ = 1; }
   bool IsExceedingLimit(const char* ptr) {
     return ptr > limit_end_ &&
@@ -566,7 +572,13 @@ inline const char* ReadTag(const char* p, uint32_t* out,
     return p + 1;
   }
   uint32_t second = static_cast<uint8_t>(p[1]);
+#if __has_builtin(__builtin_add_overflow) && __has_builtin(__builtin_sub_overflow)
+  uint32_t second_minus_1;
+  __builtin_sub_overflow(second, 1, &second_minus_1);
+  __builtin_add_overflow(res, second_minus_1 << 7, &res);
+#else
   res += (second - 1) << 7;
+#endif
   if (second < 128) {
     *out = res;
     return p + 2;
