@@ -1,0 +1,18 @@
+name: "protobuf"
+description:
+    "Protocol Buffers - Google's data interchange format"
+
+third_party {
+  identifier: {
+    type: "Git"
+    value: "https://github.com/protocolbuffers/protobuf"
+    version: "v3.7.1"
+    primary_source: true
+  }
+  version: "v3.7.1"
+  last_upgrade_date { year: 2019 month: 03 day: 26 }
+  license_type: NOTICE
+  security {
+    tag: "NVD-CPE2.3:cpe:/a:google:protobuf:3.7.1"
+  }
+}
