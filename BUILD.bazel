@@ -47,7 +47,7 @@ genrule(
     name = "libprotobuf-python-copy-protos",
     srcs = [":libprotobuf-python-proto-gen"],
     outs = ["python/" + f + "_pb2.py" for f in proto_filenames],
-    cmd = "cp -rf $(BINDIR)/external/protobuf/_virtual_imports/libprotobuf-proto/google $(BINDIR)/external/protobuf/python/"
+    cmd = "cp -rf $(BINDIR)/external/protobuf/libprotobuf-python-proto-gen_proto_gen/google $(BINDIR)/external/protobuf/python/"
 )
 
 py_proto_library(
