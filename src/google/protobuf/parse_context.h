@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <type_traits>
 
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream.h>
@@ -41,6 +42,7 @@
 #include <google/protobuf/port.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/arenastring.h>
+#include <google/protobuf/endian.h>
 #include <google/protobuf/implicit_weak_message.h>
 #include <google/protobuf/inlined_string_field.h>
 #include <google/protobuf/metadata_lite.h>
@@ -323,7 +325,7 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
 
   template <typename A>
   const char* AppendSize(const char* ptr, int size, const A& append) {
-    int chunk_size = buffer_end_ + kSlopBytes - ptr;
+    int chunk_size = static_cast<int>(buffer_end_ + kSlopBytes - ptr);
     do {
       GOOGLE_DCHECK(size > chunk_size);
       if (next_chunk_ == nullptr) return nullptr;
@@ -337,7 +339,7 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
       ptr = Next();
       if (ptr == nullptr) return nullptr;  // passed the limit
       ptr += kSlopBytes;
-      chunk_size = buffer_end_ + kSlopBytes - ptr;
+      chunk_size = static_cast<int>(buffer_end_ + kSlopBytes - ptr);
     } while (size > chunk_size);
     append(ptr, size);
     return ptr + size;
@@ -374,6 +376,7 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
 
 using LazyEagerVerifyFnType = const char* (*)(const char* ptr,
                                               ParseContext* ctx);
+using LazyEagerVerifyFnRef = std::remove_pointer<LazyEagerVerifyFnType>::type&;
 
 // ParseContext holds all data that is global to the entire parse. Most
 // importantly it contains the input stream, but also recursion depth and also
@@ -407,7 +410,7 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
   // Spawns a child parsing context that inherits key properties. New context
   // inherits the following:
   // --depth_, data_, check_required_fields_, lazy_parse_mode_
-  // The spanwed context always disables aliasing (different input).
+  // The spawned context always disables aliasing (different input).
   template <typename... T>
   ParseContext Spawn(const char** start, T&&... args) {
     ParseContext spawned(depth_, false, start, std::forward<T>(args)...);
@@ -484,10 +487,7 @@ struct EndianHelper<2> {
   static uint16_t Load(const void* p) {
     uint16_t tmp;
     std::memcpy(&tmp, p, 2);
-#ifndef PROTOBUF_LITTLE_ENDIAN
-    tmp = bswap_16(tmp);
-#endif
-    return tmp;
+    return little_endian::ToHost(tmp);
   }
 };
 
@@ -496,10 +496,7 @@ struct EndianHelper<4> {
   static uint32_t Load(const void* p) {
     uint32_t tmp;
     std::memcpy(&tmp, p, 4);
-#ifndef PROTOBUF_LITTLE_ENDIAN
-    tmp = bswap_32(tmp);
-#endif
-    return tmp;
+    return little_endian::ToHost(tmp);
   }
 };
 
@@ -508,10 +505,7 @@ struct EndianHelper<8> {
   static uint64_t Load(const void* p) {
     uint64_t tmp;
     std::memcpy(&tmp, p, 8);
-#ifndef PROTOBUF_LITTLE_ENDIAN
-    tmp = bswap_64(tmp);
-#endif
-    return tmp;
+    return little_endian::ToHost(tmp);
   }
 };
 
@@ -582,20 +576,96 @@ inline const char* ReadTag(const char* p, uint32_t* out,
   return tmp.first;
 }
 
+// As above, but optimized to consume very few registers while still being fast,
+// ReadTagInlined is useful for callers that don't mind the extra code but would
+// like to avoid an extern function call causing spills into the stack.
+//
+// Two support routines for ReadTagInlined come first...
+template <class T>
+PROTOBUF_NODISCARD PROTOBUF_ALWAYS_INLINE constexpr T RotateLeft(
+    T x, int s) noexcept {
+  return static_cast<T>(x << (s & (std::numeric_limits<T>::digits - 1))) |
+         static_cast<T>(x >> ((-s) & (std::numeric_limits<T>::digits - 1)));
+}
+
+PROTOBUF_NODISCARD inline PROTOBUF_ALWAYS_INLINE uint64_t
+RotRight7AndReplaceLowByte(uint64_t res, const char& byte) {
+#if defined(__x86_64__) && defined(__GNUC__)
+  // This will only use one register for `res`.
+  // `byte` comes as a reference to allow the compiler to generate code like:
+  //
+  //   rorq    $7, %rcx
+  //   movb    1(%rax), %cl
+  //
+  // which avoids loading the incoming bytes into a separate register first.
+  asm("ror $7,%0\n\t"
+      "movb %1,%b0"
+      : "+r"(res)
+      : "m"(byte));
+#else
+  res = RotateLeft(res, -7);
+  res = res & ~0xFF;
+  res |= 0xFF & byte;
+#endif
+  return res;
+};
+
+inline PROTOBUF_ALWAYS_INLINE
+const char* ReadTagInlined(const char* ptr, uint32_t* out) {
+  uint64_t res = 0xFF & ptr[0];
+  if (PROTOBUF_PREDICT_FALSE(res >= 128)) {
+    res = RotRight7AndReplaceLowByte(res, ptr[1]);
+    if (PROTOBUF_PREDICT_FALSE(res & 0x80)) {
+      res = RotRight7AndReplaceLowByte(res, ptr[2]);
+      if (PROTOBUF_PREDICT_FALSE(res & 0x80)) {
+        res = RotRight7AndReplaceLowByte(res, ptr[3]);
+        if (PROTOBUF_PREDICT_FALSE(res & 0x80)) {
+          // Note: this wouldn't work if res were 32-bit,
+          // because then replacing the low byte would overwrite
+          // the bottom 4 bits of the result.
+          res = RotRight7AndReplaceLowByte(res, ptr[4]);
+          if (PROTOBUF_PREDICT_FALSE(res & 0x80)) {
+            // The proto format does not permit longer than 5-byte encodings for
+            // tags.
+            *out = 0;
+            return nullptr;
+          }
+          *out = static_cast<uint32_t>(RotateLeft(res, 28));
+#if defined(__GNUC__)
+          // Note: this asm statement prevents the compiler from
+          // trying to share the "return ptr + constant" among all
+          // branches.
+          asm("" : "+r"(ptr));
+#endif
+          return ptr + 5;
+        }
+        *out = static_cast<uint32_t>(RotateLeft(res, 21));
+        return ptr + 4;
+      }
+      *out = static_cast<uint32_t>(RotateLeft(res, 14));
+      return ptr + 3;
+    }
+    *out = static_cast<uint32_t>(RotateLeft(res, 7));
+    return ptr + 2;
+  }
+  *out = static_cast<uint32_t>(res);
+  return ptr + 1;
+}
+
 // Decode 2 consecutive bytes of a varint and returns the value, shifted left
 // by 1. It simultaneous updates *ptr to *ptr + 1 or *ptr + 2 depending if the
 // first byte's continuation bit is set.
 // If bit 15 of return value is set (equivalent to the continuation bits of both
 // bytes being set) the varint continues, otherwise the parse is done. On x86
 // movsx eax, dil
-// add edi, eax
+// and edi, eax
+// add eax, edi
 // adc [rsi], 1
-// add eax, eax
-// and eax, edi
 inline uint32_t DecodeTwoBytes(const char** ptr) {
   uint32_t value = UnalignedLoad<uint16_t>(*ptr);
   // Sign extend the low byte continuation bit
   uint32_t x = static_cast<int8_t>(value);
+  value &= x;  // Mask out the high byte iff no continuation
   // This add is an amazing operation, it cancels the low byte continuation bit
   // from y transferring it to the carry. Simultaneously it also shifts the 7
   // LSB left by one tightly against high byte varint bits. Hence value now
@@ -603,7 +673,7 @@ inline uint32_t DecodeTwoBytes(const char** ptr) {
   value += x;
   // Use the carry to update the ptr appropriately.
   *ptr += value < x ? 2 : 1;
-  return value & (x + x);  // Mask out the high byte iff no continuation
+  return value;
 }
 
 // More efficient varint parsing for big varints
@@ -713,7 +783,7 @@ template <typename T>
 const char* EpsCopyInputStream::ReadPackedFixed(const char* ptr, int size,
                                                 RepeatedField<T>* out) {
   GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
-  int nbytes = buffer_end_ + kSlopBytes - ptr;
+  int nbytes = static_cast<int>(buffer_end_ + kSlopBytes - ptr);
   while (size > nbytes) {
     int num = nbytes / sizeof(T);
     int old_entries = out->size();
@@ -731,7 +801,7 @@ const char* EpsCopyInputStream::ReadPackedFixed(const char* ptr, int size,
     ptr = Next();
     if (ptr == nullptr) return nullptr;
     ptr += kSlopBytes - (nbytes - block_size);
-    nbytes = buffer_end_ + kSlopBytes - ptr;
+    nbytes = static_cast<int>(buffer_end_ + kSlopBytes - ptr);
   }
   int num = size / sizeof(T);
   int old_entries = out->size();
@@ -763,11 +833,11 @@ template <typename Add>
 const char* EpsCopyInputStream::ReadPackedVarint(const char* ptr, Add add) {
   int size = ReadSize(&ptr);
   GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
-  int chunk_size = buffer_end_ - ptr;
+  int chunk_size = static_cast<int>(buffer_end_ - ptr);
   while (size > chunk_size) {
     ptr = ReadPackedVarintArray(ptr, buffer_end_, add);
     if (ptr == nullptr) return nullptr;
-    int overrun = ptr - buffer_end_;
+    int overrun = static_cast<int>(ptr - buffer_end_);
     GOOGLE_DCHECK(overrun >= 0 && overrun <= kSlopBytes);
     if (size - chunk_size <= kSlopBytes) {
       // The current buffer contains all the information needed, we don't need
@@ -788,7 +858,7 @@ const char* EpsCopyInputStream::ReadPackedVarint(const char* ptr, Add add) {
     ptr = Next();
     if (ptr == nullptr) return nullptr;
     ptr += overrun;
-    chunk_size = buffer_end_ - ptr;
+    chunk_size = static_cast<int>(buffer_end_ - ptr);
   }
   auto end = ptr + size;
   ptr = ReadPackedVarintArray(ptr, end, add);
@@ -811,7 +881,7 @@ PROTOBUF_NODISCARD PROTOBUF_EXPORT const char* InlineGreedyStringParser(
 template <typename T>
 PROTOBUF_NODISCARD const char* FieldParser(uint64_t tag, T& field_parser,
                                            const char* ptr, ParseContext* ctx) {
-  uint32_t number = tag >> 3;
+  uint32_t number = static_cast<uint32_t>(tag >> 3);
   GOOGLE_PROTOBUF_PARSER_ASSERT(number != 0);
   using WireType = internal::WireFormatLite::WireType;
   switch (tag & 7) {
