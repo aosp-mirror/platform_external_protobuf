@@ -1,0 +1,21 @@
+name: "protobuf"
+description:
+    "Protocol Buffers - Google's data interchange format"
+
+third_party {
+  url {
+    type: HOMEPAGE
+    value: "https://developers.google.com/protocol-buffers/"
+  }
+  url {
+    type: GIT
+    value: "https://github.com/protocolbuffers/protobuf"
+  }
+  # Also update the suffix in Android.bp when updating the version.
+  version: "v21.7"
+  last_upgrade_date { year: 2022 month: 10 day: 31 }
+  license_type: NOTICE
+  security {
+    tag: "NVD-CPE2.3:cpe:/a:google:protobuf:3.21.7"
+  }
+}

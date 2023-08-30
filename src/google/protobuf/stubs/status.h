@@ -40,6 +40,29 @@
 namespace google {
 namespace protobuf {
 namespace util {
+namespace error {
+// These values must match error codes defined in google/rpc/code.proto.
+enum Code {
+  OK = 0,
+  CANCELLED = 1,
+  UNKNOWN = 2,
+  INVALID_ARGUMENT = 3,
+  DEADLINE_EXCEEDED = 4,
+  NOT_FOUND = 5,
+  ALREADY_EXISTS = 6,
+  PERMISSION_DENIED = 7,
+  UNAUTHENTICATED = 16,
+  RESOURCE_EXHAUSTED = 8,
+  FAILED_PRECONDITION = 9,
+  ABORTED = 10,
+  OUT_OF_RANGE = 11,
+  UNIMPLEMENTED = 12,
+  INTERNAL = 13,
+  UNAVAILABLE = 14,
+  DATA_LOSS = 15,
+};
+}  // namespace error
+
 namespace status_internal {
 
 // These values must match error codes defined in google/rpc/code.proto.
@@ -72,6 +95,9 @@ class PROTOBUF_EXPORT Status {
   // code, and error message.  If "code == 0", error_message is
   // ignored and a Status object identical to Status::kOk is
   // constructed.
+  Status(::google::protobuf::util::error::Code error_code,
+         StringPiece error_message)
+      : Status(static_cast<StatusCode>(error_code), error_message) {}
   Status(StatusCode error_code, StringPiece error_message);
   Status(const Status&);
   Status& operator=(const Status& x);
