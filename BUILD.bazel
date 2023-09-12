@@ -65,7 +65,21 @@ proto_library(
 java_library(
     name = "libprotobuf-java-full",
     java_version = "1.7",
-    srcs = glob(["java/core/src/main/java/**/*.java"]) + [":libprotobuf-java-full_proto_gen"],
+    srcs = [
+        ":libprotobuf-internal-java-full-srcs",
+        ":libprotobuf-java-full_proto_gen",
+    ],
+    target_compatible_with = select({
+        "//build/bazel/platforms/os:android": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+java_library(
+    name = "libprotobuf-java-full-neverlink",
+    exports = [":libprotobuf-java-full"],
+    java_version = "1.7",
+    neverlink = True,
     target_compatible_with = select({
         "//build/bazel/platforms/os:android": ["@platforms//:incompatible"],
         "//conditions:default": [],
