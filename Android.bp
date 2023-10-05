@@ -707,6 +707,12 @@ filegroup {
 }
 
 filegroup {
+    name: "libprotobuf-internal-java-full-srcs",
+    srcs: ["java/core/src/main/java/**/*.java"],
+    path: "java",
+}
+
+filegroup {
     name: "libprotobuf-internal-protos",
     srcs: [
         "src/google/protobuf/descriptor.proto",
