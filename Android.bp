@@ -132,8 +132,9 @@ cc_library_static {
     apex_available: [
         "//apex_available:platform",
         "com.android.adservices",
+        "com.android.extservices",
     ],
-    min_sdk_version: "33",
+    min_sdk_version: "30",
 }
 
 // C++ lite library for the platform and host.
@@ -704,6 +705,12 @@ filegroup {
     name: "libprotobuf-internal-python-srcs",
     srcs: ["python/google/**/*.py"],
     path: "python",
+}
+
+filegroup {
+    name: "libprotobuf-internal-java-full-srcs",
+    srcs: ["java/core/src/main/java/**/*.java"],
+    path: "java",
 }
 
 filegroup {
