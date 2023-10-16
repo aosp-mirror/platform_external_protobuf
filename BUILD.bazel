@@ -16,6 +16,7 @@
 # from Android.bp. The BUILD file in this folder is unused, it's from
 # the protocol-buffers github repo.
 load("//build/bazel/rules/python:py_proto.bzl", "py_proto_library")
+load("//build/bazel/rules/java:proto.bzl", "java_proto_sources_gen")
 
 py_library(
     name = "libprotobuf-python",
@@ -47,7 +48,7 @@ genrule(
     name = "libprotobuf-python-copy-protos",
     srcs = [":libprotobuf-python-proto-gen"],
     outs = ["python/" + f + "_pb2.py" for f in proto_filenames],
-    cmd = "cp -rf $(BINDIR)/external/protobuf/_virtual_imports/libprotobuf-proto/google $(BINDIR)/external/protobuf/python/"
+    cmd = "cp -rf $(BINDIR)/external/protobuf/libprotobuf-python-proto-gen_proto_gen/google $(BINDIR)/external/protobuf/python/"
 )
 
 py_proto_library(
@@ -59,4 +60,33 @@ proto_library(
     name = "libprotobuf-proto",
     srcs = ["src/" + f + ".proto" for f in proto_filenames],
     strip_import_prefix = "src",
+)
+
+java_library(
+    name = "libprotobuf-java-full",
+    java_version = "1.7",
+    srcs = [
+        ":libprotobuf-internal-java-full-srcs",
+        ":libprotobuf-java-full_proto_gen",
+    ],
+    target_compatible_with = select({
+        "//build/bazel_common_rules/platforms/os:android": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+java_library(
+    name = "libprotobuf-java-full-neverlink",
+    exports = [":libprotobuf-java-full"],
+    java_version = "1.7",
+    neverlink = True,
+    target_compatible_with = select({
+        "//build/bazel_common_rules/platforms/os:android": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+java_proto_sources_gen(
+    name = "libprotobuf-java-full_proto_gen",
+    deps = [":libprotobuf-internal-protos_proto"],
 )
