@@ -70,7 +70,7 @@ java_library(
         ":libprotobuf-java-full_proto_gen",
     ],
     target_compatible_with = select({
-        "//build/bazel/platforms/os:android": ["@platforms//:incompatible"],
+        "//build/bazel_common_rules/platforms/os:android": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
 )
@@ -81,7 +81,7 @@ java_library(
     java_version = "1.7",
     neverlink = True,
     target_compatible_with = select({
-        "//build/bazel/platforms/os:android": ["@platforms//:incompatible"],
+        "//build/bazel_common_rules/platforms/os:android": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
 )
