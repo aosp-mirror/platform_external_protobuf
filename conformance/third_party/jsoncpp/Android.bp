@@ -1,0 +1,16 @@
+package {
+    default_applicable_licenses: ["external_protobuf_confirmance_third_party_jsoncpp_license"],
+}
+
+license {
+    name: "external_protobuf_confirmance_third_party_jsoncpp_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-MIT"],
+    license_text: ["LICENSE"],
+}
+
+filegroup {
+    name: "external_protobuf_confirmance_third_party_jsoncpp",
+    srcs: ["*"],
+    visibility: ["//visibility:private"],
+}
