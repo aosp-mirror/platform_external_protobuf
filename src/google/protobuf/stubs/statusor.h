@@ -144,6 +144,7 @@ class StatusOr {
 
   // Returns a reference to our current value, or CHECK-fails if !this->ok().
   const T& value () const;
+  const T& ValueOrDie() const { return value(); }
 
  private:
   Status status_;

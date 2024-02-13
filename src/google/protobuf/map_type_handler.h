@@ -395,7 +395,7 @@ const char* MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::Read(
 template <typename Type>
 const char* MapTypeHandler<WireFormatLite::TYPE_STRING, Type>::Read(
     const char* ptr, ParseContext* ctx, MapEntryAccessorType* value) {
-  int size = ReadSize(&ptr);
+  int size = static_cast<int>(ReadSize(&ptr));
   GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
   return ctx->ReadString(ptr, size, value);
 }
@@ -403,7 +403,7 @@ const char* MapTypeHandler<WireFormatLite::TYPE_STRING, Type>::Read(
 template <typename Type>
 const char* MapTypeHandler<WireFormatLite::TYPE_BYTES, Type>::Read(
     const char* ptr, ParseContext* ctx, MapEntryAccessorType* value) {
-  int size = ReadSize(&ptr);
+  int size = static_cast<int>(ReadSize(&ptr));
   GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
   return ctx->ReadString(ptr, size, value);
 }
