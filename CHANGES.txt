@@ -1,3 +1,44 @@
+2022-12-07 version 21.11 (C++/Java/Python/PHP/Objective-C/C#/Ruby)
+  Python
+  * Add license file to pypi wheels (#10936)
+  * Fix round-trip bug (#10158)
+
+2022-11-29 version 21.10 (C++/Java/Python/PHP/Objective-C/C#/Ruby)
+
+  Java
+  * Use bit-field int values in buildPartial to skip work on unset groups of fields. (#10960)
+  * Mark nested builder as clean after clear is called (#10984)
+  UPB
+  * Fix UPB_LIKELY() for 32-bit Windows builds; update protobuf_deps to point to the current upb 21.x (#11028)
+  Other
+  * Add public modifiers to kotlin code (#11068)
+
+2022-10-26 version 21.9 (C++/Java/Python/PHP/Objective-C/C#/Ruby)
+
+  C++
+  * Update zlib to 1.2.13 (#10819)
+
+  Python
+  * Target MacOS 10.9 to fix #10799 (#10807)
+
+  Ruby
+  * Replace libc strdup usage with internal impl to restore musl compat (#10818)
+
+2022-10-18 version 21.8 (C++/Java/Python/PHP/Objective-C/C#/Ruby)
+
+  Other
+  * Fix for grpc.tools #17995 & protobuf #7474 (handle UTF-8 paths in argumentfile) (#10721)
+
+  C++
+  * 21.x No longer define no_threadlocal on OpenBSD (#10743)
+
+  Java
+  * Mark default instance as immutable first to avoid race during static initialization of default instances (#10771)
+
+  Ruby
+  * Auto capitalize enums name in Ruby (#10454) (#10763)
+
+
 2022-09-29 version 21.7 (C++/Java/Python/PHP/Objective-C/C#/Ruby)
   Java
   * Refactoring java full runtime to reuse sub-message builders and prepare to
