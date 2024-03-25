@@ -126,6 +126,8 @@ if(MSVC AND protobuf_BUILD_SHARED_LIBS)
     PUBLIC  PROTOBUF_USE_DLLS
     PRIVATE LIBPROTOBUF_EXPORTS)
 endif()
+# Suppress inconsistent-missing-override warnings that are being ignored upstream
+target_compile_options(libprotobuf PRIVATE -Wno-inconsistent-missing-override)
 set_target_properties(libprotobuf PROPERTIES
     VERSION ${protobuf_VERSION}
     OUTPUT_NAME ${LIB_PREFIX}protobuf
