@@ -604,6 +604,9 @@ java_library_static {
         android: {
             libs: ["libcore_private.stubs"],
         },
+        windows: {
+            enabled: true,
+        },
     },
 
     java_version: "1.7",
@@ -645,6 +648,11 @@ java_library_host {
     },
 
     java_version: "1.7",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 java_library_host {
@@ -662,6 +670,11 @@ java_library_host {
     ],
     // b/267831518: Pin tradefed and dependencies to Java 11.
     java_version: "11",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // Java full library (compatibility for old host-side users)
