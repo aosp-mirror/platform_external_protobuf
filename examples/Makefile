@@ -1,4 +1,4 @@
-# See README.txt.
+# See README.md.
 
 .PHONY: all cpp java python clean
 
@@ -10,16 +10,18 @@ go:     add_person_go     list_people_go
 gotest: add_person_gotest list_people_gotest
 java:   add_person_java   list_people_java
 python: add_person_python list_people_python
+ruby:   add_person_ruby   list_people_ruby
 
 clean:
-	rm -f add_person_cpp list_people_cpp add_person_java list_people_java add_person_python list_people_python
-	rm -f javac_middleman AddPerson*.class ListPeople*.class com/example/tutorial/*.class
-	rm -f protoc_middleman addressbook.pb.cc addressbook.pb.h addressbook_pb2.py com/example/tutorial/AddressBookProtos.java
+	rm -f add_person_cpp list_people_cpp add_person_java list_people_java add_person_python list_people_python add_person_ruby list_people_ruby
+	rm -f javac_middleman AddPerson*.class ListPeople*.class com/example/tutorial/protos/*.class
+	rm -f protoc_middleman protoc_middleman_ruby addressbook.pb.cc addressbook.pb.h addressbook_pb2.py addressbook_pb.rb com/example/tutorial/protos/*.java
 	rm -f *.pyc
 	rm -f go/tutorialpb/*.pb.go add_person_go list_people_go
 	rm -f protoc_middleman_dart dart_tutorial/*.pb*.dart
 	rmdir dart_tutorial 2>/dev/null || true
 	rmdir tutorial 2>/dev/null || true
+	rmdir com/example/tutorial/protos 2>/dev/null || true
 	rmdir com/example/tutorial 2>/dev/null || true
 	rmdir com/example 2>/dev/null || true
 	rmdir com 2>/dev/null || true
@@ -38,13 +40,17 @@ protoc_middleman_dart: addressbook.proto
 	pub get
 	@touch protoc_middleman_dart
 
+protoc_middleman_ruby: addressbook.proto
+	protoc $$PROTO_PATH --ruby_out=. addressbook.proto
+	@touch protoc_middleman_ruby
+
 add_person_cpp: add_person.cc protoc_middleman
 	pkg-config --cflags protobuf  # fails if protobuf is not installed
-	c++ -std=c++11 add_person.cc addressbook.pb.cc -o add_person_cpp `pkg-config --cflags --libs protobuf`
+	c++ -std=c++14 add_person.cc addressbook.pb.cc -o add_person_cpp `pkg-config --cflags --libs protobuf`
 
 list_people_cpp: list_people.cc protoc_middleman
 	pkg-config --cflags protobuf  # fails if protobuf is not installed
-	c++ -std=c++11 list_people.cc addressbook.pb.cc -o list_people_cpp `pkg-config --cflags --libs protobuf`
+	c++ -std=c++14 list_people.cc addressbook.pb.cc -o list_people_cpp `pkg-config --cflags --libs protobuf`
 
 add_person_dart: add_person.dart protoc_middleman_dart
 
@@ -63,7 +69,7 @@ list_people_gotest: go/tutorialpb/addressbook.pb.go
 	cd go && go test ./cmd/list_people
 
 javac_middleman: AddPerson.java ListPeople.java protoc_middleman
-	javac -cp $$CLASSPATH AddPerson.java ListPeople.java com/example/tutorial/AddressBookProtos.java
+	javac -cp $$CLASSPATH AddPerson.java ListPeople.java com/example/tutorial/protos/*.java
 	@touch javac_middleman
 
 add_person_java: javac_middleman
@@ -89,3 +95,15 @@ list_people_python: list_people.py protoc_middleman
 	@echo '#! /bin/sh' > list_people_python
 	@echo './list_people.py "$$@"' >> list_people_python
 	@chmod +x list_people_python
+
+add_person_ruby: add_person.rb protoc_middleman_ruby
+	@echo "Writing shortcut script add_person_ruby..."
+	@echo '#! /bin/sh' > add_person_ruby
+	@echo './add_person.rb "$$@"' >> add_person_ruby
+	@chmod +x add_person_ruby
+
+list_people_ruby: list_people.rb protoc_middleman_ruby
+	@echo "Writing shortcut script list_people_ruby..."
+	@echo '#! /bin/sh' > list_people_ruby
+	@echo './list_people.rb "$$@"' >> list_people_ruby
+	@chmod +x list_people_ruby

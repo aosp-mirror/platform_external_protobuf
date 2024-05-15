@@ -1,61 +1,44 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #include "conformance_test.h"
 
 #include <stdarg.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
-#include <set>
+#include <memory>
 #include <string>
 
-#include <google/protobuf/stubs/stringprintf.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/util/field_comparator.h>
-#include <google/protobuf/util/json_util.h>
-#include <google/protobuf/util/message_differencer.h>
-#include "conformance.pb.h"
+#include "google/protobuf/util/field_comparator.h"
+#include "google/protobuf/util/message_differencer.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
+#include "conformance/conformance.pb.h"
+#include "conformance/conformance.pb.h"
+#include "google/protobuf/descriptor_legacy.h"
+#include "google/protobuf/message.h"
+#include "google/protobuf/text_format.h"
 
 using conformance::ConformanceRequest;
 using conformance::ConformanceResponse;
 using conformance::WireFormat;
-using google::protobuf::TextFormat;
 using google::protobuf::util::DefaultFieldComparator;
 using google::protobuf::util::MessageDifferencer;
 using std::string;
 
 namespace {
 
-static string ToOctString(const string& binary_string) {
-  string oct_string;
+static std::string ToOctString(const std::string& binary_string) {
+  std::string oct_string;
   for (size_t i = 0; i < binary_string.size(); i++) {
     uint8_t c = binary_string.at(i);
     uint8_t high = c / 64;
@@ -69,18 +52,53 @@ static string ToOctString(const string& binary_string) {
   return oct_string;
 }
 
+template <typename SetT>
+bool CheckSetEmpty(const SetT& set_to_check, absl::string_view write_to_file,
+                   absl::string_view msg, absl::string_view output_dir,
+                   std::string* output) {
+  if (set_to_check.empty()) return true;
+
+  absl::StrAppendFormat(output, "\n");
+  absl::StrAppendFormat(output, "%s\n\n", msg);
+  for (absl::string_view v : set_to_check) {
+    absl::StrAppendFormat(output, "  %s\n", v);
+  }
+  absl::StrAppendFormat(output, "\n");
+
+  if (!write_to_file.empty()) {
+    std::string full_filename;
+    absl::string_view filename = write_to_file;
+    if (!output_dir.empty()) {
+      full_filename = std::string(output_dir);
+      if (*output_dir.rbegin() != '/') {
+        full_filename.push_back('/');
+      }
+      absl::StrAppend(&full_filename, write_to_file);
+      filename = full_filename;
+    }
+    std::ofstream os{std::string(filename)};
+    if (os) {
+      for (absl::string_view v : set_to_check) {
+        os << v << "\n";
+      }
+    } else {
+      absl::StrAppendFormat(output, "Failed to open file: %s\n", filename);
+    }
+  }
+
+  return false;
+}
+
 }  // namespace
 
 namespace google {
 namespace protobuf {
 
 ConformanceTestSuite::ConformanceRequestSetting::ConformanceRequestSetting(
-    ConformanceLevel level,
-    conformance::WireFormat input_format,
+    ConformanceLevel level, conformance::WireFormat input_format,
     conformance::WireFormat output_format,
-    conformance::TestCategory test_category,
-    const Message& prototype_message,
-    const string& test_name, const string& input)
+    conformance::TestCategory test_category, const Message& prototype_message,
+    const std::string& test_name, const std::string& input)
     : level_(level),
       input_format_(input_format),
       output_format_(output_format),
@@ -109,7 +127,7 @@ ConformanceTestSuite::ConformanceRequestSetting::ConformanceRequestSetting(
     }
 
     default:
-      GOOGLE_LOG(FATAL) << "Unspecified input format";
+      ABSL_LOG(FATAL) << "Unspecified input format";
   }
 
   request_.set_test_category(test_category);
@@ -123,30 +141,49 @@ ConformanceTestSuite::ConformanceRequestSetting::NewTestMessage() const {
   return std::unique_ptr<Message>(prototype_message_for_compare_->New());
 }
 
-string ConformanceTestSuite::ConformanceRequestSetting::
-    GetTestName() const {
-  string rname =
-      prototype_message_.GetDescriptor()->file()->syntax() ==
-        FileDescriptor::SYNTAX_PROTO3 ? "Proto3" : "Proto2";
+std::string
+ConformanceTestSuite::ConformanceRequestSetting::GetSyntaxIdentifier() const {
+  switch (FileDescriptorLegacy(prototype_message_.GetDescriptor()->file())
+              .edition()) {
+    case Edition::EDITION_PROTO3:
+      return "Proto3";
+    case Edition::EDITION_PROTO2:
+      return "Proto2";
+    default: {
+      std::string id = "Editions";
+      if (prototype_message_.GetDescriptor()->name() == "TestAllTypesProto2") {
+        absl::StrAppend(&id, "_Proto2");
+      } else if (prototype_message_.GetDescriptor()->name() ==
+                 "TestAllTypesProto3") {
+        absl::StrAppend(&id, "_Proto3");
+      }
+      return id;
+    }
+  }
+}
 
-  return StrCat(ConformanceLevelToString(level_), ".", rname, ".",
+string ConformanceTestSuite::ConformanceRequestSetting::GetTestName() const {
+  return absl::StrCat(ConformanceLevelToString(level_), ".",
+                      GetSyntaxIdentifier(), ".",
                       InputFormatString(input_format_), ".", test_name_, ".",
                       OutputFormatString(output_format_));
 }
 
-string ConformanceTestSuite::ConformanceRequestSetting::
-    ConformanceLevelToString(
-        ConformanceLevel level) const {
+std::string
+ConformanceTestSuite::ConformanceRequestSetting::ConformanceLevelToString(
+    ConformanceLevel level) const {
   switch (level) {
-    case REQUIRED: return "Required";
-    case RECOMMENDED: return "Recommended";
+    case REQUIRED:
+      return "Required";
+    case RECOMMENDED:
+      return "Recommended";
   }
-  GOOGLE_LOG(FATAL) << "Unknown value: " << level;
+  ABSL_LOG(FATAL) << "Unknown value: " << level;
   return "";
 }
 
-string ConformanceTestSuite::ConformanceRequestSetting::
-    InputFormatString(conformance::WireFormat format) const {
+std::string ConformanceTestSuite::ConformanceRequestSetting::InputFormatString(
+    conformance::WireFormat format) const {
   switch (format) {
     case conformance::PROTOBUF:
       return "ProtobufInput";
@@ -155,13 +192,13 @@ string ConformanceTestSuite::ConformanceRequestSetting::
     case conformance::TEXT_FORMAT:
       return "TextFormatInput";
     default:
-      GOOGLE_LOG(FATAL) << "Unspecified output format";
+      ABSL_LOG(FATAL) << "Unspecified output format";
   }
   return "";
 }
 
-string ConformanceTestSuite::ConformanceRequestSetting::
-    OutputFormatString(conformance::WireFormat format) const {
+std::string ConformanceTestSuite::ConformanceRequestSetting::OutputFormatString(
+    conformance::WireFormat format) const {
   switch (format) {
     case conformance::PROTOBUF:
       return "ProtobufOutput";
@@ -170,72 +207,123 @@ string ConformanceTestSuite::ConformanceRequestSetting::
     case conformance::TEXT_FORMAT:
       return "TextFormatOutput";
     default:
-      GOOGLE_LOG(FATAL) << "Unspecified output format";
+      ABSL_LOG(FATAL) << "Unspecified output format";
   }
   return "";
 }
 
-void ConformanceTestSuite::ReportSuccess(const string& test_name) {
+void ConformanceTestSuite::TruncateDebugPayload(string* payload) {
+  if (payload != nullptr && payload->size() > 200) {
+    payload->resize(200);
+    payload->append("...(truncated)");
+  }
+}
+
+ConformanceRequest ConformanceTestSuite::TruncateRequest(
+    const ConformanceRequest& request) {
+  ConformanceRequest debug_request(request);
+  switch (debug_request.payload_case()) {
+    case ConformanceRequest::kProtobufPayload:
+      TruncateDebugPayload(debug_request.mutable_protobuf_payload());
+      break;
+    case ConformanceRequest::kJsonPayload:
+      TruncateDebugPayload(debug_request.mutable_json_payload());
+      break;
+    case ConformanceRequest::kTextPayload:
+      TruncateDebugPayload(debug_request.mutable_text_payload());
+      break;
+    case ConformanceRequest::kJspbPayload:
+      TruncateDebugPayload(debug_request.mutable_jspb_payload());
+      break;
+    default:
+      // Do nothing.
+      break;
+  }
+  return debug_request;
+}
+
+ConformanceResponse ConformanceTestSuite::TruncateResponse(
+    const ConformanceResponse& response) {
+  ConformanceResponse debug_response(response);
+  switch (debug_response.result_case()) {
+    case ConformanceResponse::kProtobufPayload:
+      TruncateDebugPayload(debug_response.mutable_protobuf_payload());
+      break;
+    case ConformanceResponse::kJsonPayload:
+      TruncateDebugPayload(debug_response.mutable_json_payload());
+      break;
+    case ConformanceResponse::kTextPayload:
+      TruncateDebugPayload(debug_response.mutable_text_payload());
+      break;
+    case ConformanceResponse::kJspbPayload:
+      TruncateDebugPayload(debug_response.mutable_jspb_payload());
+      break;
+    default:
+      // Do nothing.
+      break;
+  }
+  return debug_response;
+}
+
+void ConformanceTestSuite::ReportSuccess(const std::string& test_name) {
   if (expected_to_fail_.erase(test_name) != 0) {
-    StringAppendF(&output_,
-                  "ERROR: test %s is in the failure list, but test succeeded.  "
-                  "Remove it from the failure list.\n",
-                  test_name.c_str());
+    absl::StrAppendFormat(
+        &output_,
+        "ERROR: test %s is in the failure list, but test succeeded.  "
+        "Remove it from the failure list.\n",
+        test_name);
     unexpected_succeeding_tests_.insert(test_name);
   }
   successes_++;
 }
 
-void ConformanceTestSuite::ReportFailure(const string& test_name,
+void ConformanceTestSuite::ReportFailure(const std::string& test_name,
                                          ConformanceLevel level,
                                          const ConformanceRequest& request,
                                          const ConformanceResponse& response,
-                                         const char* fmt, ...) {
+                                         absl::string_view message) {
   if (expected_to_fail_.erase(test_name) == 1) {
     expected_failures_++;
-    if (!verbose_)
-      return;
+    if (!verbose_) return;
   } else if (level == RECOMMENDED && !enforce_recommended_) {
-    StringAppendF(&output_, "WARNING, test=%s: ", test_name.c_str());
+    absl::StrAppendFormat(&output_, "WARNING, test=%s: ", test_name);
   } else {
-    StringAppendF(&output_, "ERROR, test=%s: ", test_name.c_str());
+    absl::StrAppendFormat(&output_, "ERROR, test=%s: ", test_name);
     unexpected_failing_tests_.insert(test_name);
   }
-  va_list args;
-  va_start(args, fmt);
-  StringAppendV(&output_, fmt, args);
-  va_end(args);
-  StringAppendF(&output_, " request=%s, response=%s\n",
-                request.ShortDebugString().c_str(),
-                response.ShortDebugString().c_str());
+
+  absl::StrAppendFormat(&output_, "%s, request=%s, response=%s\n", message,
+                        TruncateRequest(request).ShortDebugString(),
+                        TruncateResponse(response).ShortDebugString());
 }
 
-void ConformanceTestSuite::ReportSkip(const string& test_name,
+void ConformanceTestSuite::ReportSkip(const std::string& test_name,
                                       const ConformanceRequest& request,
                                       const ConformanceResponse& response) {
   if (verbose_) {
-    StringAppendF(&output_, "SKIPPED, test=%s request=%s, response=%s\n",
-                  test_name.c_str(), request.ShortDebugString().c_str(),
-                  response.ShortDebugString().c_str());
+    absl::StrAppendFormat(
+        &output_, "SKIPPED, test=%s request=%s, response=%s\n", test_name,
+        request.ShortDebugString(), response.ShortDebugString());
   }
   skipped_.insert(test_name);
 }
 
 void ConformanceTestSuite::RunValidInputTest(
     const ConformanceRequestSetting& setting,
-    const string& equivalent_text_format) {
+    const std::string& equivalent_text_format) {
   std::unique_ptr<Message> reference_message(setting.NewTestMessage());
-  GOOGLE_CHECK(TextFormat::ParseFromString(equivalent_text_format,
-                                    reference_message.get()))
+  ABSL_CHECK(TextFormat::ParseFromString(equivalent_text_format,
+                                         reference_message.get()))
       << "Failed to parse data for test case: " << setting.GetTestName()
       << ", data: " << equivalent_text_format;
-  const string equivalent_wire_format = reference_message->SerializeAsString();
+  const std::string equivalent_wire_format =
+      reference_message->SerializeAsString();
   RunValidBinaryInputTest(setting, equivalent_wire_format);
 }
 
 void ConformanceTestSuite::RunValidBinaryInputTest(
     const ConformanceRequestSetting& setting,
-    const string& equivalent_wire_format, bool require_same_wire_format) {
+    const std::string& equivalent_wire_format, bool require_same_wire_format) {
   const ConformanceRequest& request = setting.GetRequest();
   ConformanceResponse response;
   RunTest(setting.GetTestName(), request, &response);
@@ -245,15 +333,16 @@ void ConformanceTestSuite::RunValidBinaryInputTest(
 
 void ConformanceTestSuite::VerifyResponse(
     const ConformanceRequestSetting& setting,
-    const string& equivalent_wire_format, const ConformanceResponse& response,
-    bool need_report_success, bool require_same_wire_format) {
+    const std::string& equivalent_wire_format,
+    const ConformanceResponse& response, bool need_report_success,
+    bool require_same_wire_format) {
   std::unique_ptr<Message> test_message(setting.NewTestMessage());
   const ConformanceRequest& request = setting.GetRequest();
-  const string& test_name = setting.GetTestName();
+  const std::string& test_name = setting.GetTestName();
   ConformanceLevel level = setting.GetLevel();
   std::unique_ptr<Message> reference_message = setting.NewTestMessage();
 
-  GOOGLE_CHECK(reference_message->ParseFromString(equivalent_wire_format))
+  ABSL_CHECK(reference_message->ParseFromString(equivalent_wire_format))
       << "Failed to parse wire data for test case: " << test_name;
 
   switch (response.result_case()) {
@@ -263,6 +352,7 @@ void ConformanceTestSuite::VerifyResponse(
       return;
 
     case ConformanceResponse::kParseError:
+    case ConformanceResponse::kTimeoutError:
     case ConformanceResponse::kRuntimeError:
     case ConformanceResponse::kSerializeError:
       ReportFailure(test_name, level, request, response,
@@ -281,16 +371,17 @@ void ConformanceTestSuite::VerifyResponse(
   DefaultFieldComparator field_comparator;
   field_comparator.set_treat_nan_as_equal(true);
   differencer.set_field_comparator(&field_comparator);
-  string differences;
+  std::string differences;
   differencer.ReportDifferencesToString(&differences);
 
   bool check = false;
 
   if (require_same_wire_format) {
-    GOOGLE_DCHECK_EQ(response.result_case(), ConformanceResponse::kProtobufPayload);
-    const string& protobuf_payload = response.protobuf_payload();
+    ABSL_DCHECK_EQ(response.result_case(),
+                   ConformanceResponse::kProtobufPayload);
+    const std::string& protobuf_payload = response.protobuf_payload();
     check = equivalent_wire_format == protobuf_payload;
-    differences = StrCat("Expect: ", ToOctString(equivalent_wire_format),
+    differences = absl::StrCat("Expect: ", ToOctString(equivalent_wire_format),
                                ", but got: ", ToOctString(protobuf_payload));
   } else {
     check = differencer.Compare(*reference_message, *test_message);
@@ -301,21 +392,22 @@ void ConformanceTestSuite::VerifyResponse(
       ReportSuccess(test_name);
     }
   } else {
-    ReportFailure(test_name, level, request, response,
-                  "Output was not equivalent to reference message: %s.",
-                  differences.c_str());
+    ReportFailure(
+        test_name, level, request, response,
+        absl::StrCat("Output was not equivalent to reference message: ",
+                     differences));
   }
 }
 
-void ConformanceTestSuite::RunTest(const string& test_name,
+void ConformanceTestSuite::RunTest(const std::string& test_name,
                                    const ConformanceRequest& request,
                                    ConformanceResponse* response) {
   if (test_names_.insert(test_name).second == false) {
-    GOOGLE_LOG(FATAL) << "Duplicated test name: " << test_name;
+    ABSL_LOG(FATAL) << "Duplicated test name: " << test_name;
   }
 
-  string serialized_request;
-  string serialized_response;
+  std::string serialized_request;
+  std::string serialized_response;
   request.SerializeToString(&serialized_request);
 
   runner_->RunTest(test_name, serialized_request, &serialized_response);
@@ -326,58 +418,14 @@ void ConformanceTestSuite::RunTest(const string& test_name,
   }
 
   if (verbose_) {
-    StringAppendF(&output_,
-                  "conformance test: name=%s, request=%s, response=%s\n",
-                  test_name.c_str(),
-                  request.ShortDebugString().c_str(),
-                  response->ShortDebugString().c_str());
+    absl::StrAppendFormat(
+        &output_, "conformance test: name=%s, request=%s, response=%s\n",
+        test_name, TruncateRequest(request).ShortDebugString(),
+        TruncateResponse(*response).ShortDebugString());
   }
 }
 
-bool ConformanceTestSuite::CheckSetEmpty(
-    const std::set<string>& set_to_check,
-    const std::string& write_to_file,
-    const std::string& msg) {
-  if (set_to_check.empty()) {
-    return true;
-  } else {
-    StringAppendF(&output_, "\n");
-    StringAppendF(&output_, "%s\n\n", msg.c_str());
-    for (std::set<string>::const_iterator iter = set_to_check.begin();
-         iter != set_to_check.end(); ++iter) {
-      StringAppendF(&output_, "  %s\n", iter->c_str());
-    }
-    StringAppendF(&output_, "\n");
-
-    if (!write_to_file.empty()) {
-      std::string full_filename;
-      const std::string* filename = &write_to_file;
-      if (!output_dir_.empty()) {
-        full_filename = output_dir_;
-        if (*output_dir_.rbegin() != '/') {
-          full_filename.push_back('/');
-        }
-        full_filename += write_to_file;
-        filename = &full_filename;
-      }
-      std::ofstream os(*filename);
-      if (os) {
-        for (std::set<string>::const_iterator iter = set_to_check.begin();
-             iter != set_to_check.end(); ++iter) {
-          os << *iter << "\n";
-        }
-      } else {
-        StringAppendF(&output_, "Failed to open file: %s\n",
-                      filename->c_str());
-      }
-    }
-
-    return false;
-  }
-}
-
-string ConformanceTestSuite::WireFormatToString(
-    WireFormat wire_format) {
+std::string ConformanceTestSuite::WireFormatToString(WireFormat wire_format) {
   switch (wire_format) {
     case conformance::PROTOBUF:
       return "PROTOBUF";
@@ -390,7 +438,7 @@ string ConformanceTestSuite::WireFormatToString(
     case conformance::UNSPECIFIED:
       return "UNSPECIFIED";
     default:
-      GOOGLE_LOG(FATAL) << "unknown wire type: " << wire_format;
+      ABSL_LOG(FATAL) << "unknown wire type: " << wire_format;
   }
   return "";
 }
@@ -400,7 +448,8 @@ void ConformanceTestSuite::AddExpectedFailedTest(const std::string& test_name) {
 }
 
 bool ConformanceTestSuite::RunSuite(ConformanceTestRunner* runner,
-                                    std::string* output, const string& filename,
+                                    std::string* output,
+                                    const std::string& filename,
                                     conformance::FailureSet* failure_list) {
   runner_ = runner;
   successes_ = 0;
@@ -414,50 +463,59 @@ bool ConformanceTestSuite::RunSuite(ConformanceTestRunner* runner,
 
   failure_list_filename_ = filename;
   expected_to_fail_.clear();
-  for (const string& failure : failure_list->failure()) {
+  for (const std::string& failure : failure_list->failure()) {
     AddExpectedFailedTest(failure);
   }
   RunSuiteImpl();
 
   bool ok = true;
-  if (!CheckSetEmpty(expected_to_fail_, "nonexistent_tests.txt",
-                     "These tests were listed in the failure list, but they "
-                     "don't exist.  Remove them from the failure list by "
-                     "running:\n"
-                     "  ./update_failure_list.py " + failure_list_filename_ +
-                     " --remove nonexistent_tests.txt")) {
+  if (!CheckSetEmpty(
+          expected_to_fail_, "nonexistent_tests.txt",
+          absl::StrCat("These tests were listed in the failure list, but they "
+                       "don't exist.  Remove them from the failure list by "
+                       "running:\n"
+                       "  ./update_failure_list.py ",
+                       failure_list_filename_,
+                       " --remove nonexistent_tests.txt"),
+          output_dir_, &output_)) {
     ok = false;
   }
-  if (!CheckSetEmpty(unexpected_failing_tests_, "failing_tests.txt",
-                     "These tests failed.  If they can't be fixed right now, "
-                     "you can add them to the failure list so the overall "
-                     "suite can succeed.  Add them to the failure list by "
-                     "running:\n"
-                     "  ./update_failure_list.py " + failure_list_filename_ +
-                     " --add failing_tests.txt")) {
+  if (!CheckSetEmpty(
+          unexpected_failing_tests_, "failing_tests.txt",
+          absl::StrCat("These tests failed.  If they can't be fixed right now, "
+                       "you can add them to the failure list so the overall "
+                       "suite can succeed.  Add them to the failure list by "
+                       "running:\n"
+                       "  ./update_failure_list.py ",
+                       failure_list_filename_, " --add failing_tests.txt"),
+          output_dir_, &output_)) {
     ok = false;
   }
-  if (!CheckSetEmpty(unexpected_succeeding_tests_, "succeeding_tests.txt",
-                     "These tests succeeded, even though they were listed in "
-                     "the failure list.  Remove them from the failure list "
-                     "by running:\n"
-                     "  ./update_failure_list.py " + failure_list_filename_ +
-                     " --remove succeeding_tests.txt")) {
+  if (!CheckSetEmpty(
+          unexpected_succeeding_tests_, "succeeding_tests.txt",
+          absl::StrCat("These tests succeeded, even though they were listed in "
+                       "the failure list.  Remove them from the failure list "
+                       "by running:\n"
+                       "  ./update_failure_list.py ",
+                       failure_list_filename_,
+                       " --remove succeeding_tests.txt"),
+          output_dir_, &output_)) {
     ok = false;
   }
 
   if (verbose_) {
     CheckSetEmpty(skipped_, "",
                   "These tests were skipped (probably because support for some "
-                  "features is not implemented)");
+                  "features is not implemented)",
+                  output_dir_, &output_);
   }
 
-  StringAppendF(&output_,
-                "CONFORMANCE SUITE %s: %d successes, %zu skipped, "
-                "%d expected failures, %zu unexpected failures.\n",
-                ok ? "PASSED" : "FAILED", successes_, skipped_.size(),
-                expected_failures_, unexpected_failing_tests_.size());
-  StringAppendF(&output_, "\n");
+  absl::StrAppendFormat(&output_,
+                        "CONFORMANCE SUITE %s: %d successes, %zu skipped, "
+                        "%d expected failures, %zu unexpected failures.\n",
+                        ok ? "PASSED" : "FAILED", successes_, skipped_.size(),
+                        expected_failures_, unexpected_failing_tests_.size());
+  absl::StrAppendFormat(&output_, "\n");
 
   output->assign(output_);
 
