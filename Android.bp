@@ -112,10 +112,10 @@ cc_defaults {
         // This suffix for vendor and product must be updated
         // when a new version is imported.
         vendor: {
-            suffix: "-21.7",
+            suffix: "-21.12",
         },
         product: {
-            suffix: "-21.7",
+            suffix: "-21.12",
         },
     },
 }
@@ -161,14 +161,6 @@ cc_library {
         "//apex_available:anyapex",
     ],
     min_sdk_version: "29",
-}
-
-// C++ lite library for the platform and host.
-// =======================================================
-cc_library_static {
-    name: "libprotobuf-cpp-lite_static",
-    host_supported: true,
-    defaults: ["libprotobuf-cpp-lite-defaults"],
 }
 
 // C++ full library
@@ -269,7 +261,6 @@ cc_library {
     },
     apex_available: [
         "//apex_available:platform",
-        "com.android.btservices",
         "com.android.appsearch",
         "com.android.virt",
     ],
@@ -386,6 +377,9 @@ cc_library {
         "android",
         "src",
         "config",
+    ],
+    cflags: [
+        "-Wno-unused-private-field",
     ],
 
     target: {
@@ -610,6 +604,9 @@ java_library_static {
         android: {
             libs: ["libcore_private.stubs"],
         },
+        windows: {
+            enabled: true,
+        },
     },
 
     java_version: "1.7",
@@ -618,6 +615,10 @@ java_library_static {
         "//apex_available:platform",
         "//apex_available:anyapex",
     ],
+
+    optimize: {
+        proguard_flags_files: ["java/lite/proguard.pgcfg"],
+    }
 }
 
 // Java lite library (compatibility for old host-side users)
@@ -647,6 +648,11 @@ java_library_host {
     },
 
     java_version: "1.7",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 java_library_host {
@@ -664,6 +670,11 @@ java_library_host {
     ],
     // b/267831518: Pin tradefed and dependencies to Java 11.
     java_version: "11",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // Java full library (compatibility for old host-side users)
@@ -710,6 +721,12 @@ filegroup {
 }
 
 filegroup {
+    name: "libprotobuf-internal-java-full-srcs",
+    srcs: ["java/core/src/main/java/**/*.java"],
+    path: "java",
+}
+
+filegroup {
     name: "libprotobuf-internal-protos",
     srcs: [
         "src/google/protobuf/descriptor.proto",
@@ -734,6 +751,210 @@ filegroup {
         "src/google/protobuf/descriptor.proto",
     ],
     path: "src",
+}
+
+// Unit tests
+// =======================================================
+cc_defaults {
+    name: "libprotobuf-test-defaults",
+    host_supported: true,
+    compile_multilib: "64",
+    proto: {
+        local_include_dirs: ["src"],
+        canonical_path_from_root: false,
+    },
+    shared_libs: ["liblog"],
+}
+
+filegroup {
+    name: "libprotobuf-test-protos-lite",
+    srcs: [
+        "src/google/protobuf/map_lite_unittest.proto",
+        "src/google/protobuf/unittest_import.proto",
+        "src/google/protobuf/unittest_import_lite.proto",
+        "src/google/protobuf/unittest_import_public.proto",
+        "src/google/protobuf/unittest_import_public_lite.proto",
+        "src/google/protobuf/unittest_lite.proto",
+        "src/google/protobuf/unittest_proto3.proto",
+        "src/google/protobuf/unittest_proto3_arena.proto",
+    ],
+    path: "src",
+}
+
+// Full test protos include some lite protos, because they are used in
+// unknown_field_set_unittest.cc, which mixes full and lite protos.
+// Full protos are a strict superset of lite protos, so this shouldn't
+// matter for the test.
+filegroup {
+    name: "libprotobuf-test-protos-full",
+    srcs: [
+        "src/google/protobuf/any_test.proto",
+        "src/google/protobuf/map_unittest.proto",
+        "src/google/protobuf/map_proto2_unittest.proto",
+        "src/google/protobuf/test_messages_proto2.proto",
+        "src/google/protobuf/test_messages_proto3.proto",
+        "src/google/protobuf/unittest.proto",
+        "src/google/protobuf/unittest_arena.proto",
+        "src/google/protobuf/unittest_custom_options.proto",
+        "src/google/protobuf/unittest_drop_unknown_fields.proto",
+        "src/google/protobuf/unittest_embed_optimize_for.proto",
+        "src/google/protobuf/unittest_empty.proto",
+        "src/google/protobuf/unittest_enormous_descriptor.proto",
+        "src/google/protobuf/unittest_import.proto",
+        "src/google/protobuf/unittest_import_lite.proto",
+        "src/google/protobuf/unittest_import_public.proto",
+        "src/google/protobuf/unittest_import_public_lite.proto",
+        "src/google/protobuf/unittest_lazy_dependencies.proto",
+        "src/google/protobuf/unittest_lazy_dependencies_custom_option.proto",
+        "src/google/protobuf/unittest_lazy_dependencies_enum.proto",
+        "src/google/protobuf/unittest_lite.proto",
+        "src/google/protobuf/unittest_mset_wire_format.proto",
+        "src/google/protobuf/unittest_mset.proto",
+        "src/google/protobuf/unittest_no_field_presence.proto",
+        "src/google/protobuf/unittest_no_generic_services.proto",
+        "src/google/protobuf/unittest_optimize_for.proto",
+        "src/google/protobuf/unittest_preserve_unknown_enum.proto",
+        "src/google/protobuf/unittest_preserve_unknown_enum2.proto",
+        "src/google/protobuf/unittest_proto3_arena.proto",
+        "src/google/protobuf/unittest_proto3_optional.proto",
+        "src/google/protobuf/unittest_proto3.proto",
+        "src/google/protobuf/unittest_well_known_types.proto",
+        "src/google/protobuf/util/internal/testdata/anys.proto",
+        "src/google/protobuf/util/internal/testdata/books.proto",
+        "src/google/protobuf/util/internal/testdata/default_value.proto",
+        "src/google/protobuf/util/internal/testdata/default_value_test.proto",
+        "src/google/protobuf/util/internal/testdata/field_mask.proto",
+        "src/google/protobuf/util/internal/testdata/maps.proto",
+        "src/google/protobuf/util/internal/testdata/oneofs.proto",
+        "src/google/protobuf/util/internal/testdata/proto3.proto",
+        "src/google/protobuf/util/internal/testdata/struct.proto",
+        "src/google/protobuf/util/internal/testdata/timestamp_duration.proto",
+        "src/google/protobuf/util/internal/testdata/wrappers.proto",
+        "src/google/protobuf/util/json_format.proto",
+        "src/google/protobuf/util/json_format_proto3.proto",
+        "src/google/protobuf/util/message_differencer_unittest.proto",
+    ],
+    path: "src",
+}
+
+cc_test {
+    name: "libprotobuf-lite-test",
+    defaults: ["libprotobuf-test-defaults"],
+    srcs: [
+        "src/google/protobuf/arena_test_util.cc",
+        "src/google/protobuf/generated_message_tctable_lite_test.cc",
+        "src/google/protobuf/lite_arena_unittest.cc",
+        "src/google/protobuf/lite_unittest.cc",
+        "src/google/protobuf/map_lite_test_util.cc",
+        "src/google/protobuf/proto3_arena_lite_unittest.cc",
+        "src/google/protobuf/proto3_lite_unittest.cc",
+        "src/google/protobuf/test_util_lite.cc",
+        ":libprotobuf-test-protos-lite",
+    ],
+    cflags: [
+        // Occurs in generated_message_tctable_lite_test.cc
+        "-Wno-missing-field-initializers",
+    ],
+    proto: {
+        type: "lite",
+    },
+    static_libs: [
+        "libgmock",
+        "libprotobuf-cpp-lite",
+    ],
+}
+
+cc_test {
+    name: "libprotobuf-full-test",
+    defaults: ["libprotobuf-test-defaults"],
+    srcs: [
+        "src/google/protobuf/any_test.cc",
+        "src/google/protobuf/arena_test_util.cc",
+        "src/google/protobuf/arena_unittest.cc",
+        "src/google/protobuf/arenastring_unittest.cc",
+        "src/google/protobuf/arenaz_sampler_test.cc",
+        "src/google/protobuf/descriptor_database_unittest.cc",
+        "src/google/protobuf/descriptor_unittest.cc",
+        "src/google/protobuf/drop_unknown_fields_test.cc",
+        "src/google/protobuf/dynamic_message_unittest.cc",
+        "src/google/protobuf/extension_set_unittest.cc",
+        "src/google/protobuf/generated_message_reflection_unittest.cc",
+        "src/google/protobuf/inlined_string_field_unittest.cc",
+        "src/google/protobuf/io/coded_stream_unittest.cc",
+        "src/google/protobuf/io/io_win32_unittest.cc",
+        "src/google/protobuf/io/printer_unittest.cc",
+        "src/google/protobuf/io/tokenizer_unittest.cc",
+        "src/google/protobuf/io/zero_copy_stream_unittest.cc",
+        "src/google/protobuf/map_field_test.cc",
+        "src/google/protobuf/map_test.cc",
+        "src/google/protobuf/message_unittest.cc",
+        "src/google/protobuf/no_field_presence_test.cc",
+        "src/google/protobuf/preserve_unknown_enum_test.cc",
+        "src/google/protobuf/proto3_arena_unittest.cc",
+        "src/google/protobuf/reflection_ops_unittest.cc",
+        "src/google/protobuf/reflection_tester.cc",
+        "src/google/protobuf/repeated_field_reflection_unittest.cc",
+        "src/google/protobuf/repeated_field_unittest.cc",
+        "src/google/protobuf/testing/googletest.cc",
+        "src/google/protobuf/testing/file.cc",
+        "src/google/protobuf/test_util.cc",
+        "src/google/protobuf/text_format_unittest.cc",
+        "src/google/protobuf/unknown_field_set_unittest.cc",
+        "src/google/protobuf/util/delimited_message_util_test.cc",
+        "src/google/protobuf/util/field_comparator_test.cc",
+        "src/google/protobuf/util/field_mask_util_test.cc",
+        "src/google/protobuf/util/internal/default_value_objectwriter_test.cc",
+        "src/google/protobuf/util/internal/json_objectwriter_test.cc",
+        "src/google/protobuf/util/internal/json_stream_parser_test.cc",
+        "src/google/protobuf/util/internal/protostream_objectsource_test.cc",
+        "src/google/protobuf/util/internal/protostream_objectwriter_test.cc",
+        "src/google/protobuf/util/internal/type_info_test_helper.cc",
+        "src/google/protobuf/util/json_util_test.cc",
+        "src/google/protobuf/util/message_differencer_unittest.cc",
+        "src/google/protobuf/util/time_util_test.cc",
+        "src/google/protobuf/util/type_resolver_util_test.cc",
+        "src/google/protobuf/well_known_types_unittest.cc",
+        "src/google/protobuf/wire_format_unittest.cc",
+        ":libprotobuf-test-protos-full",
+    ],
+    data: [
+        "src/google/protobuf/testdata/*",
+    ],
+    cflags: ["-Wno-unused-parameter"],
+    proto: {
+        type: "full",
+    },
+    static_libs: [
+        "libbase",
+        "libgmock",
+    ],
+    shared_libs: ["libprotobuf-cpp-full"],
+}
+
+cc_test {
+    name: "libprotobuf-stubs-test",
+    defaults: ["libprotobuf-test-defaults"],
+    srcs: [
+        "src/google/protobuf/stubs/bytestream_unittest.cc",
+        "src/google/protobuf/stubs/common_unittest.cc",
+        "src/google/protobuf/stubs/int128_unittest.cc",
+        "src/google/protobuf/stubs/status_test.cc",
+        "src/google/protobuf/stubs/statusor_test.cc",
+        "src/google/protobuf/stubs/stringpiece_unittest.cc",
+        "src/google/protobuf/stubs/stringprintf_unittest.cc",
+        "src/google/protobuf/stubs/structurally_valid_unittest.cc",
+        "src/google/protobuf/stubs/strutil_unittest.cc",
+        "src/google/protobuf/stubs/template_util_unittest.cc",
+        "src/google/protobuf/stubs/time_test.cc",
+        "src/google/protobuf/testing/googletest.cc",
+        "src/google/protobuf/testing/file.cc",
+    ],
+    cflags: ["-Wno-unused-parameter"],
+    static_libs: [
+        "libbase",
+        "libgmock",
+    ],
+    shared_libs: ["libprotobuf-cpp-full"],
 }
 
 // To test java proto params build rules.
