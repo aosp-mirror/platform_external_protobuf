@@ -108,6 +108,9 @@ cc_defaults {
         android: {
             shared_libs: ["liblog"],
         },
+        host: {
+            rtti: true,
+        },
 
         // This suffix for vendor and product must be updated
         // when a new version is imported.
@@ -389,8 +392,6 @@ cc_library {
             cflags: ["-UWIN32_LEAN_AND_MEAN"],
         },
     },
-
-    rtti: true,
 }
 
 // Android Protocol buffer compiler, aprotoc (host executable)
