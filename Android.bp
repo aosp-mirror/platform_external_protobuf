@@ -692,6 +692,7 @@ java_library {
     sdk_version: "core_current",
     installable: false,
     licenses: ["external_protobuf_libcore_private_stubs_license"],
+    is_stubs_module: true,
 }
 
 // Python library
