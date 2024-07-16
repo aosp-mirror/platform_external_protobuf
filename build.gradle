@@ -1,0 +1,188 @@
+/*
+ * Copyright (C) 2013 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+apply plugin: 'java'
+
+configurations {
+    micro
+    nano
+    lite
+}
+
+sourceSets {
+
+    micro {
+        java {
+            srcDirs = ['javamicro/src/main/java/']
+            include("com/google/protobuf/micro/*")
+        }
+    }
+
+    lite {
+        java {
+            srcDirs = ['java/core/src/main/java/']
+            include 'com/google/protobuf/AbstractMessageLite.java'
+            include 'com/google/protobuf/AbstractParser.java'
+            include 'com/google/protobuf/AbstractProtobufList.java'
+            include 'com/google/protobuf/AllocatedBuffer.java'
+            include 'com/google/protobuf/Android.java'
+            include 'com/google/protobuf/ArrayDecoders.java'
+            include 'com/google/protobuf/BinaryReader.java'
+            include 'com/google/protobuf/BinaryWriter.java'
+            include 'com/google/protobuf/BooleanArrayList.java'
+            include 'com/google/protobuf/BufferAllocator.java'
+            include 'com/google/protobuf/ByteBufferWriter.java'
+            include 'com/google/protobuf/ByteOutput.java'
+            include 'com/google/protobuf/ByteString.java'
+            include 'com/google/protobuf/CodedInputStream.java'
+            include 'com/google/protobuf/CodedInputStreamReader.java'
+            include 'com/google/protobuf/CodedOutputStream.java'
+            include 'com/google/protobuf/CodedOutputStreamWriter.java'
+            include 'com/google/protobuf/DoubleArrayList.java'
+            include 'com/google/protobuf/ExperimentalApi.java'
+            include 'com/google/protobuf/ExtensionLite.java'
+            include 'com/google/protobuf/ExtensionRegistryFactory.java'
+            include 'com/google/protobuf/ExtensionRegistryLite.java'
+            include 'com/google/protobuf/ExtensionSchema.java'
+            include 'com/google/protobuf/ExtensionSchemaLite.java'
+            include 'com/google/protobuf/ExtensionSchemas.java'
+            include 'com/google/protobuf/FieldInfo.java'
+            include 'com/google/protobuf/FieldSet.java'
+            include 'com/google/protobuf/FieldType.java'
+            include 'com/google/protobuf/FloatArrayList.java'
+            include 'com/google/protobuf/GeneratedMessageInfoFactory.java'
+            include 'com/google/protobuf/GeneratedMessageLite.java'
+            include 'com/google/protobuf/IntArrayList.java'
+            include 'com/google/protobuf/Internal.java'
+            include 'com/google/protobuf/InvalidProtocolBufferException.java'
+            include 'com/google/protobuf/IterableByteBufferInputStream.java'
+            include 'com/google/protobuf/JavaType.java'
+            include 'com/google/protobuf/LazyField.java'
+            include 'com/google/protobuf/LazyFieldLite.java'
+            include 'com/google/protobuf/LazyStringArrayList.java'
+            include 'com/google/protobuf/LazyStringList.java'
+            include 'com/google/protobuf/ListFieldSchema.java'
+            include 'com/google/protobuf/LongArrayList.java'
+            include 'com/google/protobuf/ManifestSchemaFactory.java'
+            include 'com/google/protobuf/MapEntryLite.java'
+            include 'com/google/protobuf/MapFieldLite.java'
+            include 'com/google/protobuf/MapFieldSchema.java'
+            include 'com/google/protobuf/MapFieldSchemaLite.java'
+            include 'com/google/protobuf/MapFieldSchemas.java'
+            include 'com/google/protobuf/MessageInfo.java'
+            include 'com/google/protobuf/MessageInfoFactory.java'
+            include 'com/google/protobuf/MessageLite.java'
+            include 'com/google/protobuf/MessageLiteOrBuilder.java'
+            include 'com/google/protobuf/MessageLiteToString.java'
+            include 'com/google/protobuf/MessageSchema.java'
+            include 'com/google/protobuf/MessageSetSchema.java'
+            include 'com/google/protobuf/MutabilityOracle.java'
+            include 'com/google/protobuf/NewInstanceSchema.java'
+            include 'com/google/protobuf/NewInstanceSchemaLite.java'
+            include 'com/google/protobuf/NewInstanceSchemas.java'
+            include 'com/google/protobuf/NioByteString.java'
+            include 'com/google/protobuf/OneofInfo.java'
+            include 'com/google/protobuf/Parser.java'
+            include 'com/google/protobuf/PrimitiveNonBoxingCollection.java'
+            include 'com/google/protobuf/ProtoSyntax.java'
+            include 'com/google/protobuf/Protobuf.java'
+            include 'com/google/protobuf/ProtobufArrayList.java'
+            include 'com/google/protobuf/ProtobufLists.java'
+            include 'com/google/protobuf/ProtocolStringList.java'
+            include 'com/google/protobuf/RawMessageInfo.java'
+            include 'com/google/protobuf/Reader.java'
+            include 'com/google/protobuf/RopeByteString.java'
+            include 'com/google/protobuf/Schema.java'
+            include 'com/google/protobuf/SchemaFactory.java'
+            include 'com/google/protobuf/SchemaUtil.java'
+            include 'com/google/protobuf/SmallSortedMap.java'
+            include 'com/google/protobuf/StructuralMessageInfo.java'
+            include 'com/google/protobuf/TextFormatEscaper.java'
+            include 'com/google/protobuf/UninitializedMessageException.java'
+            include 'com/google/protobuf/UnknownFieldSchema.java'
+            include 'com/google/protobuf/UnknownFieldSetLite.java'
+            include 'com/google/protobuf/UnknownFieldSetLiteSchema.java'
+            include 'com/google/protobuf/UnmodifiableLazyStringList.java'
+            include 'com/google/protobuf/UnsafeUtil.java'
+            include 'com/google/protobuf/Utf8.java'
+            include 'com/google/protobuf/WireFormat.java'
+            include 'com/google/protobuf/Writer.java'
+        }
+    }
+
+    nano {
+        java {
+            srcDirs = [
+                    'javanano/src/main/java/',
+                    'javanano/src/device/main/java/'
+            ]
+            include("com/google/protobuf/nano/**")
+        }
+    }
+}
+
+if (project == rootProject) {
+    ext.getAndroidPrebuilt = { apiLevel ->
+        files("$rootDir/../../prebuilts/sdk/$apiLevel/public/android.jar")
+    }
+}
+
+dependencies {
+    compile getAndroidPrebuilt('8')
+    nanoCompile getAndroidPrebuilt('8')
+}
+
+jar {
+    from sourceSets.nano.output, sourceSets.micro.output
+    baseName "libprotobuf"
+    appendix "java"
+    version "3.0"
+    classifier "micronano"
+}
+
+task nanoJar(type: Jar) {
+    from sourceSets.nano.output
+    dependsOn nanoClasses
+    baseName "libprotobuf"
+    appendix "java"
+    version "3.0"
+    classifier "nano"
+}
+
+task microJar(type: Jar) {
+    from sourceSets.micro.output
+    dependsOn microClasses
+    baseName "libprotobuf"
+    appendix "java"
+    version "3.0"
+    classifier "micro"
+}
+
+task liteJar(type: Jar) {
+    from sourceSets.lite.output
+    dependsOn liteClasses
+    baseName "libprotobuf"
+    appendix "java"
+    version "3.0"
+    classifier "lite"
+}
+
+artifacts {
+    micro microJar
+    nano nanoJar
+    lite liteJar
+}
+
