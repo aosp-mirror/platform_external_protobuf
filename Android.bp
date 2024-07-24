@@ -108,6 +108,9 @@ cc_defaults {
         android: {
             shared_libs: ["liblog"],
         },
+        host: {
+            rtti: true,
+        },
 
         // This suffix for vendor and product must be updated
         // when a new version is imported.
@@ -133,6 +136,7 @@ cc_library_static {
         "//apex_available:platform",
         "com.android.adservices",
         "com.android.extservices",
+        "com.android.ondevicepersonalization",
     ],
     min_sdk_version: "30",
 }
@@ -388,8 +392,6 @@ cc_library {
             cflags: ["-UWIN32_LEAN_AND_MEAN"],
         },
     },
-
-    rtti: true,
 }
 
 // Android Protocol buffer compiler, aprotoc (host executable)
@@ -603,6 +605,9 @@ java_library_static {
         android: {
             libs: ["libcore_private.stubs"],
         },
+        windows: {
+            enabled: true,
+        },
     },
 
     java_version: "1.7",
@@ -644,6 +649,11 @@ java_library_host {
     },
 
     java_version: "1.7",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 java_library_host {
@@ -661,6 +671,11 @@ java_library_host {
     ],
     // b/267831518: Pin tradefed and dependencies to Java 11.
     java_version: "11",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // Java full library (compatibility for old host-side users)
