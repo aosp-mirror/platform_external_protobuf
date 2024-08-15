@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -38,29 +15,37 @@
 #ifndef GOOGLE_PROTOBUF_EXTENSION_SET_H__
 #define GOOGLE_PROTOBUF_EXTENSION_SET_H__
 
-
 #include <algorithm>
+#include <atomic>
 #include <cassert>
-#include <map>
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/port.h>
-#include <google/protobuf/parse_context.h>
-#include <google/protobuf/repeated_field.h>
-#include <google/protobuf/wire_format_lite.h>
+#include "google/protobuf/stubs/common.h"
+#include "absl/base/call_once.h"
+#include "absl/container/btree_map.h"
+#include "absl/log/absl_check.h"
+#include "google/protobuf/internal_visibility.h"
+#include "google/protobuf/port.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/message_lite.h"
+#include "google/protobuf/parse_context.h"
+#include "google/protobuf/repeated_field.h"
+#include "google/protobuf/repeated_ptr_field.h"
+#include "google/protobuf/wire_format_lite.h"
 
 // clang-format off
-#include <google/protobuf/port_def.inc>  // Must be last
+#include "google/protobuf/port_def.inc"  // Must be last
 // clang-format on
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
 #endif
+
 
 namespace google {
 namespace protobuf {
@@ -73,12 +58,19 @@ class Message;          // message.h
 class MessageFactory;   // message.h
 class Reflection;       // message.h
 class UnknownFieldSet;  // unknown_field_set.h
+class FeatureSet;
 namespace internal {
-class FieldSkipper;  // wire_format_lite.h
-enum class LazyVerifyOption;
+class FieldSkipper;     // wire_format_lite.h
+class ReflectionVisit;  // message_reflection_util.h
+class WireFormat;
+struct DynamicExtensionInfoHelper;
+void InitializeLazyExtensionSet();
 }  // namespace internal
 }  // namespace protobuf
 }  // namespace google
+namespace pb {
+class CppFeatures;
+}  // namespace pb
 
 namespace google {
 namespace protobuf {
@@ -101,17 +93,33 @@ typedef bool EnumValidityFunc(int number);
 // extensions that are not compiled in.
 typedef bool EnumValidityFuncWithArg(const void* arg, int number);
 
+enum class LazyAnnotation : int8_t {
+  kUndefined = 0,
+  kLazy = 1,
+  kEager = 2,
+};
+
 // Information about a registered extension.
 struct ExtensionInfo {
   constexpr ExtensionInfo() : enum_validity_check() {}
   constexpr ExtensionInfo(const MessageLite* extendee, int param_number,
-                          FieldType type_param, bool isrepeated, bool ispacked,
-                          LazyEagerVerifyFnType verify_func)
+                          FieldType type_param, bool isrepeated, bool ispacked)
       : message(extendee),
         number(param_number),
         type(type_param),
         is_repeated(isrepeated),
         is_packed(ispacked),
+        enum_validity_check() {}
+  constexpr ExtensionInfo(const MessageLite* extendee, int param_number,
+                          FieldType type_param, bool isrepeated, bool ispacked,
+                          LazyEagerVerifyFnType verify_func,
+                          LazyAnnotation islazy = LazyAnnotation::kUndefined)
+      : message(extendee),
+        number(param_number),
+        type(type_param),
+        is_repeated(isrepeated),
+        is_packed(ispacked),
+        is_lazy(islazy),
         enum_validity_check(),
         lazy_eager_verify_func(verify_func) {}
 
@@ -121,6 +129,7 @@ struct ExtensionInfo {
   FieldType type = 0;
   bool is_repeated = false;
   bool is_packed = false;
+  LazyAnnotation is_lazy = LazyAnnotation::kUndefined;
 
   struct EnumValidityCheck {
     EnumValidityFuncWithArg* func;
@@ -146,6 +155,7 @@ struct ExtensionInfo {
   // If nullptr then no verification is performed.
   LazyEagerVerifyFnType lazy_eager_verify_func = nullptr;
 };
+
 
 // An ExtensionFinder is an object which looks up extension definitions.  It
 // must implement this method:
@@ -182,9 +192,19 @@ class PROTOBUF_EXPORT GeneratedExtensionFinder {
 // off to the ExtensionSet for parsing.  Etc.
 class PROTOBUF_EXPORT ExtensionSet {
  public:
-  constexpr ExtensionSet();
-  explicit ExtensionSet(Arena* arena);
+  constexpr ExtensionSet() : ExtensionSet(nullptr) {}
+  ExtensionSet(const ExtensionSet& rhs) = delete;
+
+  // Arena enabled constructors: for internal use only.
+  ExtensionSet(internal::InternalVisibility, Arena* arena)
+      : ExtensionSet(arena) {}
+
+  // TODO: make constructor private, and migrate `ArenaInitialized`
+  // to `InternalVisibility` overloaded constructor(s).
+  explicit constexpr ExtensionSet(Arena* arena);
   ExtensionSet(ArenaInitialized, Arena* arena) : ExtensionSet(arena) {}
+
+  ExtensionSet& operator=(const ExtensionSet&) = delete;
   ~ExtensionSet();
 
   // These are called at startup by protocol-compiler-generated code to
@@ -194,8 +214,7 @@ class PROTOBUF_EXPORT ExtensionSet {
   // methods do.
   static void RegisterExtension(const MessageLite* extendee, int number,
                                 FieldType type, bool is_repeated,
-                                bool is_packed,
-                                LazyEagerVerifyFnType verify_func);
+                                bool is_packed);
   static void RegisterEnumExtension(const MessageLite* extendee, int number,
                                     FieldType type, bool is_repeated,
                                     bool is_packed, EnumValidityFunc* is_valid);
@@ -203,12 +222,14 @@ class PROTOBUF_EXPORT ExtensionSet {
                                        FieldType type, bool is_repeated,
                                        bool is_packed,
                                        const MessageLite* prototype,
-                                       LazyEagerVerifyFnType verify_func);
+                                       LazyEagerVerifyFnType verify_func,
+                                       LazyAnnotation is_lazy);
 
   // =================================================================
 
   // Add all fields which are currently present to the given vector.  This
-  // is useful to implement Reflection::ListFields().
+  // is useful to implement Reflection::ListFields(). Descriptors are appended
+  // in increasing tag order.
   void AppendToList(const Descriptor* extendee, const DescriptorPool* pool,
                     std::vector<const FieldDescriptor*>* output) const;
 
@@ -318,7 +339,7 @@ class PROTOBUF_EXPORT ExtensionSet {
 
   // This is an overload of MutableRawRepeatedField to maintain compatibility
   // with old code using a previous API. This version of
-  // MutableRawRepeatedField() will GOOGLE_CHECK-fail on a missing extension.
+  // MutableRawRepeatedField() will ABSL_CHECK-fail on a missing extension.
   // (E.g.: borg/clients/internal/proto1/proto2_reflection.cc.)
   void* MutableRawRepeatedField(int number);
 
@@ -384,7 +405,7 @@ class PROTOBUF_EXPORT ExtensionSet {
   void SwapExtension(const MessageLite* extendee, ExtensionSet* other,
                      int number);
   void UnsafeShallowSwapExtension(ExtensionSet* other, int number);
-  bool IsInitialized() const;
+  bool IsInitialized(const MessageLite* extendee) const;
 
   // Lite parser
   const char* ParseField(uint64_t tag, const char* ptr,
@@ -511,6 +532,11 @@ class PROTOBUF_EXPORT ExtensionSet {
   friend class RepeatedEnumTypeTraits;
 
   friend class google::protobuf::Reflection;
+  friend class google::protobuf::internal::ReflectionVisit;
+  friend struct google::protobuf::internal::DynamicExtensionInfoHelper;
+  friend class google::protobuf::internal::WireFormat;
+
+  friend void internal::InitializeLazyExtensionSet();
 
   const int32_t& GetRefInt32(int number, const int32_t& default_value) const;
   const int64_t& GetRefInt64(int number, const int64_t& default_value) const;
@@ -537,8 +563,10 @@ class PROTOBUF_EXPORT ExtensionSet {
   // Interface of a lazily parsed singular message extension.
   class PROTOBUF_EXPORT LazyMessageExtension {
    public:
-    LazyMessageExtension() {}
-    virtual ~LazyMessageExtension() {}
+    LazyMessageExtension() = default;
+    LazyMessageExtension(const LazyMessageExtension&) = delete;
+    LazyMessageExtension& operator=(const LazyMessageExtension&) = delete;
+    virtual ~LazyMessageExtension() = default;
 
     virtual LazyMessageExtension* New(Arena* arena) const = 0;
     virtual const MessageLite& GetMessage(const MessageLite& prototype,
@@ -553,10 +581,15 @@ class PROTOBUF_EXPORT ExtensionSet {
     virtual MessageLite* UnsafeArenaReleaseMessage(const MessageLite& prototype,
                                                    Arena* arena) = 0;
 
-    virtual bool IsInitialized() const = 0;
+    virtual bool IsInitialized(const MessageLite* prototype,
+                               Arena* arena) const = 0;
+    virtual bool IsEagerSerializeSafe(const MessageLite* prototype,
+                                      Arena* arena) const = 0;
 
-    PROTOBUF_DEPRECATED_MSG("Please use ByteSizeLong() instead")
-    virtual int ByteSize() const { return internal::ToIntSize(ByteSizeLong()); }
+    [[deprecated("Please use ByteSizeLong() instead")]] virtual int ByteSize()
+        const {
+      return internal::ToIntSize(ByteSizeLong());
+    }
     virtual size_t ByteSizeLong() const = 0;
     virtual size_t SpaceUsedLong() const = 0;
 
@@ -565,8 +598,8 @@ class PROTOBUF_EXPORT ExtensionSet {
     virtual void MergeFromMessage(const MessageLite& msg, Arena* arena) = 0;
     virtual void Clear() = 0;
 
-    virtual const char* _InternalParse(const Message& prototype, Arena* arena,
-                                       LazyVerifyOption option, const char* ptr,
+    virtual const char* _InternalParse(const MessageLite& prototype,
+                                       Arena* arena, const char* ptr,
                                        ParseContext* ctx) = 0;
     virtual uint8_t* WriteMessageToArray(
         const MessageLite* prototype, int number, uint8_t* target,
@@ -574,11 +607,15 @@ class PROTOBUF_EXPORT ExtensionSet {
 
    private:
     virtual void UnusedKeyMethod();  // Dummy key method to avoid weak vtable.
-
-    GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(LazyMessageExtension);
   };
   // Give access to function defined below to see LazyMessageExtension.
-  friend LazyMessageExtension* MaybeCreateLazyExtension(Arena* arena);
+  static LazyMessageExtension* MaybeCreateLazyExtensionImpl(Arena* arena);
+  static LazyMessageExtension* MaybeCreateLazyExtension(Arena* arena) {
+    auto* f = maybe_create_lazy_extension_.load(std::memory_order_relaxed);
+    return f != nullptr ? f(arena) : nullptr;
+  }
+  static std::atomic<LazyMessageExtension* (*)(Arena* arena)>
+      maybe_create_lazy_extension_;
   struct Extension {
     // The order of these fields packs Extension into 24 bytes when using 8
     // byte alignment. Consider this when adding or removing fields here.
@@ -630,7 +667,7 @@ class PROTOBUF_EXPORT ExtensionSet {
 
     // For packed fields, the size of the packed data is recorded here when
     // ByteSize() is called then used during serialization.
-    // TODO(kenton):  Use atomic<int> when C++ supports it.
+    // TODO:  Use atomic<int> when C++ supports it.
     mutable int cached_size;
 
     // The descriptor for this extension, if one exists and is known.  May be
@@ -651,7 +688,8 @@ class PROTOBUF_EXPORT ExtensionSet {
     int GetSize() const;
     void Free();
     size_t SpaceUsedExcludingSelfLong() const;
-    bool IsInitialized() const;
+    bool IsInitialized(const ExtensionSet* ext_set, const MessageLite* extendee,
+                       int number, Arena* arena) const;
   };
 
   // The Extension struct is small enough to be passed by value, so we use it
@@ -677,7 +715,7 @@ class PROTOBUF_EXPORT ExtensionSet {
     };
   };
 
-  typedef std::map<int, Extension> LargeMap;
+  using LargeMap = absl::btree_map<int, Extension>;
 
   // Wrapper API that switches between flat-map and LargeMap.
 
@@ -755,7 +793,7 @@ class PROTOBUF_EXPORT ExtensionSet {
         // someone
         // adds a new wire type.
     }
-    PROTOBUF_ASSUME(false);  // switch handles all possible enum values
+    Unreachable();  // switch handles all possible enum values
     return false;
   }
 
@@ -787,8 +825,8 @@ class PROTOBUF_EXPORT ExtensionSet {
       return false;
     }
 
-    GOOGLE_DCHECK(extension->type > 0 &&
-           extension->type <= WireFormatLite::MAX_FIELD_TYPE);
+    ABSL_DCHECK(extension->type > 0 &&
+                extension->type <= WireFormatLite::MAX_FIELD_TYPE);
     auto real_type = static_cast<WireFormatLite::FieldType>(extension->type);
 
     WireFormatLite::WireType expected_wire_type =
@@ -908,12 +946,10 @@ class PROTOBUF_EXPORT ExtensionSet {
   } map_;
 
   static void DeleteFlatMap(const KeyValue* flat, uint16_t flat_capacity);
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ExtensionSet);
 };
 
-constexpr ExtensionSet::ExtensionSet()
-    : arena_(nullptr), flat_capacity_(0), flat_size_(0), map_{nullptr} {}
+constexpr ExtensionSet::ExtensionSet(Arena* arena)
+    : arena_(arena), flat_capacity_(0), flat_size_(0), map_{nullptr} {}
 
 // These are just for convenience...
 inline void ExtensionSet::SetString(int number, FieldType type,
@@ -971,8 +1007,6 @@ inline void ExtensionSet::AddString(int number, FieldType type,
 //     static inline MutableType Add(int number, ExtensionSet* set);
 //     This is used by the ExtensionIdentifier constructor to register
 //     the extension at dynamic initialization.
-//     template <typename ExtendeeT>
-//     static void Register(int number, FieldType type, bool is_packed);
 //   };
 //
 // Not all of these methods make sense for all field types.  For example, the
@@ -998,7 +1032,10 @@ class PrimitiveTypeTraits {
  public:
   typedef Type ConstType;
   typedef Type MutableType;
+  using InitType = ConstType;
+  static const ConstType& FromInitType(const InitType& v) { return v; }
   typedef PrimitiveTypeTraits<Type> Singular;
+  static constexpr bool kLifetimeBound = false;
 
   static inline ConstType Get(int number, const ExtensionSet& set,
                               ConstType default_value);
@@ -1007,12 +1044,6 @@ class PrimitiveTypeTraits {
                                         const ConstType& default_value);
   static inline void Set(int number, FieldType field_type, ConstType value,
                          ExtensionSet* set);
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType verify_func) {
-    ExtensionSet::RegisterExtension(&ExtendeeT::default_instance(), number,
-                                    type, false, is_packed, verify_func);
-  }
 };
 
 template <typename Type>
@@ -1020,7 +1051,10 @@ class RepeatedPrimitiveTypeTraits {
  public:
   typedef Type ConstType;
   typedef Type MutableType;
+  using InitType = ConstType;
+  static const ConstType& FromInitType(const InitType& v) { return v; }
   typedef RepeatedPrimitiveTypeTraits<Type> Repeated;
+  static constexpr bool kLifetimeBound = false;
 
   typedef RepeatedField<Type> RepeatedFieldType;
 
@@ -1041,12 +1075,6 @@ class RepeatedPrimitiveTypeTraits {
                                                      ExtensionSet* set);
 
   static const RepeatedFieldType* GetDefaultRepeatedField();
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType verify_func) {
-    ExtensionSet::RegisterExtension(&ExtendeeT::default_instance(), number,
-                                    type, true, is_packed, verify_func);
-  }
 };
 
 class PROTOBUF_EXPORT RepeatedPrimitiveDefaults {
@@ -1146,7 +1174,10 @@ class PROTOBUF_EXPORT StringTypeTraits {
  public:
   typedef const std::string& ConstType;
   typedef std::string* MutableType;
+  using InitType = ConstType;
+  static ConstType FromInitType(InitType v) { return v; }
   typedef StringTypeTraits Singular;
+  static constexpr bool kLifetimeBound = true;
 
   static inline const std::string& Get(int number, const ExtensionSet& set,
                                        ConstType default_value) {
@@ -1164,19 +1195,16 @@ class PROTOBUF_EXPORT StringTypeTraits {
                                      ExtensionSet* set) {
     return set->MutableString(number, field_type, nullptr);
   }
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType verify_func) {
-    ExtensionSet::RegisterExtension(&ExtendeeT::default_instance(), number,
-                                    type, false, is_packed, verify_func);
-  }
 };
 
 class PROTOBUF_EXPORT RepeatedStringTypeTraits {
  public:
   typedef const std::string& ConstType;
   typedef std::string* MutableType;
+  using InitType = ConstType;
+  static ConstType FromInitType(InitType v) { return v; }
   typedef RepeatedStringTypeTraits Repeated;
+  static constexpr bool kLifetimeBound = true;
 
   typedef RepeatedPtrField<std::string> RepeatedFieldType;
 
@@ -1221,13 +1249,6 @@ class PROTOBUF_EXPORT RepeatedStringTypeTraits {
 
   static const RepeatedFieldType* GetDefaultRepeatedField();
 
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType fn) {
-    ExtensionSet::RegisterExtension(&ExtendeeT::default_instance(), number,
-                                    type, true, is_packed, fn);
-  }
-
  private:
   static void InitializeDefaultRepeatedFields();
   static void DestroyDefaultRepeatedFields();
@@ -1243,7 +1264,10 @@ class EnumTypeTraits {
  public:
   typedef Type ConstType;
   typedef Type MutableType;
+  using InitType = ConstType;
+  static const ConstType& FromInitType(const InitType& v) { return v; }
   typedef EnumTypeTraits<Type, IsValid> Singular;
+  static constexpr bool kLifetimeBound = false;
 
   static inline ConstType Get(int number, const ExtensionSet& set,
                               ConstType default_value) {
@@ -1256,14 +1280,8 @@ class EnumTypeTraits {
   }
   static inline void Set(int number, FieldType field_type, ConstType value,
                          ExtensionSet* set) {
-    GOOGLE_DCHECK(IsValid(value));
+    ABSL_DCHECK(IsValid(value));
     set->SetEnum(number, field_type, value, nullptr);
-  }
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType fn) {
-    ExtensionSet::RegisterEnumExtension(&ExtendeeT::default_instance(), number,
-                                        type, false, is_packed, IsValid);
   }
 };
 
@@ -1272,7 +1290,10 @@ class RepeatedEnumTypeTraits {
  public:
   typedef Type ConstType;
   typedef Type MutableType;
+  using InitType = ConstType;
+  static const ConstType& FromInitType(const InitType& v) { return v; }
   typedef RepeatedEnumTypeTraits<Type, IsValid> Repeated;
+  static constexpr bool kLifetimeBound = false;
 
   typedef RepeatedField<Type> RepeatedFieldType;
 
@@ -1286,12 +1307,12 @@ class RepeatedEnumTypeTraits {
   }
   static inline void Set(int number, int index, ConstType value,
                          ExtensionSet* set) {
-    GOOGLE_DCHECK(IsValid(value));
+    ABSL_DCHECK(IsValid(value));
     set->SetRepeatedEnum(number, index, value);
   }
   static inline void Add(int number, FieldType field_type, bool is_packed,
                          ConstType value, ExtensionSet* set) {
-    GOOGLE_DCHECK(IsValid(value));
+    ABSL_DCHECK(IsValid(value));
     set->AddEnum(number, field_type, is_packed, value, nullptr);
   }
   static inline const RepeatedField<Type>& GetRepeated(
@@ -1325,12 +1346,6 @@ class RepeatedEnumTypeTraits {
     return reinterpret_cast<const RepeatedField<Type>*>(
         RepeatedPrimitiveTypeTraits<int32_t>::GetDefaultRepeatedField());
   }
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType fn) {
-    ExtensionSet::RegisterEnumExtension(&ExtendeeT::default_instance(), number,
-                                        type, true, is_packed, IsValid);
-  }
 };
 
 // -------------------------------------------------------------------
@@ -1344,7 +1359,12 @@ class MessageTypeTraits {
  public:
   typedef const Type& ConstType;
   typedef Type* MutableType;
+  using InitType = const void*;
+  static ConstType FromInitType(InitType v) {
+    return *static_cast<const Type*>(v);
+  }
   typedef MessageTypeTraits<Type> Singular;
+  static constexpr bool kLifetimeBound = true;
 
   static inline ConstType Get(int number, const ExtensionSet& set,
                               ConstType default_value) {
@@ -1381,13 +1401,6 @@ class MessageTypeTraits {
     return static_cast<Type*>(
         set->UnsafeArenaReleaseMessage(number, Type::default_instance()));
   }
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType fn) {
-    ExtensionSet::RegisterMessageExtension(&ExtendeeT::default_instance(),
-                                           number, type, false, is_packed,
-                                           &Type::default_instance(), fn);
-  }
 };
 
 // Used by WireFormatVerify to extract the verify function from the registry.
@@ -1402,7 +1415,12 @@ class RepeatedMessageTypeTraits {
  public:
   typedef const Type& ConstType;
   typedef Type* MutableType;
+  using InitType = const void*;
+  static ConstType FromInitType(InitType v) {
+    return *static_cast<const Type*>(v);
+  }
   typedef RepeatedMessageTypeTraits<Type> Repeated;
+  static constexpr bool kLifetimeBound = true;
 
   typedef RepeatedPtrField<Type> RepeatedFieldType;
 
@@ -1447,13 +1465,6 @@ class RepeatedMessageTypeTraits {
   }
 
   static const RepeatedFieldType* GetDefaultRepeatedField();
-  template <typename ExtendeeT>
-  static void Register(int number, FieldType type, bool is_packed,
-                       LazyEagerVerifyFnType fn) {
-    ExtensionSet::RegisterMessageExtension(&ExtendeeT::default_instance(),
-                                           number, type, true, is_packed,
-                                           &Type::default_instance(), fn);
-  }
 };
 
 template <typename Type>
@@ -1489,37 +1500,27 @@ class ExtensionIdentifier {
   typedef TypeTraitsType TypeTraits;
   typedef ExtendeeType Extendee;
 
-  ExtensionIdentifier(int number, typename TypeTraits::ConstType default_value,
-                      LazyEagerVerifyFnType verify_func = nullptr)
-      : number_(number), default_value_(default_value) {
-    Register(number, verify_func);
-  }
+  constexpr ExtensionIdentifier(int number,
+                                typename TypeTraits::InitType default_value)
+      : number_(number), default_value_(default_value) {}
+
   inline int number() const { return number_; }
   typename TypeTraits::ConstType default_value() const {
-    return default_value_;
-  }
-
-  static void Register(int number, LazyEagerVerifyFnType verify_func) {
-    TypeTraits::template Register<ExtendeeType>(number, field_type, is_packed,
-                                                verify_func);
+    return TypeTraits::FromInitType(default_value_);
   }
 
   typename TypeTraits::ConstType const& default_value_ref() const {
-    return default_value_;
+    return TypeTraits::FromInitType(default_value_);
   }
 
  private:
   const int number_;
-  typename TypeTraits::ConstType default_value_;
+  typename TypeTraits::InitType default_value_;
 };
 
 // -------------------------------------------------------------------
 // Generated accessors
 
-
-// Used to retrieve a lazy extension, may return nullptr in some environments.
-extern PROTOBUF_ATTRIBUTE_WEAK ExtensionSet::LazyMessageExtension*
-MaybeCreateLazyExtension(Arena* arena);
 
 }  // namespace internal
 
@@ -1553,9 +1554,24 @@ void LinkExtensionReflection(
   internal::StrongReference(extension);
 }
 
+// Returns the field descriptor for a generated extension identifier.  This is
+// useful when doing reflection over generated extensions.
+template <typename ExtendeeType, typename TypeTraitsType,
+          internal::FieldType field_type, bool is_packed,
+          typename PoolType = DescriptorPool>
+const FieldDescriptor* GetExtensionReflection(
+    const google::protobuf::internal::ExtensionIdentifier<
+        ExtendeeType, TypeTraitsType, field_type, is_packed>& extension) {
+  return PoolType::generated_pool()->FindExtensionByNumber(
+      google::protobuf::internal::ExtensionIdentifier<ExtendeeType, TypeTraitsType,
+                                            field_type,
+                                            is_packed>::Extendee::descriptor(),
+      extension.number());
+}
+
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_EXTENSION_SET_H__

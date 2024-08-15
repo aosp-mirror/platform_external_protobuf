@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef GOOGLE_PROTOBUF_INLINED_STRING_FIELD_H__
 #define GOOGLE_PROTOBUF_INLINED_STRING_FIELD_H__
@@ -34,15 +11,15 @@
 #include <string>
 #include <utility>
 
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/port.h>
-#include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/arenastring.h>
-#include <google/protobuf/message_lite.h>
+#include "absl/log/absl_check.h"
+#include "absl/strings/string_view.h"
+#include "google/protobuf/arenastring.h"
+#include "google/protobuf/explicitly_constructed.h"
+#include "google/protobuf/message_lite.h"
+#include "google/protobuf/port.h"
 
 // Must be included last.
-#include <google/protobuf/port_def.inc>
+#include "google/protobuf/port_def.inc"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
@@ -109,6 +86,8 @@ namespace internal {
 class PROTOBUF_EXPORT InlinedStringField {
  public:
   InlinedStringField() { Init(); }
+  InlinedStringField(const InlinedStringField&) = delete;
+  InlinedStringField& operator=(const InlinedStringField&) = delete;
   inline void Init() { new (get_mutable()) std::string(); }
   // Add the dummy parameter just to make InlinedStringField(nullptr)
   // unambiguous.
@@ -118,6 +97,7 @@ class PROTOBUF_EXPORT InlinedStringField {
       : value_{} {}
   explicit InlinedStringField(const std::string& default_value);
   explicit InlinedStringField(Arena* arena);
+  InlinedStringField(Arena* arena, const InlinedStringField& rhs);
   ~InlinedStringField() { Destruct(); }
 
   // Lvalue Set. To save space, we pack the donating states of multiple
@@ -130,7 +110,7 @@ class PROTOBUF_EXPORT InlinedStringField {
   //   `donated == ((donating_states & ~mask) != 0)`
   //
   // This method never changes the `donating_states`.
-  void Set(ConstStringParam value, Arena* arena, bool donated,
+  void Set(absl::string_view value, Arena* arena, bool donated,
            uint32_t* donating_states, uint32_t mask, MessageLite* msg);
 
   // Rvalue Set. If this field is donated, this method will undonate this field
@@ -149,7 +129,7 @@ class PROTOBUF_EXPORT InlinedStringField {
            ::google::protobuf::Arena* arena, bool donated, uint32_t* donating_states,
            uint32_t mask, MessageLite* msg);
 
-  void SetBytes(ConstStringParam value, Arena* arena, bool donated,
+  void SetBytes(absl::string_view value, Arena* arena, bool donated,
                 uint32_t* donating_states, uint32_t mask, MessageLite* msg);
 
   void SetBytes(std::string&& value, Arena* arena, bool donated,
@@ -167,7 +147,7 @@ class PROTOBUF_EXPORT InlinedStringField {
                 ::google::protobuf::Arena* arena, bool donated, uint32_t* donating_states,
                 uint32_t mask, MessageLite* msg);
 
-  PROTOBUF_NDEBUG_INLINE void SetNoArena(StringPiece value);
+  PROTOBUF_NDEBUG_INLINE void SetNoArena(absl::string_view value);
   PROTOBUF_NDEBUG_INLINE void SetNoArena(std::string&& value);
 
   // Basic accessors.
@@ -228,7 +208,7 @@ class PROTOBUF_EXPORT InlinedStringField {
     return Release();
   }
 
-  void Set(const std::string*, ConstStringParam value, Arena* arena,
+  void Set(const std::string*, absl::string_view value, Arena* arena,
            bool donated, uint32_t* donating_states, uint32_t mask,
            MessageLite* msg) {
     Set(value, arena, donated, donating_states, mask, msg);
@@ -261,7 +241,7 @@ class PROTOBUF_EXPORT InlinedStringField {
     Set(const_string_ref, arena, donated, donating_states, mask, msg);
   }
 
-  void SetBytes(const std::string*, ConstStringParam value, Arena* arena,
+  void SetBytes(const std::string*, absl::string_view value, Arena* arena,
                 bool donated, uint32_t* donating_states, uint32_t mask,
                 MessageLite* msg) {
     Set(value, arena, donated, donating_states, mask, msg);
@@ -297,7 +277,7 @@ class PROTOBUF_EXPORT InlinedStringField {
              msg);
   }
 
-  void SetNoArena(const std::string*, StringPiece value) {
+  void SetNoArena(const std::string*, absl::string_view value) {
     SetNoArena(value);
   }
   void SetNoArena(const std::string*, std::string&& value) {
@@ -321,10 +301,10 @@ class PROTOBUF_EXPORT InlinedStringField {
   // Swap()/UnsafeArenaSwap() at the message level, so this method is
   // 'unsafe' if called directly.
   inline PROTOBUF_NDEBUG_INLINE static void InternalSwap(
-      InlinedStringField* lhs, Arena* lhs_arena, bool lhs_arena_dtor_registered,
+      InlinedStringField* lhs, bool lhs_arena_dtor_registered,
       MessageLite* lhs_msg,  //
-      InlinedStringField* rhs, Arena* rhs_arena, bool rhs_arena_dtor_registered,
-      MessageLite* rhs_msg);
+      InlinedStringField* rhs, bool rhs_arena_dtor_registered,
+      MessageLite* rhs_msg, Arena* arena);
 
   // Frees storage (if not on an arena).
   PROTOBUF_NDEBUG_INLINE void Destroy(const std::string* default_value,
@@ -358,6 +338,9 @@ class PROTOBUF_EXPORT InlinedStringField {
   static constexpr bool IsDefault(const std::string*) { return false; }
 
  private:
+  // ScopedCheckInvariants checks all string in-variants at destruction.
+  class ScopedCheckInvariants;
+
   void Destruct() { get_mutable()->~basic_string(); }
 
   PROTOBUF_NDEBUG_INLINE std::string* get_mutable();
@@ -392,6 +375,12 @@ inline InlinedStringField::InlinedStringField(
 
 inline InlinedStringField::InlinedStringField(Arena* /*arena*/) { Init(); }
 
+inline InlinedStringField::InlinedStringField(Arena* arena,
+                                              const InlinedStringField& rhs) {
+  const std::string& src = *rhs.get_const();
+  new (value_) std::string(src);
+}
+
 inline const std::string& InlinedStringField::GetNoArena() const {
   return *get_const();
 }
@@ -413,7 +402,7 @@ inline void InlinedStringField::DestroyNoArena(const std::string*) {
   this->~InlinedStringField();
 }
 
-inline void InlinedStringField::SetNoArena(StringPiece value) {
+inline void InlinedStringField::SetNoArena(absl::string_view value) {
   get_mutable()->assign(value.data(), value.length());
 }
 
@@ -421,22 +410,20 @@ inline void InlinedStringField::SetNoArena(std::string&& value) {
   get_mutable()->assign(std::move(value));
 }
 
-// Caller should make sure rhs_arena allocated rhs, and lhs_arena allocated lhs.
 inline PROTOBUF_NDEBUG_INLINE void InlinedStringField::InternalSwap(
-    InlinedStringField* lhs, Arena* lhs_arena, bool lhs_arena_dtor_registered,
+    InlinedStringField* lhs, bool lhs_arena_dtor_registered,
     MessageLite* lhs_msg,  //
-    InlinedStringField* rhs, Arena* rhs_arena, bool rhs_arena_dtor_registered,
-    MessageLite* rhs_msg) {
-#if GOOGLE_PROTOBUF_INTERNAL_DONATE_STEAL_INLINE
+    InlinedStringField* rhs, bool rhs_arena_dtor_registered,
+    MessageLite* rhs_msg, Arena* arena) {
+#ifdef GOOGLE_PROTOBUF_INTERNAL_DONATE_STEAL_INLINE
   lhs->get_mutable()->swap(*rhs->get_mutable());
   if (!lhs_arena_dtor_registered && rhs_arena_dtor_registered) {
-    lhs_msg->OnDemandRegisterArenaDtor(lhs_arena);
+    lhs_msg->OnDemandRegisterArenaDtor(arena);
   } else if (lhs_arena_dtor_registered && !rhs_arena_dtor_registered) {
-    rhs_msg->OnDemandRegisterArenaDtor(rhs_arena);
+    rhs_msg->OnDemandRegisterArenaDtor(arena);
   }
 #else
-  (void)lhs_arena;
-  (void)rhs_arena;
+  (void)arena;
   (void)lhs_arena_dtor_registered;
   (void)rhs_arena_dtor_registered;
   (void)lhs_msg;
@@ -445,7 +432,7 @@ inline PROTOBUF_NDEBUG_INLINE void InlinedStringField::InternalSwap(
 #endif
 }
 
-inline void InlinedStringField::Set(ConstStringParam value, Arena* arena,
+inline void InlinedStringField::Set(absl::string_view value, Arena* arena,
                                     bool donated, uint32_t* /*donating_states*/,
                                     uint32_t /*mask*/, MessageLite* /*msg*/) {
   (void)arena;
@@ -456,17 +443,17 @@ inline void InlinedStringField::Set(ConstStringParam value, Arena* arena,
 inline void InlinedStringField::Set(const char* str, ::google::protobuf::Arena* arena,
                                     bool donated, uint32_t* donating_states,
                                     uint32_t mask, MessageLite* msg) {
-  Set(ConstStringParam(str), arena, donated, donating_states, mask, msg);
+  Set(absl::string_view(str), arena, donated, donating_states, mask, msg);
 }
 
 inline void InlinedStringField::Set(const char* str, size_t size,
                                     ::google::protobuf::Arena* arena, bool donated,
                                     uint32_t* donating_states, uint32_t mask,
                                     MessageLite* msg) {
-  Set(ConstStringParam{str, size}, arena, donated, donating_states, mask, msg);
+  Set(absl::string_view{str, size}, arena, donated, donating_states, mask, msg);
 }
 
-inline void InlinedStringField::SetBytes(ConstStringParam value, Arena* arena,
+inline void InlinedStringField::SetBytes(absl::string_view value, Arena* arena,
                                          bool donated,
                                          uint32_t* donating_states,
                                          uint32_t mask, MessageLite* msg) {
@@ -527,6 +514,6 @@ inline std::string* InlinedStringField::MutableNoCopy(std::nullptr_t) {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_INLINED_STRING_FIELD_H__
