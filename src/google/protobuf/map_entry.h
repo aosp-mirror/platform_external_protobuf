@@ -24,6 +24,11 @@
 // Must be included last.
 #include "google/protobuf/port_def.inc"
 
+#ifdef _MSC_VER
+#undef ABSL_CONST_INIT
+#define ABSL_CONST_INIT
+#endif
+
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
 #endif

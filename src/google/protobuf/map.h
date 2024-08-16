@@ -1204,9 +1204,8 @@ class Map : private internal::KeyMapBase<internal::KeyForBase<Key>> {
                     !std::is_reference<key_type>::value,
                 "We do not support reference types.");
   static constexpr PROTOBUF_ALWAYS_INLINE void StaticValidityCheck() {
-    // MSVC compiler issue.
-    // static_assert(alignof(internal::NodeBase) >= alignof(mapped_type),
-    //               "Alignment of mapped type is too high.");
+    static_assert(alignof(internal::NodeBase) >= alignof(mapped_type),
+                  "Alignment of mapped type is too high.");
     static_assert(
         absl::disjunction<internal::is_supported_integral_type<key_type>,
                           internal::is_supported_string_type<key_type>,

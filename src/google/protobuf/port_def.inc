@@ -495,7 +495,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
 #endif
 
 // Lexan sets both MSV_VER and clang, so handle it with the clang path.
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 // MSVC 17 currently seems to raise an error about constant-initialized pointers.
 # if PROTOBUF_MSC_VER_MIN(1930)
 #  define PROTOBUF_CONSTINIT

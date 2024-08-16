@@ -698,14 +698,14 @@ struct MapEntryToMapField<
   typedef MapField<T, Key, Value, kKeyFieldType, kValueFieldType> MapFieldType;
 };
 
-class PROTOBUF_EXPORT DynamicMapField final
+class  DynamicMapField final
     : public TypeDefinedMapFieldBase<MapKey, MapValueRef> {
  public:
-  explicit DynamicMapField(const Message* default_entry);
-  DynamicMapField(const Message* default_entry, Arena* arena);
+  PROTOBUF_EXPORT explicit DynamicMapField(const Message* default_entry);
+  PROTOBUF_EXPORT DynamicMapField(const Message* default_entry, Arena* arena);
   DynamicMapField(const DynamicMapField&) = delete;
   DynamicMapField& operator=(const DynamicMapField&) = delete;
-  ~DynamicMapField();
+  PROTOBUF_EXPORT ~DynamicMapField();
 
  private:
   friend class MapFieldBase;
@@ -714,22 +714,22 @@ class PROTOBUF_EXPORT DynamicMapField final
 
   static const VTable kVTable;
 
-  void AllocateMapValue(MapValueRef* map_val);
+  PROTOBUF_EXPORT void AllocateMapValue(MapValueRef* map_val);
 
-  static void MergeFromImpl(MapFieldBase& base, const MapFieldBase& other);
-  static bool InsertOrLookupMapValueNoSyncImpl(MapFieldBase& base,
+  PROTOBUF_EXPORT static void MergeFromImpl(MapFieldBase& base, const MapFieldBase& other);
+  PROTOBUF_EXPORT static bool InsertOrLookupMapValueNoSyncImpl(MapFieldBase& base,
                                                const MapKey& map_key,
                                                MapValueRef* val);
-  static void ClearMapNoSyncImpl(MapFieldBase& base);
+  PROTOBUF_EXPORT static void ClearMapNoSyncImpl(MapFieldBase& base);
 
-  static void UnsafeShallowSwapImpl(MapFieldBase& lhs, MapFieldBase& rhs) {
+  PROTOBUF_EXPORT static void UnsafeShallowSwapImpl(MapFieldBase& lhs, MapFieldBase& rhs) {
     static_cast<DynamicMapField&>(lhs).Swap(
         static_cast<DynamicMapField*>(&rhs));
   }
 
-  static size_t SpaceUsedExcludingSelfNoLockImpl(const MapFieldBase& map);
+  PROTOBUF_EXPORT static size_t SpaceUsedExcludingSelfNoLockImpl(const MapFieldBase& map);
 
-  static const Message* GetPrototypeImpl(const MapFieldBase& map);
+  PROTOBUF_EXPORT static const Message* GetPrototypeImpl(const MapFieldBase& map);
 };
 
 }  // namespace internal
