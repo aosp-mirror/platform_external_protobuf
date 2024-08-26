@@ -754,6 +754,15 @@ filegroup {
     path: "src",
 }
 
+
+filegroup {
+    name: "libprotobuf-internal-any-proto",
+    srcs: [
+        "src/google/protobuf/any.proto",
+    ],
+    path: "src",
+}
+
 // Unit tests
 // =======================================================
 cc_defaults {
