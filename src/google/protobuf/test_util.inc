@@ -1,32 +1,10 @@
+// -*- c++ -*-
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -37,11 +15,10 @@
 // within an enclosing namespace and requires header files to be included
 // out of this file.
 
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/common.h>
 #include <gtest/gtest.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/message.h>
+#include "absl/log/absl_check.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/message.h"
 
 namespace google {
 namespace protobuf {
@@ -318,7 +295,16 @@ inline void TestUtil::ModifyRepeatedFields(UNITTEST::TestAllTypes* message) {
 inline void TestUtil::SetOneofFields(UNITTEST::TestAllTypes* message) {
   message->set_oneof_uint32(601);
   message->mutable_oneof_nested_message()->set_bb(602);
+  message->mutable_oneof_lazy_nested_message()->set_bb(605);
   message->set_oneof_string("603");
+#ifndef PROTOBUF_TEST_NO_DESCRIPTORS
+  message->GetReflection()->SetString(
+      message, message->GetDescriptor()->FindFieldByName("oneof_cord"), "606");
+  message->GetReflection()->SetString(
+      message, message->GetDescriptor()->FindFieldByName("oneof_string_piece"),
+      "607");
+#endif  // !PROTOBUF_TEST_NO_DESCRIPTORS
+  // Must be last because tests are expecting it.
   message->set_oneof_bytes("604");
 }
 
@@ -1114,7 +1100,7 @@ inline void TestUtil::SetOneofFields(UNITTEST::TestAllExtensions* message) {
 
 inline void TestUtil::SetAllFieldsAndExtensions(
     UNITTEST::TestFieldOrderings* message) {
-  GOOGLE_CHECK(message);
+  ABSL_CHECK(message);
   message->set_my_int(1);
   message->set_my_string("foo");
   message->set_my_float(1.0);
@@ -1935,7 +1921,7 @@ inline void TestUtil::ExpectUnpackedExtensionsSet(
             message.GetExtension(UNITTEST::unpacked_sfixed64_extension, 1));
   EXPECT_EQ(711, message.GetExtension(UNITTEST::unpacked_float_extension, 1));
   EXPECT_EQ(712, message.GetExtension(UNITTEST::unpacked_double_extension, 1));
-  EXPECT_EQ(false, message.GetExtension(UNITTEST::unpacked_bool_extension, 1));
+  EXPECT_FALSE(message.GetExtension(UNITTEST::unpacked_bool_extension, 1));
   EXPECT_EQ(UNITTEST::FOREIGN_BAZ,
             message.GetExtension(UNITTEST::unpacked_enum_extension, 1));
 }
@@ -2396,6 +2382,7 @@ inline void TestUtil::ExpectOneofClear(const UNITTEST::TestOneof2& message) {
   EXPECT_FALSE(message.has_foo_message());
   EXPECT_FALSE(message.has_foogroup());
   EXPECT_FALSE(message.has_foo_lazy_message());
+  EXPECT_FALSE(message.has_foo_bytes_cord());
 
   EXPECT_FALSE(message.has_bar_int());
   EXPECT_FALSE(message.has_bar_string());
@@ -2419,6 +2406,7 @@ inline void TestUtil::ExpectAtMostOneFieldSetInOneof(
   if (message.has_foo_message()) count++;
   if (message.has_foogroup()) count++;
   if (message.has_foo_lazy_message()) count++;
+  if (message.has_foo_bytes_cord()) count++;
   EXPECT_LE(count, 1);
   count = 0;
   if (message.has_bar_int()) count++;
