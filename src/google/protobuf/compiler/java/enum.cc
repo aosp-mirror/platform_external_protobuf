@@ -1,52 +1,29 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <google/protobuf/compiler/java/enum.h>
+#include "google/protobuf/compiler/java/enum.h"
 
-#include <map>
 #include <string>
 
-#include <google/protobuf/io/printer.h>
-#include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/compiler/java/context.h>
-#include <google/protobuf/compiler/java/doc_comment.h>
-#include <google/protobuf/compiler/java/helpers.h>
-#include <google/protobuf/compiler/java/name_resolver.h>
-#include <google/protobuf/descriptor.pb.h>
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/str_cat.h"
+#include "google/protobuf/compiler/java/context.h"
+#include "google/protobuf/compiler/java/doc_comment.h"
+#include "google/protobuf/compiler/java/helpers.h"
+#include "google/protobuf/compiler/java/name_resolver.h"
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/io/printer.h"
 
 // Must be last.
-#include <google/protobuf/port_def.inc>
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -80,6 +57,10 @@ EnumGenerator::~EnumGenerator() {}
 void EnumGenerator::Generate(io::Printer* printer) {
   WriteEnumDocComment(printer, descriptor_);
   MaybePrintGeneratedAnnotation(context_, printer, descriptor_, immutable_api_);
+
+  if (!context_->options().opensource_runtime) {
+    printer->Print("@com.google.protobuf.Internal.ProtoNonnullApi\n");
+  }
   printer->Print(
       "$deprecation$public enum $classname$\n"
       "    implements com.google.protobuf.ProtocolMessageEnum {\n",
@@ -99,10 +80,10 @@ void EnumGenerator::Generate(io::Printer* printer) {
   }
 
   for (int i = 0; i < canonical_values_.size(); i++) {
-    std::map<std::string, std::string> vars;
+    absl::flat_hash_map<absl::string_view, std::string> vars;
     vars["name"] = canonical_values_[i]->name();
-    vars["index"] = StrCat(canonical_values_[i]->index());
-    vars["number"] = StrCat(canonical_values_[i]->number());
+    vars["index"] = absl::StrCat(canonical_values_[i]->index());
+    vars["number"] = absl::StrCat(canonical_values_[i]->number());
     WriteEnumValueDocComment(printer, canonical_values_[i]);
     if (canonical_values_[i]->options().deprecated()) {
       printer->Print("@java.lang.Deprecated\n");
@@ -115,7 +96,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
     printer->Annotate("name", canonical_values_[i]);
   }
 
-  if (SupportUnknownEnumValue(descriptor_->file())) {
+  if (!descriptor_->is_closed()) {
     if (ordinal_is_index) {
       printer->Print("${$UNRECOGNIZED$}$(-1),\n", "{", "", "}", "");
     } else {
@@ -130,8 +111,15 @@ void EnumGenerator::Generate(io::Printer* printer) {
 
   // -----------------------------------------------------------------
 
+  printer->Print("static {\n");
+  printer->Indent();
+  PrintGencodeVersionValidator(printer, context_->options().opensource_runtime,
+                               descriptor_->name());
+  printer->Outdent();
+  printer->Print("}\n");
+
   for (int i = 0; i < aliases_.size(); i++) {
-    std::map<std::string, std::string> vars;
+    absl::flat_hash_map<absl::string_view, std::string> vars;
     vars["classname"] = descriptor_->name();
     vars["name"] = aliases_[i].value->name();
     vars["canonical_name"] = aliases_[i].canonical_value->name();
@@ -142,9 +130,9 @@ void EnumGenerator::Generate(io::Printer* printer) {
   }
 
   for (int i = 0; i < descriptor_->value_count(); i++) {
-    std::map<std::string, std::string> vars;
+    absl::flat_hash_map<absl::string_view, std::string> vars;
     vars["name"] = descriptor_->value(i)->name();
-    vars["number"] = StrCat(descriptor_->value(i)->number());
+    vars["number"] = absl::StrCat(descriptor_->value(i)->number());
     vars["{"] = "";
     vars["}"] = "";
     vars["deprecation"] = descriptor_->value(i)->options().deprecated()
@@ -163,7 +151,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
   printer->Print(
       "\n"
       "public final int getNumber() {\n");
-  if (SupportUnknownEnumValue(descriptor_->file())) {
+  if (!descriptor_->is_closed()) {
     if (ordinal_is_index) {
       printer->Print(
           "  if (this == UNRECOGNIZED) {\n"
@@ -181,23 +169,32 @@ void EnumGenerator::Generate(io::Printer* printer) {
   printer->Print(
       "  return value;\n"
       "}\n"
-      "\n"
+      "\n");
+  if (context_->options().opensource_runtime) {
+    printer->Print(
+        "/**\n"
+        " * @param value The numeric wire value of the corresponding enum "
+        "entry.\n"
+        " * @return The enum associated with the given numeric wire value.\n"
+        " * @deprecated Use {@link #forNumber(int)} instead.\n"
+        " */\n"
+        "@java.lang.Deprecated\n"
+        "public static $classname$ valueOf(int value) {\n"
+        "  return forNumber(value);\n"
+        "}\n"
+        "\n",
+        "classname", descriptor_->name());
+  }
+  printer->Print(
       "/**\n"
       " * @param value The numeric wire value of the corresponding enum "
       "entry.\n"
       " * @return The enum associated with the given numeric wire value.\n"
-      " * @deprecated Use {@link #forNumber(int)} instead.\n"
-      " */\n"
-      "@java.lang.Deprecated\n"
-      "public static $classname$ valueOf(int value) {\n"
-      "  return forNumber(value);\n"
-      "}\n"
-      "\n"
-      "/**\n"
-      " * @param value The numeric wire value of the corresponding enum "
-      "entry.\n"
-      " * @return The enum associated with the given numeric wire value.\n"
-      " */\n"
+      " */\n");
+  if (!context_->options().opensource_runtime) {
+    printer->Print("@com.google.protobuf.Internal.ProtoMethodMayReturnNull\n");
+  }
+  printer->Print(
       "public static $classname$ forNumber(int value) {\n"
       "  switch (value) {\n",
       "classname", descriptor_->name());
@@ -207,7 +204,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
   for (int i = 0; i < canonical_values_.size(); i++) {
     printer->Print("case $number$: return $name$;\n", "name",
                    canonical_values_[i]->name(), "number",
-                   StrCat(canonical_values_[i]->number()));
+                   absl::StrCat(canonical_values_[i]->number()));
   }
 
   printer->Outdent();
@@ -238,7 +235,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
     printer->Print(
         "public final com.google.protobuf.Descriptors.EnumValueDescriptor\n"
         "    getValueDescriptor() {\n");
-    if (SupportUnknownEnumValue(descriptor_->file())) {
+    if (!descriptor_->is_closed()) {
       if (ordinal_is_index) {
         printer->Print(
             "  if (this == UNRECOGNIZED) {\n"
@@ -266,7 +263,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
         "    getDescriptor() {\n",
         "index_text", index_text);
 
-    // TODO(kenton):  Cache statically?  Note that we can't access descriptors
+    // TODO:  Cache statically?  Note that we can't access descriptors
     //   at module init time because it wouldn't work with descriptor.proto, but
     //   we can cache the value the first time getDescriptor() is called.
     if (descriptor_->containing_type() == NULL) {
@@ -277,7 +274,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
           "  return $file$.getDescriptor().getEnumTypes().get($index$);\n",
           "file",
           name_resolver_->GetClassName(descriptor_->file(), immutable_api_),
-          "index", StrCat(descriptor_->index()));
+          "index", absl::StrCat(descriptor_->index()));
     } else {
       printer->Print(
           "  return $parent$.$descriptor$.getEnumTypes().get($index$);\n",
@@ -290,7 +287,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
                   .no_standard_descriptor_accessor()
               ? "getDefaultInstance().getDescriptorForType()"
               : "getDescriptor()",
-          "index", StrCat(descriptor_->index()));
+          "index", absl::StrCat(descriptor_->index()));
     }
 
     printer->Print(
@@ -333,7 +330,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
         "      \"EnumValueDescriptor is not for this type.\");\n"
         "  }\n",
         "classname", descriptor_->name());
-    if (SupportUnknownEnumValue(descriptor_->file())) {
+    if (!descriptor_->is_closed()) {
       printer->Print(
           "  if (desc.getIndex() == -1) {\n"
           "    return UNRECOGNIZED;\n"
@@ -394,4 +391,4 @@ bool EnumGenerator::CanUseEnumValues() {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"

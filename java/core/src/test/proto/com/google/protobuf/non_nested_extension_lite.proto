@@ -1,0 +1,27 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2008 Google Inc.  All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
+// Author: Darick Tong (darick@google.com)
+//
+// A proto file with extensions for a MessageLite messages.
+
+syntax = "proto2";
+
+package protobuf_unittest;
+
+option optimize_for = LITE_RUNTIME;
+
+message MessageLiteToBeExtended {
+  extensions 1 to max;
+}
+
+message MyNonNestedExtensionLite {}
+
+extend MessageLiteToBeExtended {
+  optional MyNonNestedExtensionLite nonNestedExtensionLite = 1;
+  optional bool package = 2006;
+}
