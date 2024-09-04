@@ -693,6 +693,7 @@ java_library {
     sdk_version: "core_current",
     installable: false,
     licenses: ["external_protobuf_libcore_private_stubs_license"],
+    is_stubs_module: true,
 }
 
 // Python library
@@ -750,6 +751,15 @@ filegroup {
     name: "libprotobuf-internal-descriptor-proto",
     srcs: [
         "src/google/protobuf/descriptor.proto",
+    ],
+    path: "src",
+}
+
+
+filegroup {
+    name: "libprotobuf-internal-any-proto",
+    srcs: [
+        "src/google/protobuf/any.proto",
     ],
     path: "src",
 }
