@@ -1,43 +1,16 @@
 # -*- coding: utf-8 -*-
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# https://developers.google.com/protocol-buffers/
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-#
-#     * Redistributions of source code must retain the above copyright
-# notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above
-# copyright notice, this list of conditions and the following disclaimer
-# in the documentation and/or other materials provided with the
-# distribution.
-#     * Neither the name of Google Inc. nor the names of its
-# contributors may be used to endorse or promote products derived from
-# this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
 
 """Tests python protocol buffers against the golden message.
 
 Note that the golden messages exercise every known field type, thus this
 test ends up exercising and verifying nearly all of the parsing and
 serialization code in the whole library.
-
-TODO(kenton):  Merge with wire_format_test?  It doesn't make a whole lot of
-sense to call this a test of the "message" module, which only declares an
-abstract interface.
 """
 
 __author__ = 'gps@google.com (Gregory P. Smith)'
@@ -50,29 +23,30 @@ import pickle
 import pydoc
 import sys
 import unittest
+from unittest import mock
 import warnings
 
 cmp = lambda x, y: (x > y) - (x < y)
 
+from google.protobuf.internal import api_implementation # pylint: disable=g-import-not-at-top
+from google.protobuf.internal import encoder
+from google.protobuf.internal import more_extensions_pb2
+from google.protobuf.internal import more_messages_pb2
+from google.protobuf.internal import packed_field_test_pb2
+from google.protobuf.internal import test_proto3_optional_pb2
+from google.protobuf.internal import test_util
+from google.protobuf.internal import testing_refleaks
+from google.protobuf import descriptor
+from google.protobuf import message
+from google.protobuf.internal import _parameterized
 from google.protobuf import map_proto2_unittest_pb2
 from google.protobuf import map_unittest_pb2
 from google.protobuf import unittest_pb2
 from google.protobuf import unittest_proto3_arena_pb2
-from google.protobuf import descriptor
-from google.protobuf.internal import api_implementation
-from google.protobuf.internal import encoder
-from google.protobuf.internal import more_extensions_pb2
-from google.protobuf.internal import packed_field_test_pb2
-from google.protobuf.internal import test_util
-from google.protobuf.internal import test_proto3_optional_pb2
-from google.protobuf.internal import testing_refleaks
-from google.protobuf import message
-from google.protobuf.internal import _parameterized
 
 UCS2_MAXUNICODE = 65535
 
 warnings.simplefilter('error', DeprecationWarning)
-
 
 @_parameterized.named_parameters(('_proto2', unittest_pb2),
                                 ('_proto3', unittest_proto3_arena_pb2))
@@ -122,7 +96,7 @@ class MessageTest(unittest.TestCase):
     msg = message_module.TestAllTypes()
     self.assertRaises(TypeError, msg.FromString, 0)
     self.assertRaises(Exception, msg.FromString, '0')
-    # TODO(jieluo): Fix cpp extension to raise error instead of warning.
+    # TODO: Fix cpp extension to raise error instead of warning.
     # b/27494216
     end_tag = encoder.TagBytes(1, 4)
     if (api_implementation.Type() == 'python' or
@@ -425,6 +399,22 @@ class MessageTest(unittest.TestCase):
     empty.ParseFromString(populated.SerializeToString())
     self.assertEqual(str(empty), '')
 
+  def testCopyFromEmpty(self, message_module):
+    msg = message_module.NestedTestAllTypes()
+    test_msg = message_module.NestedTestAllTypes()
+    test_util.SetAllFields(test_msg.payload)
+    self.assertTrue(test_msg.HasField('payload'))
+    # Copy from empty message
+    test_msg.CopyFrom(msg)
+    self.assertEqual(0, len(test_msg.ListFields()))
+
+    test_util.SetAllFields(test_msg.payload)
+    self.assertTrue(test_msg.HasField('payload'))
+    # Copy from a non exist message
+    test_msg.CopyFrom(msg.child)
+    self.assertFalse(test_msg.HasField('payload'))
+    self.assertEqual(0, len(test_msg.ListFields()))
+
   def testAppendRepeatedCompositeField(self, message_module):
     msg = message_module.TestAllTypes()
     msg.repeated_nested_message.append(
@@ -476,6 +466,12 @@ class MessageTest(unittest.TestCase):
         '}\n')
     self.assertEqual(sub_msg.bb, 1)
 
+  def testAssignRepeatedField(self, message_module):
+    msg = message_module.NestedTestAllTypes()
+    msg.payload.repeated_int32[:] = [1, 2, 3, 4]
+    self.assertEqual(4, len(msg.payload.repeated_int32))
+    self.assertEqual([1, 2, 3, 4], msg.payload.repeated_int32)
+
   def testMergeFromRepeatedField(self, message_module):
     msg = message_module.TestAllTypes()
     msg.repeated_int32.append(1)
@@ -493,6 +489,16 @@ class MessageTest(unittest.TestCase):
 
     msg.repeated_nested_message.MergeFrom(other_msg.repeated_nested_message)
     self.assertEqual([1, 2, 3, 4], [m.bb for m in msg.repeated_nested_message])
+
+  def testInternalMergeWithMissingRequiredField(self, message_module):
+    req = more_messages_pb2.RequiredField()
+    more_messages_pb2.RequiredWrapper(request=req)
+
+  def testMergeFromMissingRequiredField(self, message_module):
+    msg = more_messages_pb2.RequiredField()
+    message = more_messages_pb2.RequiredField()
+    message.MergeFrom(msg)
+    self.assertEqual(msg, message)
 
   def testAddWrongRepeatedNestedField(self, message_module):
     msg = message_module.TestAllTypes()
@@ -547,7 +553,7 @@ class MessageTest(unittest.TestCase):
     """Check some different types with the default comparator."""
     message = message_module.TestAllTypes()
 
-    # TODO(mattp): would testing more scalar types strengthen test?
+    # TODO: would testing more scalar types strengthen test?
     message.repeated_int32.append(1)
     message.repeated_int32.append(3)
     message.repeated_int32.append(2)
@@ -887,6 +893,7 @@ class MessageTest(unittest.TestCase):
 
   def testOneofClearField(self, message_module):
     m = message_module.TestAllTypes()
+    m.ClearField('oneof_field')
     m.oneof_uint32 = 11
     m.ClearField('oneof_field')
     if message_module is unittest_pb2:
@@ -997,46 +1004,53 @@ class MessageTest(unittest.TestCase):
     with self.assertRaises(NameError) as _:
       m.repeated_nested_enum.extend(a for i in range(10))  # pylint: disable=undefined-variable
 
-  FALSY_VALUES = [None, False, 0, 0.0, b'', u'', bytearray(), [], {}, set()]
+  FALSY_VALUES = [None, False, 0, 0.0]
+  EMPTY_VALUES = [b'', u'', bytearray(), [], {}, set()]
 
   def testExtendInt32WithNothing(self, message_module):
     """Test no-ops extending repeated int32 fields."""
     m = message_module.TestAllTypes()
     self.assertSequenceEqual([], m.repeated_int32)
 
-    # TODO(ptucker): Deprecate this behavior. b/18413862
     for falsy_value in MessageTest.FALSY_VALUES:
-      m.repeated_int32.extend(falsy_value)
+      with self.assertRaises(TypeError) as context:
+        m.repeated_int32.extend(falsy_value)
+      self.assertIn('iterable', str(context.exception))
       self.assertSequenceEqual([], m.repeated_int32)
 
-    m.repeated_int32.extend([])
-    self.assertSequenceEqual([], m.repeated_int32)
+    for empty_value in MessageTest.EMPTY_VALUES:
+      m.repeated_int32.extend(empty_value)
+      self.assertSequenceEqual([], m.repeated_int32)
 
   def testExtendFloatWithNothing(self, message_module):
     """Test no-ops extending repeated float fields."""
     m = message_module.TestAllTypes()
     self.assertSequenceEqual([], m.repeated_float)
 
-    # TODO(ptucker): Deprecate this behavior. b/18413862
     for falsy_value in MessageTest.FALSY_VALUES:
-      m.repeated_float.extend(falsy_value)
+      with self.assertRaises(TypeError) as context:
+        m.repeated_float.extend(falsy_value)
+      self.assertIn('iterable', str(context.exception))
       self.assertSequenceEqual([], m.repeated_float)
 
-    m.repeated_float.extend([])
-    self.assertSequenceEqual([], m.repeated_float)
+    for empty_value in MessageTest.EMPTY_VALUES:
+      m.repeated_float.extend(empty_value)
+      self.assertSequenceEqual([], m.repeated_float)
 
   def testExtendStringWithNothing(self, message_module):
     """Test no-ops extending repeated string fields."""
     m = message_module.TestAllTypes()
     self.assertSequenceEqual([], m.repeated_string)
 
-    # TODO(ptucker): Deprecate this behavior. b/18413862
     for falsy_value in MessageTest.FALSY_VALUES:
-      m.repeated_string.extend(falsy_value)
+      with self.assertRaises(TypeError) as context:
+        m.repeated_string.extend(falsy_value)
+      self.assertIn('iterable', str(context.exception))
       self.assertSequenceEqual([], m.repeated_string)
 
-    m.repeated_string.extend([])
-    self.assertSequenceEqual([], m.repeated_string)
+    for empty_value in MessageTest.EMPTY_VALUES:
+      m.repeated_string.extend(empty_value)
+      self.assertSequenceEqual([], m.repeated_string)
 
   def testExtendInt32WithPythonList(self, message_module):
     """Test extending repeated int32 fields with python lists."""
@@ -1255,6 +1269,42 @@ class MessageTest(unittest.TestCase):
     self.assertEqual(bool, type(m.repeated_bool[0]))
     self.assertEqual(True, m.repeated_bool[0])
 
+  def testEquality(self, message_module):
+    m = message_module.TestAllTypes()
+    m2 = message_module.TestAllTypes()
+    self.assertEqual(m, m)
+    self.assertEqual(m, m2)
+    self.assertEqual(m2, m)
+
+    different_m = message_module.TestAllTypes()
+    different_m.repeated_float.append(1)
+    self.assertNotEqual(m, different_m)
+    self.assertNotEqual(different_m, m)
+
+    self.assertIsNotNone(m)
+    self.assertIsNotNone(m)
+    self.assertNotEqual(42, m)
+    self.assertNotEqual(m, 42)
+    self.assertNotEqual('foo', m)
+    self.assertNotEqual(m, 'foo')
+
+    self.assertEqual(mock.ANY, m)
+    self.assertEqual(m, mock.ANY)
+
+    class ComparesWithFoo(object):
+
+      def __eq__(self, other):
+        if getattr(other, 'optional_string', 'not_foo') == 'foo':
+          return True
+        return NotImplemented
+
+    m.optional_string = 'foo'
+    self.assertEqual(m, ComparesWithFoo())
+    self.assertEqual(ComparesWithFoo(), m)
+    m.optional_string = 'bar'
+    self.assertNotEqual(m, ComparesWithFoo())
+    self.assertNotEqual(ComparesWithFoo(), m)
+
 
 # Class to test proto2-only features (required, extensions, etc.)
 @testing_refleaks.TestCase
@@ -1308,6 +1358,17 @@ class Proto2Test(unittest.TestCase):
     self.assertEqual(False, message.optional_bool)
     self.assertEqual(0, message.optional_nested_message.bb)
 
+  def testDel(self):
+    msg = unittest_pb2.TestAllTypes()
+
+    # Fields cannot be deleted.
+    with self.assertRaises(AttributeError):
+      del msg.optional_int32
+    with self.assertRaises(AttributeError):
+      del msg.optional_bool
+    with self.assertRaises(AttributeError):
+      del msg.repeated_nested_message
+
   def testAssignInvalidEnum(self):
     """Assigning an invalid enum number is not allowed in proto2."""
     m = unittest_pb2.TestAllTypes()
@@ -1345,6 +1406,12 @@ class Proto2Test(unittest.TestCase):
     with self.assertRaises(ValueError):
       m.unknown_map_field[1] = 123
 
+  def testDeepCopyClosedEnum(self):
+    m = map_proto2_unittest_pb2.TestEnumMap()
+    m.known_map_field[123] = 0
+    m2 = copy.deepcopy(m)
+    self.assertEqual(m, m2)
+
   def testExtensionsErrors(self):
     msg = unittest_pb2.TestAllTypes()
     self.assertRaises(AttributeError, getattr, msg, 'Extensions')
@@ -1365,6 +1432,33 @@ class Proto2Test(unittest.TestCase):
         123,
         msg1.submessage.Extensions[more_extensions_pb2.optional_int_extension])
 
+  def testCopyFromAll(self):
+    message = unittest_pb2.TestAllTypes()
+    test_util.SetAllFields(message)
+    copy = unittest_pb2.TestAllTypes()
+    copy.CopyFrom(message)
+    self.assertEqual(message, copy)
+    message.repeated_nested_message.add().bb = 123
+    self.assertNotEqual(message, copy)
+
+  def testCopyFromAllExtensions(self):
+    all_set = unittest_pb2.TestAllExtensions()
+    test_util.SetAllExtensions(all_set)
+    copy =  unittest_pb2.TestAllExtensions()
+    copy.CopyFrom(all_set)
+    self.assertEqual(all_set, copy)
+    all_set.Extensions[unittest_pb2.repeatedgroup_extension].add().a = 321
+    self.assertNotEqual(all_set, copy)
+
+  def testCopyFromAllPackedExtensions(self):
+    all_set = unittest_pb2.TestPackedExtensions()
+    test_util.SetAllPackedExtensions(all_set)
+    copy =  unittest_pb2.TestPackedExtensions()
+    copy.CopyFrom(all_set)
+    self.assertEqual(all_set, copy)
+    all_set.Extensions[unittest_pb2.packed_float_extension].extend([61.0, 71.0])
+    self.assertNotEqual(all_set, copy)
+
   def testGoldenExtensions(self):
     golden_data = test_util.GoldenFileData('golden_message')
     golden_message = unittest_pb2.TestAllExtensions()
@@ -1374,7 +1468,11 @@ class Proto2Test(unittest.TestCase):
     self.assertEqual(all_set, golden_message)
     self.assertEqual(golden_data, golden_message.SerializeToString())
     golden_copy = copy.deepcopy(golden_message)
-    self.assertEqual(golden_data, golden_copy.SerializeToString())
+    self.assertEqual(golden_message, golden_copy)
+    # Depend on a specific serialization order for extensions is not
+    # reasonable to guarantee.
+    if api_implementation.Type() != 'upb':
+      self.assertEqual(golden_data, golden_copy.SerializeToString())
 
   def testGoldenPackedExtensions(self):
     golden_data = test_util.GoldenFileData('golden_packed_fields_message')
@@ -1385,7 +1483,11 @@ class Proto2Test(unittest.TestCase):
     self.assertEqual(all_set, golden_message)
     self.assertEqual(golden_data, all_set.SerializeToString())
     golden_copy = copy.deepcopy(golden_message)
-    self.assertEqual(golden_data, golden_copy.SerializeToString())
+    self.assertEqual(golden_message, golden_copy)
+    # Depend on a specific serialization order for extensions is not
+    # reasonable to guarantee.
+    if api_implementation.Type() != 'upb':
+      self.assertEqual(golden_data, golden_copy.SerializeToString())
 
   def testPickleIncompleteProto(self):
     golden_message = unittest_pb2.TestRequired(a=1)
@@ -1397,7 +1499,7 @@ class Proto2Test(unittest.TestCase):
     # This is still an incomplete proto - so serializing should fail
     self.assertRaises(message.EncodeError, unpickled_message.SerializeToString)
 
-  # TODO(haberman): this isn't really a proto2-specific test except that this
+  # TODO: this isn't really a proto2-specific test except that this
   # message has a required field in it.  Should probably be factored out so
   # that we can test the other parts with proto3.
   def testParsingMerge(self):
@@ -1526,7 +1628,6 @@ class Proto2Test(unittest.TestCase):
     msg = unittest_pb2.TestAllTypes(**kwargs)
     self.assertEqual(100, msg.optional_int32)
     self.assertEqual(200, msg.optional_fixed32)
-
 
   def test_documentation(self):
     # Also used by the interactive help() function.
@@ -1676,7 +1777,8 @@ class Proto3Test(unittest.TestCase):
 
     # Test has presence:
     for field in test_proto3_optional_pb2.TestProto3Optional.DESCRIPTOR.fields:
-      self.assertTrue(field.has_presence)
+      if field.name.startswith('optional_'):
+        self.assertTrue(field.has_presence)
     for field in unittest_pb2.TestAllTypes.DESCRIPTOR.fields:
       if field.label == descriptor.FieldDescriptor.LABEL_REPEATED:
         self.assertFalse(field.has_presence)
@@ -1765,6 +1867,19 @@ class Proto3Test(unittest.TestCase):
 
     with self.assertRaises(TypeError):
       123 in msg.map_string_string
+
+  def testScalarMapComparison(self):
+    msg1 = map_unittest_pb2.TestMap()
+    msg2 = map_unittest_pb2.TestMap()
+
+    self.assertEqual(msg1.map_int32_int32, msg2.map_int32_int32)
+
+  def testMessageMapComparison(self):
+    msg1 = map_unittest_pb2.TestMap()
+    msg2 = map_unittest_pb2.TestMap()
+
+    self.assertEqual(msg1.map_int32_foreign_message,
+                     msg2.map_int32_foreign_message)
 
   def testMapGet(self):
     # Need to test that get() properly returns the default, even though the dict
@@ -1909,7 +2024,7 @@ class Proto3Test(unittest.TestCase):
     self.assertIn(-456, msg2.map_int32_foreign_message)
     self.assertEqual(2, len(msg2.map_int32_foreign_message))
     msg2.map_int32_foreign_message[123].c = 1
-    # TODO(jieluo): Fix text format for message map.
+    # TODO: Fix text format for message map.
     self.assertIn(
         str(msg2.map_int32_foreign_message),
         ('{-456: , 123: c: 1\n}', '{123: c: 1\n, -456: }'))
@@ -2230,7 +2345,7 @@ class Proto3Test(unittest.TestCase):
   def testMapItems(self):
     # Map items used to have strange behaviors when use c extension. Because
     # [] may reorder the map and invalidate any existing iterators.
-    # TODO(jieluo): Check if [] reordering the map is a bug or intended
+    # TODO: Check if [] reordering the map is a bug or intended
     # behavior.
     msg = map_unittest_pb2.TestMap()
     msg.map_string_string['local_init_op'] = ''
@@ -2350,7 +2465,7 @@ class Proto3Test(unittest.TestCase):
 
     if api_implementation.Type() == 'cpp':
       # Need to keep the map reference because of b/27942626.
-      # TODO(jieluo): Remove it.
+      # TODO: Remove it.
       unused_map = msg.map_int32_all_types  # pylint: disable=unused-variable
     msg_value = msg.map_int32_all_types[2]
     msg.Clear()
@@ -2453,7 +2568,25 @@ class Proto3Test(unittest.TestCase):
     with self.assertRaises(ValueError):
       unittest_proto3_arena_pb2.TestAllTypes(optional_string=u'\ud801\ud801')
 
+  def testCrashNullAA(self):
+    self.assertEqual(
+        unittest_proto3_arena_pb2.TestAllTypes.NestedMessage(),
+        unittest_proto3_arena_pb2.TestAllTypes.NestedMessage())
 
+  def testCrashNullAB(self):
+    self.assertEqual(
+        unittest_proto3_arena_pb2.TestAllTypes.NestedMessage(),
+        unittest_proto3_arena_pb2.TestAllTypes().optional_nested_message)
+
+  def testCrashNullBA(self):
+    self.assertEqual(
+        unittest_proto3_arena_pb2.TestAllTypes().optional_nested_message,
+        unittest_proto3_arena_pb2.TestAllTypes.NestedMessage())
+
+  def testCrashNullBB(self):
+    self.assertEqual(
+        unittest_proto3_arena_pb2.TestAllTypes().optional_nested_message,
+        unittest_proto3_arena_pb2.TestAllTypes().optional_nested_message)
 
 
 @testing_refleaks.TestCase
@@ -2478,6 +2611,30 @@ class ValidTypeNamesTest(unittest.TestCase):
     pb = unittest_pb2.TestAllTypes()
     self.assertImportFromName(pb.repeated_int32, 'Scalar')
     self.assertImportFromName(pb.repeated_nested_message, 'Composite')
+
+
+# We can only test this case under proto2, because proto3 will reject invalid
+# UTF-8 in the parser, so there should be no way of creating a string field
+# that contains invalid UTF-8.
+#
+# We also can't test it in pure-Python, which validates all string fields for
+# UTF-8 even when the spec says it shouldn't.
+@unittest.skipIf(api_implementation.Type() == 'python',
+                 'Python can\'t create invalid UTF-8 strings')
+@testing_refleaks.TestCase
+class InvalidUtf8Test(unittest.TestCase):
+
+  def testInvalidUtf8Printing(self):
+    one_bytes = unittest_pb2.OneBytes()
+    one_bytes.data = b'ABC\xff123'
+    one_string = unittest_pb2.OneString()
+    one_string.ParseFromString(one_bytes.SerializeToString())
+    self.assertIn('data: "ABC\\377123"', str(one_string))
+
+  def testValidUtf8Printing(self):
+    self.assertIn('data: "€"', str(unittest_pb2.OneString(data='€')))  # 2 byte
+    self.assertIn('data: "￡"', str(unittest_pb2.OneString(data='￡')))  # 3 byte
+    self.assertIn('data: "🙂"', str(unittest_pb2.OneString(data='🙂')))  # 4 byte
 
 
 @testing_refleaks.TestCase
