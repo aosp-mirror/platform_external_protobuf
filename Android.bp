@@ -479,6 +479,7 @@ java_library_static {
         "//apex_available:platform",
         "com.android.tethering",
         "com.android.wifi",
+        "com.android.neuralnetworks",
     ],
 }
 
@@ -619,7 +620,7 @@ java_library_static {
 
     optimize: {
         proguard_flags_files: ["java/lite/proguard.pgcfg"],
-    }
+    },
 }
 
 // Java lite library (compatibility for old host-side users)
@@ -754,7 +755,6 @@ filegroup {
     ],
     path: "src",
 }
-
 
 filegroup {
     name: "libprotobuf-internal-any-proto",
