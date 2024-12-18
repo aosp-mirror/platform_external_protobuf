@@ -277,7 +277,6 @@ cc_test_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.os.statsd",
-        "test_com.android.os.statsd",
     ],
     min_sdk_version: "29",
 }
