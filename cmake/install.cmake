@@ -41,9 +41,13 @@ foreach(_library ${_protobuf_libraries})
   endif()
   install(TARGETS ${_library} EXPORT protobuf-targets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT ${_library}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ${_library}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ${_library})
+    # We do not want to do a complete install, only the dll will do.
+    #LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ${_library}
+    #ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ${_library})
 endforeach()
+
+# Emulator does not want to do a complete install, we just want the dlls.
+return()
 
 if (protobuf_BUILD_PROTOC_BINARIES)
   install(TARGETS protoc EXPORT protobuf-targets
