@@ -248,6 +248,7 @@ cc_library {
     name: "libprotobuf-cpp-full",
     defaults: ["libprotobuf-cpp-full-defaults"],
     host_supported: true,
+    recovery_available: true,
     vendor_available: true,
     product_available: true,
     // TODO(b/153609531): remove when no longer needed.
