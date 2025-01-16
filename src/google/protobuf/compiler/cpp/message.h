@@ -116,7 +116,9 @@ class MessageGenerator {
   // Generate standard Message methods.
   void GenerateClear(io::Printer* p);
   void GenerateOneofClear(io::Printer* p);
+  void GenerateVerifyDecl(io::Printer* p);
   void GenerateVerify(io::Printer* p);
+  void GenerateAnnotationDecl(io::Printer* p);
   void GenerateSerializeWithCachedSizes(io::Printer* p);
   void GenerateSerializeWithCachedSizesToArray(io::Printer* p);
   void GenerateSerializeWithCachedSizesBody(io::Printer* p);
@@ -126,11 +128,11 @@ class MessageGenerator {
   void GenerateMapEntryClassDefinition(io::Printer* p);
   void GenerateAnyMethodDefinition(io::Printer* p);
   void GenerateImplDefinition(io::Printer* p);
-  void GenerateMergeFrom(io::Printer* p);
   void GenerateClassSpecificMergeImpl(io::Printer* p);
   void GenerateCopyFrom(io::Printer* p);
   void GenerateSwap(io::Printer* p);
   void GenerateIsInitialized(io::Printer* p);
+  bool NeedsIsInitialized();
 
   // Helpers for GenerateSerializeWithCachedSizes().
   //

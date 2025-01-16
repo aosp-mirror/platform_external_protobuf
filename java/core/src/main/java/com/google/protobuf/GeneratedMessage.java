@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
@@ -135,7 +136,9 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
    */
   private Map<FieldDescriptor, Object> getAllFieldsMutable(boolean getBytesForString) {
     final TreeMap<FieldDescriptor, Object> result = new TreeMap<>();
-    final Descriptor descriptor = internalGetFieldAccessorTable().descriptor;
+    final FieldAccessorTable fieldAccessorTable = internalGetFieldAccessorTable();
+
+    final Descriptor descriptor = fieldAccessorTable.descriptor;
     final List<FieldDescriptor> fields = descriptor.getFields();
 
     for (int i = 0; i < fields.size(); i++) {
@@ -561,7 +564,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     /** Internal helper which returns a mutable map. */
     private Map<FieldDescriptor, Object> getAllFieldsMutable() {
       final TreeMap<FieldDescriptor, Object> result = new TreeMap<>();
-      final Descriptor descriptor = internalGetFieldAccessorTable().descriptor;
+      final FieldAccessorTable fieldAccessorTable = internalGetFieldAccessorTable();
+      final Descriptor descriptor = fieldAccessorTable.descriptor;
       final List<FieldDescriptor> fields = descriptor.getFields();
 
       for (int i = 0; i < fields.size(); i++) {
@@ -882,16 +886,16 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     Message getDefaultInstanceForType();
 
     /** Check if a singular extension is present. */
-    <T> boolean hasExtension(ExtensionLite<MessageT, T> extension);
+    <T> boolean hasExtension(ExtensionLite<? extends MessageT, T> extension);
 
     /** Get the number of elements in a repeated extension. */
-    <T> int getExtensionCount(ExtensionLite<MessageT, List<T>> extension);
+    <T> int getExtensionCount(ExtensionLite<? extends MessageT, List<T>> extension);
 
     /** Get the value of an extension. */
-    <T> T getExtension(ExtensionLite<MessageT, T> extension);
+    <T> T getExtension(ExtensionLite<? extends MessageT, T> extension);
 
     /** Get one element of a repeated extension. */
-    <T> T getExtension(ExtensionLite<MessageT, List<T>> extension, int index);
+    <T> T getExtension(ExtensionLite<? extends MessageT, List<T>> extension, int index);
   }
 
   /**
@@ -942,7 +946,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       this.extensions = builder.buildExtensions();
     }
 
-    private void verifyExtensionContainingType(final Extension<MessageT, ?> extension) {
+    private void verifyExtensionContainingType(final Extension<? extends MessageT, ?> extension) {
       if (extension.getDescriptor().getContainingType() != getDescriptorForType()) {
         // This can only happen if someone uses unchecked operations.
         throw new IllegalArgumentException(
@@ -956,7 +960,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Check if a singular extension is present. */
     @Override
-    public final <T> boolean hasExtension(final ExtensionLite<MessageT, T> extensionLite) {
+    public final <T> boolean hasExtension(
+        final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -965,7 +970,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Get the number of elements in a repeated extension. */
     @Override
-    public final <T> int getExtensionCount(final ExtensionLite<MessageT, List<T>> extensionLite) {
+    public final <T> int getExtensionCount(
+        final ExtensionLite<? extends MessageT, List<T>> extensionLite) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -976,7 +982,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     /** Get the value of an extension. */
     @Override
     @SuppressWarnings("unchecked")
-    public final <T> T getExtension(final ExtensionLite<MessageT, T> extensionLite) {
+    public final <T> T getExtension(final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -999,7 +1005,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     @Override
     @SuppressWarnings("unchecked")
     public final <T> T getExtension(
-        final ExtensionLite<MessageT, List<T>> extensionLite, final int index) {
+        final ExtensionLite<? extends MessageT, List<T>> extensionLite, final int index) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1021,10 +1027,28 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /**
      * Used by subclasses to serialize extensions. Extension ranges may be interleaved with field
-     * numbers, but we must write them in canonical (sorted by field number) order. ExtensionWriter
-     * helps us write individual ranges of extensions at once.
+     * numbers, but we must write them in canonical (sorted by field number) order.
+     * ExtensionSerializer helps us write individual ranges of extensions at once.
      */
-    protected class ExtensionWriter {
+    protected interface ExtensionSerializer {
+      public void writeUntil(final int end, final CodedOutputStream output) throws IOException;
+    }
+
+    /** No-op implementation that writes nothing, for messages with no extensions. */
+    private static final class NoOpExtensionSerializer implements ExtensionSerializer {
+      // Singleton instance so we can avoid allocating a new one for each message serialization.
+      private static final NoOpExtensionSerializer INSTANCE = new NoOpExtensionSerializer();
+
+      @Override
+      public void writeUntil(final int end, final CodedOutputStream output) {
+        // no-op
+      }
+    }
+
+    /**
+     * ExtensionSerializer that writes extensions from the FieldSet, for messages with extensions.
+     */
+    protected class ExtensionWriter implements ExtensionSerializer {
       // Imagine how much simpler this code would be if Java iterators had
       // a way to get the next element without advancing the iterator.
 
@@ -1032,13 +1056,15 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       private Map.Entry<FieldDescriptor, Object> next;
       private final boolean messageSetWireFormat;
 
-      private ExtensionWriter(final boolean messageSetWireFormat) {
+      // TODO: Should be marked private in v5.x.x once GeneratedMessageV3 is removed.
+      protected ExtensionWriter(final boolean messageSetWireFormat) {
         if (iter.hasNext()) {
           next = iter.next();
         }
         this.messageSetWireFormat = messageSetWireFormat;
       }
 
+      @Override
       public void writeUntil(final int end, final CodedOutputStream output) throws IOException {
         while (next != null && next.getKey().getNumber() < end) {
           FieldDescriptor descriptor = next.getKey();
@@ -1071,11 +1097,36 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       }
     }
 
+    /**
+     * For compatibility with older gencode.
+     *
+     * <p> TODO Remove this in the next breaking release.
+     *
+     * @deprecated Use {@link newExtensionSerializer()} instead.
+     */
+    @Deprecated
     protected ExtensionWriter newExtensionWriter() {
       return new ExtensionWriter(false);
     }
 
+    protected ExtensionSerializer newExtensionSerializer() {
+      // Avoid allocation in the common case of no extensions.
+      if (extensions.isEmpty()) {
+        return NoOpExtensionSerializer.INSTANCE;
+      }
+      return new ExtensionWriter(false);
+    }
+
+    // TODO: Remove, replace with newMessageSetExtensionSerializer().
     protected ExtensionWriter newMessageSetExtensionWriter() {
+      return new ExtensionWriter(true);
+    }
+
+    protected ExtensionSerializer newMessageSetExtensionSerializer() {
+      // Avoid allocation in the common case of no extensions.
+      if (extensions.isEmpty()) {
+        return NoOpExtensionSerializer.INSTANCE;
+      }
       return new ExtensionWriter(true);
     }
 
@@ -1250,7 +1301,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Check if a singular extension is present. */
     @Override
-    public final <T> boolean hasExtension(final ExtensionLite<MessageT, T> extensionLite) {
+    public final <T> boolean hasExtension(
+        final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1259,7 +1311,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Get the number of elements in a repeated extension. */
     @Override
-    public final <T> int getExtensionCount(final ExtensionLite<MessageT, List<T>> extensionLite) {
+    public final <T> int getExtensionCount(
+        final ExtensionLite<? extends MessageT, List<T>> extensionLite) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1269,7 +1322,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Get the value of an extension. */
     @Override
-    public final <T> T getExtension(final ExtensionLite<MessageT, T> extensionLite) {
+    public final <T> T getExtension(final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1291,7 +1344,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     /** Get one element of a repeated extension. */
     @Override
     public final <T> T getExtension(
-        final ExtensionLite<MessageT, List<T>> extensionLite, final int index) {
+        final ExtensionLite<? extends MessageT, List<T>> extensionLite, final int index) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1305,7 +1358,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Set the value of an extension. */
     public final <T> BuilderT setExtension(
-        final ExtensionLite<MessageT, T> extensionLite, final T value) {
+        final ExtensionLite<? extends MessageT, T> extensionLite, final T value) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1318,7 +1371,9 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Set the value of one element of a repeated extension. */
     public final <T> BuilderT setExtension(
-        final ExtensionLite<MessageT, List<T>> extensionLite, final int index, final T value) {
+        final ExtensionLite<? extends MessageT, List<T>> extensionLite,
+        final int index,
+        final T value) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1331,7 +1386,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Append a value to a repeated extension. */
     public final <T> BuilderT addExtension(
-        final ExtensionLite<MessageT, List<T>> extensionLite, final T value) {
+        final ExtensionLite<? extends MessageT, List<T>> extensionLite, final T value) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1343,7 +1398,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     }
 
     /** Clear an extension. */
-    public final <T> BuilderT clearExtension(final ExtensionLite<MessageT, T> extensionLite) {
+    public final <T> BuilderT clearExtension(
+        final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
       verifyExtensionContainingType(extension);
@@ -1559,7 +1615,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       }
     }
 
-    protected final void mergeExtensionFields(final ExtendableMessage<?> other) {
+    // TODO: Should be marked final in v5.x.x once GeneratedMessageV3 is removed.
+    protected void mergeExtensionFields(final ExtendableMessage<?> other) {
       if (other.extensions != null) {
         ensureExtensionsIsMutable();
         extensions.mergeFrom(other.extensions);
@@ -1935,7 +1992,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
    * Users should ignore this class. This class provides the implementation with access to the
    * fields of a message object using Java reflection.
    */
-  public static final class FieldAccessorTable {
+  // TODO: Should be marked final in v5.x.x once GeneratedMessageV3 is removed.
+  public static class FieldAccessorTable {
 
     /**
      * Construct a FieldAccessorTable for a particular message class. Only one FieldAccessorTable
@@ -2052,12 +2110,11 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
           if (i < descriptor.getRealOneofs().size()) {
             oneofs[i] =
                 new RealOneofAccessor(
-                    descriptor, i, camelCaseNames[i + fieldsSize], messageClass, builderClass);
+                    descriptor, camelCaseNames[i + fieldsSize], messageClass, builderClass);
           } else {
             oneofs[i] = new SyntheticOneofAccessor(descriptor, i);
           }
         }
-
         initialized = true;
         camelCaseNames = null;
         return this;
@@ -2145,7 +2202,6 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     private static class RealOneofAccessor implements OneofAccessor {
       RealOneofAccessor(
           final Descriptor descriptor,
-          final int oneofIndex,
           final String camelCaseName,
           final Class<? extends GeneratedMessage> messageClass,
           final Class<? extends Builder<?>> builderClass) {
@@ -2262,7 +2318,6 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         private final Method caseMethodBuilder;
 
         ReflectionInvoker(
-            final FieldDescriptor descriptor,
             final String camelCaseName,
             final Class<? extends GeneratedMessage> messageClass,
             final Class<? extends Builder<?>> builderClass,
@@ -2341,7 +2396,6 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         hasHasMethod = descriptor.hasPresence();
         ReflectionInvoker reflectionInvoker =
             new ReflectionInvoker(
-                descriptor,
                 camelCaseName,
                 messageClass,
                 builderClass,
@@ -2498,7 +2552,6 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         private final Method clearMethod;
 
         ReflectionInvoker(
-            final FieldDescriptor descriptor,
             final String camelCaseName,
             final Class<? extends GeneratedMessage> messageClass,
             final Class<? extends Builder<?>> builderClass) {
@@ -2575,7 +2628,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
           final Class<? extends GeneratedMessage> messageClass,
           final Class<? extends Builder<?>> builderClass) {
         ReflectionInvoker reflectionInvoker =
-            new ReflectionInvoker(descriptor, camelCaseName, messageClass, builderClass);
+            new ReflectionInvoker(camelCaseName, messageClass, builderClass);
         type = reflectionInvoker.getRepeatedMethod.getReturnType();
         invoker = getMethodInvoker(reflectionInvoker);
       }
@@ -3133,7 +3186,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
    * Checks that the {@link Extension} is non-Lite and returns it as a {@link GeneratedExtension}.
    */
   private static <MessageT extends ExtendableMessage<MessageT>, T>
-      Extension<MessageT, T> checkNotLite(ExtensionLite<MessageT, T> extension) {
+      Extension<MessageT, T> checkNotLite(ExtensionLite<? extends MessageT, T> extension) {
     if (extension.isLite()) {
       throw new IllegalArgumentException("Expected non-lite extension.");
     }

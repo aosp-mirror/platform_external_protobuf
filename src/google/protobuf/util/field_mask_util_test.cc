@@ -202,7 +202,7 @@ TEST(FieldMaskUtilTest, TestGetFieldMaskForAllFields) {
   EXPECT_TRUE(FieldMaskUtil::IsPathInFieldMask("bb", mask));
 
   mask = FieldMaskUtil::GetFieldMaskForAllFields<TestAllTypes>();
-  EXPECT_EQ(79, mask.paths_size());
+  EXPECT_EQ(80, mask.paths_size());
   EXPECT_TRUE(FieldMaskUtil::IsPathInFieldMask("optional_int32", mask));
   EXPECT_TRUE(FieldMaskUtil::IsPathInFieldMask("optional_int64", mask));
   EXPECT_TRUE(FieldMaskUtil::IsPathInFieldMask("optional_uint32", mask));
@@ -777,7 +777,7 @@ TEST(FieldMaskUtilTest, TrimMessageReturnValue) {
   EXPECT_EQ(trimed_msg.DebugString(), default_msg.DebugString());
   trimed_msg.Clear();
 
-  // If there is no field set other then those whitelisted,
+  // If there is no field set other then those allowlisted,
   // FieldMaskUtil::TrimMessage() should return false.
   trimed_msg.set_optional_int32(123);
   EXPECT_FALSE(FieldMaskUtil::TrimMessage(mask, &trimed_msg));

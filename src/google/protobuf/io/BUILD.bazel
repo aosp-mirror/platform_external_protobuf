@@ -1,7 +1,7 @@
 # Protobuf IO library.
 
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
-load("@rules_pkg//:mappings.bzl", "pkg_files", "strip_prefix")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("//build_defs:cpp_opts.bzl", "COPTS")
 
 package(
@@ -177,6 +177,7 @@ cc_library(
     deps = [
         "//src/google/protobuf:arena",
         "//src/google/protobuf/stubs:lite",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -190,9 +191,6 @@ cc_test(
         "zero_copy_stream_unittest.cc",
     ],
     copts = COPTS,
-    data = [
-        "//src/google/protobuf:testdata",
-    ],
     deps = [
         ":gzip_stream",
         ":io",
@@ -202,6 +200,7 @@ cc_test(
         "//:protobuf",
         "//src/google/protobuf",
         "//src/google/protobuf:port",
+        "//src/google/protobuf:test_util",
         "//src/google/protobuf:test_util2",
         "//src/google/protobuf/stubs",
         "//src/google/protobuf/testing",

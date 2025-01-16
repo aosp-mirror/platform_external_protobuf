@@ -983,10 +983,23 @@ static PyObject* PyUpb_FieldDescriptor_GetName(PyUpb_DescriptorBase* self,
   return PyUnicode_FromString(upb_FieldDef_Name(self->def));
 }
 
+static char PyUpb_AsciiIsUpper(char ch) { return ch >= 'A' && ch <= 'Z'; }
+
+static char PyUpb_AsciiToLower(char ch) {
+  assert(PyUpb_AsciiIsUpper(ch));
+  return ch + ('a' - 'A');
+}
+
 static PyObject* PyUpb_FieldDescriptor_GetCamelCaseName(
     PyUpb_DescriptorBase* self, void* closure) {
-  // TODO: Ok to use jsonname here?
-  return PyUnicode_FromString(upb_FieldDef_JsonName(self->def));
+  // Camelcase is equivalent to JSON name except for potentially the first
+  // character.
+  const char* name = upb_FieldDef_JsonName(self->def);
+  size_t size = strlen(name);
+  return size > 0 && PyUpb_AsciiIsUpper(name[0])
+             ? PyUnicode_FromFormat("%c%s", PyUpb_AsciiToLower(name[0]),
+                                    name + 1)
+             : PyUnicode_FromStringAndSize(name, size);
 }
 
 static PyObject* PyUpb_FieldDescriptor_GetJsonName(PyUpb_DescriptorBase* self,
@@ -1047,6 +1060,11 @@ static PyObject* PyUpb_FieldDescriptor_GetLabel(PyUpb_DescriptorBase* self,
 static PyObject* PyUpb_FieldDescriptor_GetIsExtension(
     PyUpb_DescriptorBase* self, void* closure) {
   return PyBool_FromLong(upb_FieldDef_IsExtension(self->def));
+}
+
+static PyObject* PyUpb_FieldDescriptor_GetIsPacked(PyUpb_DescriptorBase* self,
+                                                   void* closure) {
+  return PyBool_FromLong(upb_FieldDef_IsPacked(self->def));
 }
 
 static PyObject* PyUpb_FieldDescriptor_GetNumber(PyUpb_DescriptorBase* self,
@@ -1151,6 +1169,7 @@ static PyGetSetDef PyUpb_FieldDescriptor_Getters[] = {
      "Default Value"},
     {"has_default_value", (getter)PyUpb_FieldDescriptor_HasDefaultValue},
     {"is_extension", (getter)PyUpb_FieldDescriptor_GetIsExtension, NULL, "ID"},
+    {"is_packed", (getter)PyUpb_FieldDescriptor_GetIsPacked, NULL, "Is Packed"},
     // TODO
     //{ "id", (getter)GetID, NULL, "ID"},
     {"message_type", (getter)PyUpb_FieldDescriptor_GetMessageType, NULL,

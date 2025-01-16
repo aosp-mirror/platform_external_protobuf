@@ -15,6 +15,7 @@
 
 #include "absl/log/absl_check.h"
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "google/protobuf/compiler/cpp/field.h"
@@ -72,9 +73,8 @@ std::vector<Sub> Vars(const FieldDescriptor* field, const Options& opts,
       {"_weak", weak ? "_weak" : ""},
       Sub("StrongRef",
           !weak ? ""
-                : absl::Substitute("::google::protobuf::internal::StrongReference("
-                                   "reinterpret_cast<const $0&>($1));\n",
-                                   qualified_type, default_ref))
+                : absl::StrCat(
+                      StrongReferenceToType(field->message_type(), opts), ";"))
           .WithSuffix(";"),
   };
 }
@@ -84,7 +84,6 @@ class SingularMessage : public FieldGeneratorBase {
   SingularMessage(const FieldDescriptor* field, const Options& opts,
                   MessageSCCAnalyzer* scc)
       : FieldGeneratorBase(field, opts, scc),
-        field_(field),
         opts_(&opts),
         has_required_(scc->HasRequiredFields(field->message_type())),
         has_hasbit_(HasHasbit(field)) {}
@@ -117,6 +116,7 @@ class SingularMessage : public FieldGeneratorBase {
   void GenerateSerializeWithCachedSizesToArray(io::Printer* p) const override;
   void GenerateByteSize(io::Printer* p) const override;
   void GenerateIsInitialized(io::Printer* p) const override;
+  bool NeedsIsInitialized() const override;
   void GenerateConstexprAggregateInitializer(io::Printer* p) const override;
   void GenerateAggregateInitializer(io::Printer* p) const override;
   void GenerateCopyAggregateInitializer(io::Printer* p) const override;
@@ -143,7 +143,6 @@ class SingularMessage : public FieldGeneratorBase {
  private:
   friend class OneofMessage;
 
-  const FieldDescriptor* field_;
   const Options* opts_;
   bool has_required_;
   bool has_hasbit_;
@@ -311,42 +310,20 @@ void SingularMessage::GenerateInlineAccessorDefinitions(io::Printer* p) const {
 }
 
 void SingularMessage::GenerateClearingCode(io::Printer* p) const {
-  if (!has_hasbit_) {
-    // If we don't have has-bits, message presence is indicated only by ptr !=
-    // nullptr. Thus on clear, we need to delete the object.
-    p->Emit(
-        R"cc(
-          if (GetArena() == nullptr && $field_$ != nullptr) {
-            delete $field_$;
-          }
-          $field_$ = nullptr;
-        )cc");
-  } else {
-    p->Emit(
-        R"cc(
-          if ($field_$ != nullptr) $field_$->Clear();
-        )cc");
-  }
+  ABSL_CHECK(has_hasbit_);
+  p->Emit(
+      R"cc(
+        if ($field_$ != nullptr) $field_$->Clear();
+      )cc");
 }
 
 void SingularMessage::GenerateMessageClearingCode(io::Printer* p) const {
-  if (!has_hasbit_) {
-    // If we don't have has-bits, message presence is indicated only by ptr !=
-    // nullptr. Thus on clear, we need to delete the object.
-    p->Emit(
-        R"cc(
-          if (GetArena() == nullptr && $field_$ != nullptr) {
-            delete $field_$;
-          }
-          $field_$ = nullptr;
-        )cc");
-  } else {
-    p->Emit(
-        R"cc(
-          $DCHK$($field_$ != nullptr);
-          $field_$->Clear();
-        )cc");
-  }
+  ABSL_CHECK(has_hasbit_);
+  p->Emit(
+      R"cc(
+        $DCHK$($field_$ != nullptr);
+        $field_$->Clear();
+      )cc");
 }
 
 bool SingularMessage::RequiresArena(GeneratorFunction function) const {
@@ -409,21 +386,13 @@ void SingularMessage::GenerateDestructorCode(io::Printer* p) const {
 using internal::cpp::HasHasbit;
 
 void SingularMessage::GenerateCopyConstructorCode(io::Printer* p) const {
-  if (has_hasbit_) {
-    p->Emit(R"cc(
-      if ((from.$has_hasbit$) != 0) {
-        _this->$field_$ =
-            $superclass$::CopyConstruct<$Submsg$>(arena, *from.$field_$);
-      }
-    )cc");
-  } else {
-    p->Emit(R"cc(
-      if (from._internal_has_$name$()) {
-        _this->$field_$ =
-            $superclass$::CopyConstruct<$Submsg$>(arena, *from.$field_$);
-      }
-    )cc");
-  }
+  ABSL_CHECK(has_hasbit_);
+  p->Emit(R"cc(
+    if ((from.$has_hasbit$) != 0) {
+      _this->$field_$ =
+          $superclass$::CopyConstruct<$Submsg$>(arena, *from.$field_$);
+    }
+  )cc");
 }
 
 void SingularMessage::GenerateSerializeWithCachedSizesToArray(
@@ -431,41 +400,44 @@ void SingularMessage::GenerateSerializeWithCachedSizesToArray(
   if (!is_group()) {
     p->Emit(R"cc(
       target = $pbi$::WireFormatLite::InternalWrite$declared_type$(
-          $number$, *$field_$, $field_$->GetCachedSize(), target, stream);
+          $number$, *this_.$field_$, this_.$field_$->GetCachedSize(), target,
+          stream);
     )cc");
   } else {
     p->Emit(R"cc(
       target = stream->EnsureSpace(target);
       target = $pbi$::WireFormatLite::InternalWrite$declared_type$(
-          $number$, *$field_$, target, stream);
+          $number$, *this_.$field_$, target, stream);
     )cc");
   }
 }
 
 void SingularMessage::GenerateByteSize(io::Printer* p) const {
   p->Emit(R"cc(
-    total_size +=
-        $tag_size$ + $pbi$::WireFormatLite::$declared_type$Size(*$field_$);
+    total_size += $tag_size$ +
+                  $pbi$::WireFormatLite::$declared_type$Size(*this_.$field_$);
   )cc");
 }
 
 void SingularMessage::GenerateIsInitialized(io::Printer* p) const {
-  if (!has_required_) return;
+  if (!NeedsIsInitialized()) return;
 
   if (HasHasbit(field_)) {
     p->Emit(R"cc(
-      if (($has_hasbit$) != 0) {
-        if (!$field_$->IsInitialized()) return false;
+      if ((this_.$has_hasbit$) != 0) {
+        if (!this_.$field_$->IsInitialized()) return false;
       }
     )cc");
   } else {
     p->Emit(R"cc(
-      if (_internal_has_$name$()) {
-        if (!$field_$->IsInitialized()) return false;
+      if (this_._internal_has_$name$()) {
+        if (!this_.$field_$->IsInitialized()) return false;
       }
     )cc");
   }
 }
+
+bool SingularMessage::NeedsIsInitialized() const { return has_required_; }
 
 void SingularMessage::GenerateConstexprAggregateInitializer(
     io::Printer* p) const {
@@ -507,7 +479,9 @@ class OneofMessage : public SingularMessage {
   void GenerateSwappingCode(io::Printer* p) const override;
   void GenerateDestructorCode(io::Printer* p) const override;
   void GenerateConstructorCode(io::Printer* p) const override;
+  void GenerateCopyConstructorCode(io::Printer* p) const override;
   void GenerateIsInitialized(io::Printer* p) const override;
+  bool NeedsIsInitialized() const override;
   void GenerateMergingCode(io::Printer* p) const override;
   bool RequiresArena(GeneratorFunction func) const override;
 };
@@ -624,10 +598,27 @@ void OneofMessage::GenerateInlineAccessorDefinitions(io::Printer* p) const {
 }
 
 void OneofMessage::GenerateClearingCode(io::Printer* p) const {
-  p->Emit(R"cc(
-    if (GetArena() == nullptr) {
-      delete $field_$;
-    })cc");
+  p->Emit({{"poison_or_clear",
+            [&] {
+              if (HasDescriptorMethods(field_->file(), options_)) {
+                p->Emit(R"cc(
+                  $pbi$::MaybePoisonAfterClear($field_$);
+                )cc");
+              } else {
+                p->Emit(R"cc(
+                  if ($field_$ != nullptr) {
+                    $field_$->Clear();
+                  }
+                )cc");
+              }
+            }}},
+          R"cc(
+            if (GetArena() == nullptr) {
+              delete $field_$;
+            } else if ($pbi$::DebugHardenClearOneofMessageOnArena()) {
+              $poison_or_clear$;
+            }
+          )cc");
 }
 
 void OneofMessage::GenerateMessageClearingCode(io::Printer* p) const {
@@ -648,13 +639,26 @@ void OneofMessage::GenerateConstructorCode(io::Printer* p) const {
   // space only when this field is used.
 }
 
-void OneofMessage::GenerateIsInitialized(io::Printer* p) const {
-  if (!has_required_) return;
-
+void OneofMessage::GenerateCopyConstructorCode(io::Printer* p) const {
+  ABSL_CHECK(!has_hasbit_);
   p->Emit(R"cc(
-    if ($has_field$ && !$field_$->IsInitialized()) return false;
+    if (from._internal_has_$name$()) {
+      _this->$field_$ =
+          $superclass$::CopyConstruct<$Submsg$>(arena, *from.$field_$);
+    }
   )cc");
 }
+
+void OneofMessage::GenerateIsInitialized(io::Printer* p) const {
+  if (!NeedsIsInitialized()) return;
+
+  p->Emit(R"cc(
+    if (this_.$has_field$ && !this_.$field_$->IsInitialized())
+      return false;
+  )cc");
+}
+
+bool OneofMessage::NeedsIsInitialized() const { return has_required_; }
 
 void OneofMessage::GenerateMergingCode(io::Printer* p) const {
   if (is_weak()) {
@@ -689,7 +693,6 @@ class RepeatedMessage : public FieldGeneratorBase {
   RepeatedMessage(const FieldDescriptor* field, const Options& opts,
                   MessageSCCAnalyzer* scc)
       : FieldGeneratorBase(field, opts, scc),
-        field_(field),
         opts_(&opts),
         has_required_(scc->HasRequiredFields(field->message_type())) {}
 
@@ -711,9 +714,9 @@ class RepeatedMessage : public FieldGeneratorBase {
   void GenerateSerializeWithCachedSizesToArray(io::Printer* p) const override;
   void GenerateByteSize(io::Printer* p) const override;
   void GenerateIsInitialized(io::Printer* p) const override;
+  bool NeedsIsInitialized() const override;
 
  private:
-  const FieldDescriptor* field_;
   const Options* opts_;
   bool has_required_;
 };
@@ -951,8 +954,8 @@ void RepeatedMessage::GenerateSerializeWithCachedSizesToArray(
                 }
               }}},
             R"cc(
-              for (auto it = this->$field_$.pointer_begin(),
-                        end = this->$field_$.pointer_end();
+              for (auto it = this_.$field_$.pointer_begin(),
+                        end = this_.$field_$.pointer_end();
                    it < end; ++it) {
                 $serialize_field$;
               }
@@ -963,7 +966,7 @@ void RepeatedMessage::GenerateSerializeWithCachedSizesToArray(
                 if (field_->type() == FieldDescriptor::TYPE_MESSAGE) {
                   p->Emit(
                       R"cc(
-                        const auto& repfield = this->_internal_$name$().Get(i);
+                        const auto& repfield = this_._internal_$name$().Get(i);
                         target =
                             $pbi$::WireFormatLite::InternalWrite$declared_type$(
                                 $number$, repfield, repfield.GetCachedSize(),
@@ -975,14 +978,14 @@ void RepeatedMessage::GenerateSerializeWithCachedSizesToArray(
                         target = stream->EnsureSpace(target);
                         target =
                             $pbi$::WireFormatLite::InternalWrite$declared_type$(
-                                $number$, this->_internal_$name$().Get(i),
+                                $number$, this_._internal_$name$().Get(i),
                                 target, stream);
                       )cc");
                 }
               }}},
             R"cc(
               for (unsigned i = 0, n = static_cast<unsigned>(
-                                       this->_internal_$name$_size());
+                                       this_._internal_$name$_size());
                    i < n; i++) {
                 $serialize_field$;
               }
@@ -993,28 +996,32 @@ void RepeatedMessage::GenerateSerializeWithCachedSizesToArray(
 void RepeatedMessage::GenerateByteSize(io::Printer* p) const {
   p->Emit(
       R"cc(
-        total_size += $tag_size$UL * this->_internal_$name$_size();
-        for (const auto& msg : this->_internal$_weak$_$name$()) {
+        total_size += $tag_size$UL * this_._internal_$name$_size();
+        for (const auto& msg : this_._internal$_weak$_$name$()) {
           total_size += $pbi$::WireFormatLite::$declared_type$Size(msg);
         }
       )cc");
 }
 
 void RepeatedMessage::GenerateIsInitialized(io::Printer* p) const {
-  if (!has_required_) return;
+  if (!NeedsIsInitialized()) return;
 
   if (is_weak()) {
     p->Emit(
         R"cc(
-          if (!$pbi$::AllAreInitializedWeak($field_$.weak)) return false;
+          if (!$pbi$::AllAreInitializedWeak(this_.$field_$.weak))
+            return false;
         )cc");
   } else {
     p->Emit(
         R"cc(
-          if (!$pbi$::AllAreInitialized(_internal_$name$())) return false;
+          if (!$pbi$::AllAreInitialized(this_._internal_$name$()))
+            return false;
         )cc");
   }
 }
+
+bool RepeatedMessage::NeedsIsInitialized() const { return has_required_; }
 }  // namespace
 
 std::unique_ptr<FieldGeneratorBase> MakeSinguarMessageGenerator(

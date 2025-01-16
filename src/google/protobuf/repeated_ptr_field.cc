@@ -93,42 +93,6 @@ void RepeatedPtrFieldBase::DestroyProtos() {
   tagged_rep_or_elem_ = nullptr;
 }
 
-template <typename F>
-void* RepeatedPtrFieldBase::AddInternal(F factory) {
-  Arena* const arena = GetArena();
-  absl::PrefetchToLocalCache(tagged_rep_or_elem_);
-  if (tagged_rep_or_elem_ == nullptr) {
-    ExchangeCurrentSize(1);
-    tagged_rep_or_elem_ = factory(arena);
-    return tagged_rep_or_elem_;
-  }
-  if (using_sso()) {
-    if (current_size_ == 0) {
-      ExchangeCurrentSize(1);
-      return tagged_rep_or_elem_;
-    }
-    void*& result = *InternalExtend(1);
-    result = factory(arena);
-    Rep* r = rep();
-    r->allocated_size = 2;
-    ExchangeCurrentSize(2);
-    return result;
-  }
-  Rep* r = rep();
-  if (PROTOBUF_PREDICT_FALSE(SizeAtCapacity())) {
-    InternalExtend(1);
-    r = rep();
-  } else {
-    if (current_size_ != r->allocated_size) {
-      return r->elements[ExchangeCurrentSize(current_size_ + 1)];
-    }
-  }
-  ++r->allocated_size;
-  void*& result = r->elements[ExchangeCurrentSize(current_size_ + 1)];
-  result = factory(arena);
-  return result;
-}
-
 void* RepeatedPtrFieldBase::AddMessageLite(ElementFactory factory) {
   return AddInternal(factory);
 }
@@ -200,11 +164,8 @@ int RepeatedPtrFieldBase::MergeIntoClearedMessages(
   int count = std::min(ClearedCount(), from.current_size_);
   for (int i = 0; i < count; ++i) {
     ABSL_DCHECK(src[i] != nullptr);
-#if PROTOBUF_RTTI
-    // TODO: remove or replace with a cleaner check.
-    ABSL_DCHECK(typeid(*src[i]) == typeid(*src[0]))
-        << typeid(*src[i]).name() << " vs " << typeid(*src[0]).name();
-#endif
+    ABSL_DCHECK(TypeId::Get(*src[i]) == TypeId::Get(*src[0]))
+        << src[i]->GetTypeName() << " vs " << src[0]->GetTypeName();
     dst[i]->CheckTypeAndMergeFrom(*src[i]);
   }
   return count;
@@ -251,11 +212,8 @@ void RepeatedPtrFieldBase::MergeFrom<MessageLite>(
   Arena* arena = GetArena();
   for (; src < end; ++src, ++dst) {
     ABSL_DCHECK(*src != nullptr);
-#if PROTOBUF_RTTI
-    // TODO: remove or replace with a cleaner check.
-    ABSL_DCHECK(typeid(**src) == typeid(*prototype))
-        << typeid(**src).name() << " vs " << typeid(*prototype).name();
-#endif
+    ABSL_DCHECK(TypeId::Get(**src) == TypeId::Get(*prototype))
+        << (**src).GetTypeName() << " vs " << prototype->GetTypeName();
     *dst = prototype->New(arena);
     (*dst)->CheckTypeAndMergeFrom(**src);
   }
