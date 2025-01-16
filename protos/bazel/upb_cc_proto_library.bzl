@@ -4,36 +4,35 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
 # https://developers.google.com/open-source/licenses/bsd
-
 """Public rules for using upb protos:
   - upb_cc_proto_library()
 """
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
 load("//bazel:upb_proto_library.bzl", "GeneratedSrcsInfo", "UpbWrappedCcInfo", "upb_proto_library_aspect")
+load("//bazel/common:proto_info.bzl", "ProtoInfo")
 
 # begin:google_only
-# load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
+#
+# def upb_use_cpp_toolchain():
+#     # TODO: We shouldn't need to add this to the result of use_cpp_toolchain().
+#     return [
+#         config_common.toolchain_type(
+#             "@bazel_tools//tools/cpp:cc_runtimes_toolchain_type",
+#             mandatory = False,
+#         ),
+#     ] + use_cpp_toolchain()
 #
 # end:google_only
-# begin:github_only
-# Compatibility code for Bazel 4.x. Remove this when we drop support for Bazel 4.x.
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
-def use_cpp_toolchain():
-    return ["@bazel_tools//tools/cpp:toolchain_type"]
+# begin:github_only
+def upb_use_cpp_toolchain():
+    return use_cpp_toolchain()
 
 # end:github_only
 
 # Generic support code #########################################################
-
-# begin:github_only
-_is_google3 = False
-# end:github_only
-
-# begin:google_only
-# _is_google3 = True
-# end:google_only
 
 def _get_real_short_path(file):
     # For some reason, files from other archives have short paths that look like:
@@ -64,11 +63,7 @@ def _generate_output_file(ctx, src, extension):
     return ret
 
 def _filter_none(elems):
-    out = []
-    for elem in elems:
-        if elem:
-            out.append(elem)
-    return out
+    return [e for e in elems if e]
 
 def _cc_library_func(ctx, name, hdrs, srcs, copts, dep_ccinfos):
     """Like cc_library(), but callable from rules.
@@ -84,6 +79,16 @@ def _cc_library_func(ctx, name, hdrs, srcs, copts, dep_ccinfos):
     Returns:
       CcInfo provider for this compilation.
     """
+
+    # begin:google_only
+    #     cc_runtimes_toolchain = ctx.toolchains["@bazel_tools//tools/cpp:cc_runtimes_toolchain_type"]
+    #     if cc_runtimes_toolchain:
+    #         dep_ccinfos += [
+    #             target[CcInfo]
+    #             for target in cc_runtimes_toolchain.cc_runtimes_info.runtimes
+    #         ]
+    #
+    # end:google_only
 
     compilation_contexts = [info.compilation_context for info in dep_ccinfos]
     linking_contexts = [info.linking_context for info in dep_ccinfos]
@@ -235,7 +240,7 @@ _upb_cc_proto_library_aspect = aspect(
         "_gen_upbprotos": attr.label(
             executable = True,
             cfg = "exec",
-            default = "//protos_generator:protoc-gen-upb-protos",
+            default = "//src/google/protobuf/compiler/hpb:protoc-gen-upb-protos",
         ),
         "_protoc": attr.label(
             executable = True,
@@ -267,11 +272,10 @@ _upb_cc_proto_library_aspect = aspect(
     ],
     attr_aspects = ["deps"],
     fragments = ["cpp"],
-    toolchains = use_cpp_toolchain(),
+    toolchains = upb_use_cpp_toolchain(),
 )
 
 upb_cc_proto_library = rule(
-    output_to_genfiles = True,
     implementation = _upb_cc_proto_rule_impl,
     attrs = {
         "deps": attr.label_list(

@@ -18,6 +18,10 @@
 #include "google/protobuf/compiler/ruby/ruby_generator.h"
 #include "google/protobuf/compiler/rust/generator.h"
 
+#ifdef DISABLE_PROTOC_CONFIG
+#include "google/protobuf/compiler/allowlists/allowlist.h"
+#endif  // DISABLE_PROTOC_CONFIG
+
 // Must be included last.
 #include "google/protobuf/port_def.inc"
 
@@ -35,6 +39,9 @@ int ProtobufMain(int argc, char* argv[]) {
 
   CommandLineInterface cli;
   cli.AllowPlugins("protoc-");
+#ifdef GOOGLE_PROTOBUF_RUNTIME_INCLUDE_BASE
+  cli.set_opensource_runtime(true);
+#endif
 
   // Proto2 C++
   cpp::CppGenerator cpp_generator;
@@ -101,6 +108,9 @@ int ProtobufMain(int argc, char* argv[]) {
   rust::RustGenerator rust_generator;
   cli.RegisterGenerator("--rust_out", "--rust_opt", &rust_generator,
                         "Generate Rust sources.");
+#ifdef DISABLE_PROTOC_CONFIG
+  auto cleanup = internal::DisableAllowlistInternalOnly();
+#endif  // DISABLE_PROTOC_CONFIG
   return cli.Run(argc, argv);
 }
 
@@ -110,12 +120,12 @@ int ProtobufMain(int argc, char* argv[]) {
 
 #ifdef _MSC_VER
 std::string ToMultiByteUtf8String(const wchar_t* input) {
-  int size =
-      WideCharToMultiByte(CP_UTF8, 0, input, wcslen(input), 0, 0, NULL, NULL);
+  int size = WideCharToMultiByte(CP_UTF8, 0, input, wcslen(input), 0, 0,
+                                 nullptr, nullptr);
   std::string result(size, 0);
   if (size)
     WideCharToMultiByte(CP_UTF8, 0, input, wcslen(input), &result[0], size,
-                        NULL, NULL);
+                        nullptr, nullptr);
   return result;
 }
 
@@ -133,3 +143,5 @@ int main(int argc, char* argv[]) {
   return google::protobuf::compiler::ProtobufMain(argc, argv);
 }
 #endif
+
+#include "google/protobuf/port_undef.inc"

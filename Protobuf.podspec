@@ -5,7 +5,7 @@
 # dependent projects use the :git notation to refer to the library.
 Pod::Spec.new do |s|
   s.name     = 'Protobuf'
-  s.version  = '3.26.2'
+  s.version  = '3.28.4'
   s.summary  = 'Protocol Buffers v.3 runtime library for Objective-C.'
   s.homepage = 'https://github.com/protocolbuffers/protobuf'
   s.license  = 'BSD-3-Clause'
@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
   s.source = { :git => 'https://github.com/protocolbuffers/protobuf.git',
                :tag => "v#{s.version}" }
 
-  s.source_files = 'objectivec/*.{h,m}',
+  s.source_files = 'objectivec/*.{h,m,swift}',
                    'objectivec/google/protobuf/Any.pbobjc.h',
                    'objectivec/google/protobuf/Api.pbobjc.h',
                    'objectivec/google/protobuf/Duration.pbobjc.h',
@@ -33,6 +33,9 @@ Pod::Spec.new do |s|
   # left out, as it's an umbrella implementation file.
   s.exclude_files = 'objectivec/GPBProtocolBuffers.m'
 
+  # Now that there is a Swift source file, set a version.
+  s.swift_version = '5.0'
+
   s.resource_bundle = {
     "Protobuf_Privacy" => "PrivacyInfo.xcprivacy"
   }
@@ -45,6 +48,7 @@ Pod::Spec.new do |s|
   s.osx.deployment_target = '10.12'
   s.tvos.deployment_target = '12.0'
   s.watchos.deployment_target = '6.0'
+  s.visionos.deployment_target = '1.0'
   s.requires_arc = false
 
   # The unittest need the generate sources from the testing related .proto

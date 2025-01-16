@@ -7,80 +7,178 @@
 
 // Rust Protobuf runtime using the C++ kernel.
 
-use crate::__internal::{Enum, Private, PtrAndLen, RawArena, RawMap, RawMessage, RawRepeatedField};
+use crate::__internal::{Enum, Private};
 use crate::{
-    Map, Mut, ProtoStr, Proxied, ProxiedInMapValue, ProxiedInRepeated, Repeated, RepeatedMut,
-    RepeatedView, SettableValue, View,
+    IntoProxied, Map, MapIter, Mut, ProtoBytes, ProtoStr, ProtoString, Proxied, ProxiedInMapValue,
+    ProxiedInRepeated, Repeated, RepeatedMut, RepeatedView, View,
 };
 use core::fmt::Debug;
 use paste::paste;
-use std::alloc::Layout;
-use std::cell::UnsafeCell;
 use std::convert::identity;
-use std::ffi::c_int;
+use std::ffi::{c_int, c_void};
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
+use std::slice;
 
-/// A wrapper over a `proto2::Arena`.
+/// Defines a set of opaque, unique, non-accessible pointees.
 ///
-/// This is not a safe wrapper per se, because the allocation functions still
-/// have sharp edges (see their safety docs for more info).
-///
-/// This is an owning type and will automatically free the arena when
-/// dropped.
-///
-/// Note that this type is neither `Sync` nor `Send`.
+/// The [Rustonomicon][nomicon] currently recommends a zero-sized struct,
+/// though this should use [`extern type`] when that is stabilized.
+/// [nomicon]: https://doc.rust-lang.org/nomicon/ffi.html#representing-opaque-structs
+/// [`extern type`]: https://github.com/rust-lang/rust/issues/43467
+mod _opaque_pointees {
+    /// Opaque pointee for [`RawMessage`]
+    ///
+    /// This type is not meant to be dereferenced in Rust code.
+    /// It is only meant to provide type safety for raw pointers
+    /// which are manipulated behind FFI.
+    ///
+    /// [`RawMessage`]: super::RawMessage
+    #[repr(C)]
+    pub struct RawMessageData {
+        _data: [u8; 0],
+        _marker: std::marker::PhantomData<(*mut u8, ::std::marker::PhantomPinned)>,
+    }
+
+    /// Opaque pointee for [`RawRepeatedField`]
+    ///
+    /// This type is not meant to be dereferenced in Rust code.
+    /// It is only meant to provide type safety for raw pointers
+    /// which are manipulated behind FFI.
+    #[repr(C)]
+    pub struct RawRepeatedFieldData {
+        _data: [u8; 0],
+        _marker: std::marker::PhantomData<(*mut u8, ::std::marker::PhantomPinned)>,
+    }
+
+    /// Opaque pointee for [`RawMap`]
+    ///
+    /// This type is not meant to be dereferenced in Rust code.
+    /// It is only meant to provide type safety for raw pointers
+    /// which are manipulated behind FFI.
+    #[repr(C)]
+    pub struct RawMapData {
+        _data: [u8; 0],
+        _marker: std::marker::PhantomData<(*mut u8, ::std::marker::PhantomPinned)>,
+    }
+
+    /// Opaque pointee for [`CppStdString`]
+    ///
+    /// This type is not meant to be dereferenced in Rust code.
+    /// It is only meant to provide type safety for raw pointers
+    /// which are manipulated behind FFI.
+    #[repr(C)]
+    pub struct CppStdStringData {
+        _data: [u8; 0],
+        _marker: std::marker::PhantomData<(*mut u8, ::std::marker::PhantomPinned)>,
+    }
+}
+
+/// A raw pointer to the underlying message for this runtime.
+pub type RawMessage = NonNull<_opaque_pointees::RawMessageData>;
+
+/// A raw pointer to the underlying repeated field container for this runtime.
+pub type RawRepeatedField = NonNull<_opaque_pointees::RawRepeatedFieldData>;
+
+/// A raw pointer to the underlying arena for this runtime.
+pub type RawMap = NonNull<_opaque_pointees::RawMapData>;
+
+/// A raw pointer to a std::string.
+pub type CppStdString = NonNull<_opaque_pointees::CppStdStringData>;
+
+/// Kernel-specific owned `string` and `bytes` field type.
 #[derive(Debug)]
-pub struct Arena {
-    #[allow(dead_code)]
-    ptr: RawArena,
-    _not_sync: PhantomData<UnsafeCell<()>>,
+pub struct InnerProtoString {
+    owned_ptr: CppStdString,
 }
 
-impl Arena {
-    /// Allocates a fresh arena.
-    #[inline]
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self { ptr: NonNull::dangling(), _not_sync: PhantomData }
-    }
-
-    /// Returns the raw, C++-managed pointer to the arena.
-    #[inline]
-    pub fn raw(&self) -> ! {
-        unimplemented!()
-    }
-
-    /// Allocates some memory on the arena.
-    ///
-    /// # Safety
-    ///
-    /// TODO alignment requirement for layout
-    #[inline]
-    pub unsafe fn alloc(&self, _layout: Layout) -> &mut [MaybeUninit<u8>] {
-        unimplemented!()
-    }
-
-    /// Resizes some memory on the arena.
-    ///
-    /// # Safety
-    ///
-    /// After calling this function, `ptr` is essentially zapped. `old` must
-    /// be the layout `ptr` was allocated with via [`Arena::alloc()`].
-    /// TODO alignment for layout
-    #[inline]
-    pub unsafe fn resize(&self, _ptr: *mut u8, _old: Layout, _new: Layout) -> &[MaybeUninit<u8>] {
-        unimplemented!()
-    }
-}
-
-impl Drop for Arena {
-    #[inline]
+impl Drop for InnerProtoString {
     fn drop(&mut self) {
-        // unimplemented
+        // SAFETY: `self.owned_ptr` points to a valid std::string object.
+        unsafe {
+            proto2_rust_cpp_delete_string(self.owned_ptr);
+        }
+    }
+}
+
+impl InnerProtoString {
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        // SAFETY: `self.owned_ptr` points to a valid std::string object.
+        unsafe { proto2_rust_cpp_string_to_view(self.owned_ptr).as_ref() }
+    }
+
+    pub fn into_raw(self, _private: Private) -> CppStdString {
+        let s = ManuallyDrop::new(self);
+        s.owned_ptr
+    }
+}
+
+impl From<&[u8]> for InnerProtoString {
+    fn from(val: &[u8]) -> Self {
+        // SAFETY: `val` is valid byte slice.
+        let owned_ptr: CppStdString = unsafe { proto2_rust_cpp_new_string(val.into()) };
+        InnerProtoString { owned_ptr }
+    }
+}
+
+extern "C" {
+    fn proto2_rust_cpp_new_string(src: PtrAndLen) -> CppStdString;
+    fn proto2_rust_cpp_delete_string(src: CppStdString);
+    fn proto2_rust_cpp_string_to_view(src: CppStdString) -> PtrAndLen;
+}
+
+/// Represents an ABI-stable version of `NonNull<[u8]>`/`string_view` (a
+/// borrowed slice of bytes) for FFI use only.
+///
+/// Has semantics similar to `std::string_view` in C++ and `&[u8]` in Rust,
+/// but is not ABI-compatible with either.
+///
+/// If `len` is 0, then `ptr` can be null or dangling. C++ considers a dangling
+/// 0-len `std::string_view` to be invalid, and Rust considers a `&[u8]` with a
+/// null data pointer to be invalid.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct PtrAndLen {
+    /// Pointer to the first byte.
+    /// Borrows the memory.
+    pub ptr: *const u8,
+
+    /// Length of the `[u8]` pointed to by `ptr`.
+    pub len: usize,
+}
+
+impl PtrAndLen {
+    /// Unsafely dereference this slice.
+    ///
+    /// # Safety
+    /// - `self.ptr` must be dereferencable and immutable for `self.len` bytes
+    ///   for the lifetime `'a`. It can be null or dangling if `self.len == 0`.
+    pub unsafe fn as_ref<'a>(self) -> &'a [u8] {
+        if self.ptr.is_null() {
+            assert_eq!(self.len, 0, "Non-empty slice with null data pointer");
+            &[]
+        } else {
+            // SAFETY:
+            // - `ptr` is non-null
+            // - `ptr` is valid for `len` bytes as promised by the caller.
+            unsafe { slice::from_raw_parts(self.ptr, self.len) }
+        }
+    }
+}
+
+impl From<&[u8]> for PtrAndLen {
+    fn from(slice: &[u8]) -> Self {
+        Self { ptr: slice.as_ptr(), len: slice.len() }
+    }
+}
+
+impl From<&ProtoStr> for PtrAndLen {
+    fn from(s: &ProtoStr) -> Self {
+        let bytes = s.as_bytes();
+        Self { ptr: bytes.as_ptr(), len: bytes.len() }
     }
 }
 
@@ -97,6 +195,10 @@ pub struct SerializedData {
 }
 
 impl SerializedData {
+    pub fn new() -> Self {
+        Self { data: NonNull::dangling(), len: 0 }
+    }
+
     /// Constructs owned serialized data from raw components.
     ///
     /// # Safety
@@ -116,6 +218,28 @@ impl SerializedData {
     /// Gets a mutable raw slice pointer.
     fn as_mut_ptr(&mut self) -> *mut [u8] {
         ptr::slice_from_raw_parts_mut(self.data.as_ptr(), self.len)
+    }
+
+    /// Converts into a Vec<u8>.
+    pub fn into_vec(self) -> Vec<u8> {
+        // We need to prevent self from being dropped, because we are going to transfer
+        // ownership of self.data to the Vec<u8>.
+        let s = ManuallyDrop::new(self);
+
+        unsafe {
+            // SAFETY:
+            // - `data` was allocated by the Rust global allocator.
+            // - `data` was allocated with an alignment of 1 for u8.
+            // - The allocated size was `len`.
+            // - The length and capacity are equal.
+            // - All `len` bytes are initialized.
+            // - The capacity (`len` in this case) is the size the pointer was allocated
+            //   with.
+            // - The allocated size is no more than isize::MAX, because the protobuf
+            //   serializer will refuse to serialize a message if the output would exceed
+            //   2^31 - 1 bytes.
+            Vec::<u8>::from_raw_parts(s.data.as_ptr(), s.len, s.len)
+        }
     }
 }
 
@@ -142,21 +266,48 @@ impl fmt::Debug for SerializedData {
     }
 }
 
-impl SettableValue<[u8]> for SerializedData {
-    fn set_on<'msg>(self, _private: Private, mut mutator: Mut<'msg, [u8]>)
-    where
-        [u8]: 'msg,
-    {
-        mutator.set(self.as_ref())
+/// A type to transfer an owned Rust string across the FFI boundary:
+///   * This struct is ABI-compatible with the equivalent C struct.
+///   * It owns its data but does not drop it. Immediately turn it into a
+///     `String` by calling `.into()` on it.
+///   * `.data` points to a valid UTF-8 string that has been allocated with the
+///     Rust allocator and is 1-byte aligned.
+///   * `.data` contains exactly `.len` bytes.
+///   * The empty string is represented as `.data.is_null() == true`.
+#[repr(C)]
+pub struct RustStringRawParts {
+    data: *const u8,
+    len: usize,
+}
+
+impl From<RustStringRawParts> for String {
+    fn from(value: RustStringRawParts) -> Self {
+        if value.data.is_null() {
+            // Handle the case where the string is empty.
+            return String::new();
+        }
+        // SAFETY:
+        //  - `value.data` contains valid UTF-8 bytes as promised by
+        //    `RustStringRawParts`.
+        //  - `value.data` has been allocated with the Rust allocator and is 1-byte
+        //    aligned as promised by `RustStringRawParts`.
+        //  - `value.data` contains and is allocated for exactly `value.len` bytes.
+        unsafe { String::from_raw_parts(value.data as *mut u8, value.len, value.len) }
     }
 }
 
-pub type MessagePresentMutData<'msg, T> = crate::vtable::RawVTableOptionalMutatorData<'msg, T>;
-pub type MessageAbsentMutData<'msg, T> = crate::vtable::RawVTableOptionalMutatorData<'msg, T>;
-pub type BytesPresentMutData<'msg> = crate::vtable::RawVTableOptionalMutatorData<'msg, [u8]>;
-pub type BytesAbsentMutData<'msg> = crate::vtable::RawVTableOptionalMutatorData<'msg, [u8]>;
-pub type InnerBytesMut<'msg> = crate::vtable::RawVTableMutator<'msg, [u8]>;
-pub type InnerPrimitiveMut<'msg, T> = crate::vtable::RawVTableMutator<'msg, T>;
+extern "C" {
+    fn proto2_rust_utf8_debug_string(msg: RawMessage) -> RustStringRawParts;
+}
+
+pub fn debug_string(_private: Private, msg: RawMessage, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    // SAFETY:
+    // - `msg` is a valid protobuf message.
+    let dbg_str: String = unsafe { proto2_rust_utf8_debug_string(msg) }.into();
+    write!(f, "{dbg_str}")
+}
+
+pub type RawMapIter = UntypedMapIterator;
 
 /// The raw contents of every generated message.
 #[derive(Debug)]
@@ -194,20 +345,32 @@ impl<'msg> MutatorMessageRef<'msg> {
         _parent_msg: MutatorMessageRef<'msg>,
         message_field_ptr: RawMessage,
     ) -> Self {
-        MutatorMessageRef { msg: message_field_ptr, _phantom: PhantomData }
+        Self { msg: message_field_ptr, _phantom: PhantomData }
     }
 
     pub fn msg(&self) -> RawMessage {
         self.msg
     }
+
+    pub fn from_raw_msg(_private: Private, msg: &RawMessage) -> Self {
+        Self { msg: *msg, _phantom: PhantomData }
+    }
 }
 
-pub fn copy_bytes_in_arena_if_needed_by_runtime<'msg>(
-    _msg_ref: MutatorMessageRef<'msg>,
-    val: &'msg [u8],
-) -> &'msg [u8] {
-    // Nothing to do, the message manages its own string memory for C++.
-    val
+/// The raw type-erased version of an owned `Repeated`.
+#[derive(Debug)]
+pub struct InnerRepeated {
+    raw: RawRepeatedField,
+}
+
+impl InnerRepeated {
+    pub fn as_mut(&mut self) -> InnerRepeatedMut<'_> {
+        InnerRepeatedMut::new(Private, self.raw)
+    }
+
+    pub fn raw(&self) -> RawRepeatedField {
+        self.raw
+    }
 }
 
 /// The raw type-erased pointer version of `RepeatedMut`.
@@ -227,18 +390,25 @@ impl<'msg> InnerRepeatedMut<'msg> {
 }
 
 trait CppTypeConversions: Proxied {
+    type InsertElemType;
     type ElemType;
 
     fn elem_to_view<'msg>(v: Self::ElemType) -> View<'msg, Self>;
+    fn into_insertelem(v: Self) -> Self::InsertElemType;
 }
 
 macro_rules! impl_cpp_type_conversions_for_scalars {
     ($($t:ty),* $(,)?) => {
         $(
             impl CppTypeConversions for $t {
+                type InsertElemType = Self;
                 type ElemType = Self;
 
                 fn elem_to_view<'msg>(v: Self) -> View<'msg, Self> {
+                    v
+                }
+
+                fn into_insertelem(v: Self) -> Self {
                     v
                 }
             }
@@ -248,25 +418,31 @@ macro_rules! impl_cpp_type_conversions_for_scalars {
 
 impl_cpp_type_conversions_for_scalars!(i32, u32, i64, u64, f32, f64, bool);
 
-impl CppTypeConversions for ProtoStr {
+impl CppTypeConversions for ProtoString {
+    type InsertElemType = CppStdString;
     type ElemType = PtrAndLen;
 
-    fn elem_to_view<'msg>(v: PtrAndLen) -> View<'msg, ProtoStr> {
+    fn elem_to_view<'msg>(v: PtrAndLen) -> View<'msg, ProtoString> {
         ptrlen_to_str(v)
+    }
+
+    fn into_insertelem(v: Self) -> CppStdString {
+        v.into_inner(Private).into_raw(Private)
     }
 }
 
-impl CppTypeConversions for [u8] {
+impl CppTypeConversions for ProtoBytes {
+    type InsertElemType = CppStdString;
     type ElemType = PtrAndLen;
 
     fn elem_to_view<'msg>(v: Self::ElemType) -> View<'msg, Self> {
         ptrlen_to_bytes(v)
     }
-}
 
-// This type alias is used so macros can generate valid extern "C" symbol names
-// for functions working with [u8] types.
-type Bytes = [u8];
+    fn into_insertelem(v: Self) -> CppStdString {
+        v.into_inner(Private).into_raw(Private)
+    }
+}
 
 macro_rules! impl_repeated_primitives {
     (@impl $($t:ty => [
@@ -277,13 +453,14 @@ macro_rules! impl_repeated_primitives {
         $get_thunk:ident,
         $set_thunk:ident,
         $clear_thunk:ident,
-        $copy_from_thunk:ident $(,)?
+        $copy_from_thunk:ident,
+        $reserve_thunk:ident $(,)?
     ]),* $(,)?) => {
         $(
             extern "C" {
                 fn $new_thunk() -> RawRepeatedField;
                 fn $free_thunk(f: RawRepeatedField);
-                fn $add_thunk(f: RawRepeatedField, v: <$t as CppTypeConversions>::ElemType);
+                fn $add_thunk(f: RawRepeatedField, v: <$t as CppTypeConversions>::InsertElemType);
                 fn $size_thunk(f: RawRepeatedField) -> usize;
                 fn $get_thunk(
                     f: RawRepeatedField,
@@ -291,40 +468,55 @@ macro_rules! impl_repeated_primitives {
                 fn $set_thunk(
                     f: RawRepeatedField,
                     i: usize,
-                    v: <$t as CppTypeConversions>::ElemType);
+                    v: <$t as CppTypeConversions>::InsertElemType);
                 fn $clear_thunk(f: RawRepeatedField);
                 fn $copy_from_thunk(src: RawRepeatedField, dst: RawRepeatedField);
+                fn $reserve_thunk(
+                    f: RawRepeatedField,
+                    additional: usize);
             }
 
             unsafe impl ProxiedInRepeated for $t {
                 #[allow(dead_code)]
+                #[inline]
                 fn repeated_new(_: Private) -> Repeated<$t> {
-                    unsafe {
-                        Repeated::from_inner(InnerRepeatedMut::new(Private, $new_thunk()))
-                    }
+                    Repeated::from_inner(InnerRepeated {
+                        raw: unsafe { $new_thunk() }
+                    })
                 }
                 #[allow(dead_code)]
+                #[inline]
                 unsafe fn repeated_free(_: Private, f: &mut Repeated<$t>) {
                     unsafe { $free_thunk(f.as_mut().as_raw(Private)) }
                 }
+                #[inline]
                 fn repeated_len(f: View<Repeated<$t>>) -> usize {
                     unsafe { $size_thunk(f.as_raw(Private)) }
                 }
-                fn repeated_push(mut f: Mut<Repeated<$t>>, v: View<$t>) {
-                    unsafe { $add_thunk(f.as_raw(Private), v.into()) }
+                #[inline]
+                fn repeated_push(mut f: Mut<Repeated<$t>>, v: impl IntoProxied<$t>) {
+                    unsafe { $add_thunk(f.as_raw(Private), <$t as CppTypeConversions>::into_insertelem(v.into_proxied(Private))) }
                 }
+                #[inline]
                 fn repeated_clear(mut f: Mut<Repeated<$t>>) {
                     unsafe { $clear_thunk(f.as_raw(Private)) }
                 }
+                #[inline]
                 unsafe fn repeated_get_unchecked(f: View<Repeated<$t>>, i: usize) -> View<$t> {
                     <$t as CppTypeConversions>::elem_to_view(
                         unsafe { $get_thunk(f.as_raw(Private), i) })
                 }
-                unsafe fn repeated_set_unchecked(mut f: Mut<Repeated<$t>>, i: usize, v: View<$t>) {
-                    unsafe { $set_thunk(f.as_raw(Private), i, v.into()) }
+                #[inline]
+                unsafe fn repeated_set_unchecked(mut f: Mut<Repeated<$t>>, i: usize, v: impl IntoProxied<$t>) {
+                    unsafe { $set_thunk(f.as_raw(Private), i, <$t as CppTypeConversions>::into_insertelem(v.into_proxied(Private))) }
                 }
+                #[inline]
                 fn repeated_copy_from(src: View<Repeated<$t>>, mut dest: Mut<Repeated<$t>>) {
                     unsafe { $copy_from_thunk(src.as_raw(Private), dest.as_raw(Private)) }
+                }
+                #[inline]
+                fn repeated_reserve(mut f: Mut<Repeated<$t>>, additional: usize) {
+                    unsafe { $reserve_thunk(f.as_raw(Private), additional) }
                 }
             }
         )*
@@ -333,21 +525,22 @@ macro_rules! impl_repeated_primitives {
         paste!{
             impl_repeated_primitives!(@impl $(
                 $t => [
-                    [< __pb_rust_RepeatedField_ $t _new >],
-                    [< __pb_rust_RepeatedField_ $t _free >],
-                    [< __pb_rust_RepeatedField_ $t _add >],
-                    [< __pb_rust_RepeatedField_ $t _size >],
-                    [< __pb_rust_RepeatedField_ $t _get >],
-                    [< __pb_rust_RepeatedField_ $t _set >],
-                    [< __pb_rust_RepeatedField_ $t _clear >],
-                    [< __pb_rust_RepeatedField_ $t _copy_from >],
+                    [< proto2_rust_RepeatedField_ $t _new >],
+                    [< proto2_rust_RepeatedField_ $t _free >],
+                    [< proto2_rust_RepeatedField_ $t _add >],
+                    [< proto2_rust_RepeatedField_ $t _size >],
+                    [< proto2_rust_RepeatedField_ $t _get >],
+                    [< proto2_rust_RepeatedField_ $t _set >],
+                    [< proto2_rust_RepeatedField_ $t _clear >],
+                    [< proto2_rust_RepeatedField_ $t _copy_from >],
+                    [< proto2_rust_RepeatedField_ $t _reserve >],
                 ],
             )*);
         }
     };
 }
 
-impl_repeated_primitives!(i32, u32, i64, u64, f32, f64, bool, ProtoStr, Bytes);
+impl_repeated_primitives!(i32, u32, i64, u64, f32, f64, bool, ProtoString, ProtoBytes);
 
 /// Cast a `RepeatedView<SomeEnum>` to `RepeatedView<c_int>`.
 pub fn cast_enum_repeated_view<E: Enum + ProxiedInRepeated>(
@@ -377,29 +570,148 @@ pub fn cast_enum_repeated_mut<E: Enum + ProxiedInRepeated>(
     }
 }
 
+/// Cast a `RepeatedMut<SomeEnum>` to `RepeatedMut<c_int>` and call
+/// repeated_reserve.
+pub fn reserve_enum_repeated_mut<E: Enum + ProxiedInRepeated>(
+    private: Private,
+    repeated: RepeatedMut<E>,
+    additional: usize,
+) {
+    let int_repeated = cast_enum_repeated_mut(private, repeated);
+    ProxiedInRepeated::repeated_reserve(int_repeated, additional);
+}
+
+#[derive(Debug)]
+pub struct InnerMap {
+    pub(crate) raw: RawMap,
+}
+
+impl InnerMap {
+    pub fn new(_private: Private, raw: RawMap) -> Self {
+        Self { raw }
+    }
+
+    pub fn as_mut(&mut self) -> InnerMapMut<'_> {
+        InnerMapMut { raw: self.raw, _phantom: PhantomData }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct InnerMapMut<'msg> {
     pub(crate) raw: RawMap,
     _phantom: PhantomData<&'msg ()>,
 }
 
+#[doc(hidden)]
 impl<'msg> InnerMapMut<'msg> {
     pub fn new(_private: Private, raw: RawMap) -> Self {
         InnerMapMut { raw, _phantom: PhantomData }
     }
+
+    #[doc(hidden)]
+    pub fn as_raw(&self, _private: Private) -> RawMap {
+        self.raw
+    }
+}
+
+/// An untyped iterator in a map, produced via `.cbegin()` on a typed map.
+///
+/// This struct is ABI-compatible with `proto2::internal::UntypedMapIterator`.
+/// It is trivially constructible and destructible.
+#[repr(C)]
+pub struct UntypedMapIterator {
+    node: *mut c_void,
+    map: *const c_void,
+    bucket_index: u32,
+}
+
+impl UntypedMapIterator {
+    /// Returns `true` if this iterator is at the end of the map.
+    fn at_end(&self) -> bool {
+        // This behavior is verified via test `IteratorNodeFieldIsNullPtrAtEnd`.
+        self.node.is_null()
+    }
+
+    /// Assumes that the map iterator is for the input types, gets the current
+    /// entry, and moves the iterator forward to the next entry.
+    ///
+    /// Conversion to and from FFI types is provided by the user.
+    /// This is a helper function for implementing
+    /// `ProxiedInMapValue::iter_next`.
+    ///
+    /// # Safety
+    /// - The backing map must be valid and not be mutated for `'a`.
+    /// - The thunk must be safe to call if the iterator is not at the end of
+    ///   the map.
+    /// - The thunk must always write to the `key` and `value` fields, but not
+    ///   read from them.
+    /// - The get thunk must not move the iterator forward or backward.
+    #[inline(always)]
+    pub unsafe fn next_unchecked<'a, K, V, FfiKey, FfiValue>(
+        &mut self,
+        _private: Private,
+        iter_get_thunk: unsafe extern "C" fn(
+            iter: &mut UntypedMapIterator,
+            key: *mut FfiKey,
+            value: *mut FfiValue,
+        ),
+        from_ffi_key: impl FnOnce(FfiKey) -> View<'a, K>,
+        from_ffi_value: impl FnOnce(FfiValue) -> View<'a, V>,
+    ) -> Option<(View<'a, K>, View<'a, V>)>
+    where
+        K: Proxied + ?Sized + 'a,
+        V: ProxiedInMapValue<K> + ?Sized + 'a,
+    {
+        if self.at_end() {
+            return None;
+        }
+        let mut ffi_key = MaybeUninit::uninit();
+        let mut ffi_value = MaybeUninit::uninit();
+        // SAFETY:
+        // - The backing map outlives `'a`.
+        // - The iterator is not at the end (node is non-null).
+        // - `ffi_key` and `ffi_value` are not read (as uninit) as promised by the
+        //   caller.
+        unsafe { (iter_get_thunk)(self, ffi_key.as_mut_ptr(), ffi_value.as_mut_ptr()) }
+
+        // SAFETY:
+        // - The backing map is alive as promised by the caller.
+        // - `self.at_end()` is false and the `get` does not change that.
+        // - `UntypedMapIterator` has the same ABI as
+        //   `proto2::internal::UntypedMapIterator`. It is statically checked to be:
+        //   - Trivially copyable.
+        //   - Trivially destructible.
+        //   - Standard layout.
+        //   - The size and alignment of the Rust type above.
+        //   - With the `node_` field first.
+        unsafe { proto2_rust_thunk_UntypedMapIterator_increment(self) }
+
+        // SAFETY:
+        // - The `get` function always writes valid values to `ffi_key` and `ffi_value`
+        //   as promised by the caller.
+        unsafe {
+            Some((from_ffi_key(ffi_key.assume_init()), from_ffi_value(ffi_value.assume_init())))
+        }
+    }
+}
+
+extern "C" {
+    fn proto2_rust_thunk_UntypedMapIterator_increment(iter: &mut UntypedMapIterator);
 }
 
 macro_rules! impl_ProxiedInMapValue_for_non_generated_value_types {
-    ($key_t:ty, $ffi_key_t:ty, $to_ffi_key:expr, for $($t:ty, $ffi_t:ty, $to_ffi_value:expr, $from_ffi_value:expr, $zero_val:literal;)*) => {
+    ($key_t:ty, $ffi_key_t:ty, $to_ffi_key:expr, $from_ffi_key:expr, for $($t:ty, $ffi_view_t:ty, $ffi_value_t:ty, $to_ffi_value:expr, $from_ffi_value:expr;)*) => {
         paste! { $(
             extern "C" {
-                fn [< __pb_rust_Map_ $key_t _ $t _new >]() -> RawMap;
-                fn [< __pb_rust_Map_ $key_t _ $t _free >](m: RawMap);
-                fn [< __pb_rust_Map_ $key_t _ $t _clear >](m: RawMap);
-                fn [< __pb_rust_Map_ $key_t _ $t _size >](m: RawMap) -> usize;
-                fn [< __pb_rust_Map_ $key_t _ $t _insert >](m: RawMap, key: $ffi_key_t, value: $ffi_t);
-                fn [< __pb_rust_Map_ $key_t _ $t _get >](m: RawMap, key: $ffi_key_t, value: *mut $ffi_t) -> bool;
-                fn [< __pb_rust_Map_ $key_t _ $t _remove >](m: RawMap, key: $ffi_key_t, value: *mut $ffi_t) -> bool;
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _new >]() -> RawMap;
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _free >](m: RawMap);
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _clear >](m: RawMap);
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _size >](m: RawMap) -> usize;
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _insert >](m: RawMap, key: $ffi_key_t, value: $ffi_value_t) -> bool;
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _get >](m: RawMap, key: $ffi_key_t, value: *mut $ffi_view_t) -> bool;
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _iter >](m: RawMap) -> UntypedMapIterator;
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _iter_get >](iter: &mut UntypedMapIterator, key: *mut $ffi_key_t, value: *mut $ffi_view_t);
+                fn [< proto2_rust_thunk_Map_ $key_t _ $t _remove >](m: RawMap, key: $ffi_key_t, value: *mut $ffi_view_t) -> bool;
             }
 
             impl ProxiedInMapValue<$key_t> for $t {
@@ -407,9 +719,8 @@ macro_rules! impl_ProxiedInMapValue_for_non_generated_value_types {
                     unsafe {
                         Map::from_inner(
                             Private,
-                            InnerMapMut {
-                                raw: [< __pb_rust_Map_ $key_t _ $t _new >](),
-                                _phantom: PhantomData
+                            InnerMap {
+                                raw: [< proto2_rust_thunk_Map_ $key_t _ $t _new >](),
                             }
                         )
                     }
@@ -419,39 +730,71 @@ macro_rules! impl_ProxiedInMapValue_for_non_generated_value_types {
                     // SAFETY:
                     // - `map.inner.raw` is a live `RawMap`
                     // - This function is only called once for `map` in `Drop`.
-                    unsafe { [< __pb_rust_Map_ $key_t _ $t _free >](map.inner.raw); }
+                    unsafe { [< proto2_rust_thunk_Map_ $key_t _ $t _free >](map.as_mut().as_raw(Private)); }
                 }
 
 
-                fn map_clear(map: Mut<'_, Map<$key_t, Self>>) {
-                    unsafe { [< __pb_rust_Map_ $key_t _ $t _clear >](map.inner.raw); }
+                fn map_clear(mut map: Mut<'_, Map<$key_t, Self>>) {
+                    unsafe { [< proto2_rust_thunk_Map_ $key_t _ $t _clear >](map.as_raw(Private)); }
                 }
 
                 fn map_len(map: View<'_, Map<$key_t, Self>>) -> usize {
-                    unsafe { [< __pb_rust_Map_ $key_t _ $t _size >](map.raw) }
+                    unsafe { [< proto2_rust_thunk_Map_ $key_t _ $t _size >](map.as_raw(Private)) }
                 }
 
-                fn map_insert(map: Mut<'_, Map<$key_t, Self>>, key: View<'_, $key_t>, value: View<'_, Self>) -> bool {
+                fn map_insert(mut map: Mut<'_, Map<$key_t, Self>>, key: View<'_, $key_t>, value: impl IntoProxied<Self>) -> bool {
                     let ffi_key = $to_ffi_key(key);
-                    let ffi_value = $to_ffi_value(value);
-                    unsafe { [< __pb_rust_Map_ $key_t _ $t _insert >](map.inner.raw, ffi_key, ffi_value) }
-                    true
+                    let ffi_value = $to_ffi_value(value.into_proxied(Private));
+                    unsafe { [< proto2_rust_thunk_Map_ $key_t _ $t _insert >](map.as_raw(Private), ffi_key, ffi_value) }
                 }
 
                 fn map_get<'a>(map: View<'a, Map<$key_t, Self>>, key: View<'_, $key_t>) -> Option<View<'a, Self>> {
                     let ffi_key = $to_ffi_key(key);
-                    let mut ffi_value = $to_ffi_value($zero_val);
-                    let found = unsafe { [< __pb_rust_Map_ $key_t _ $t _get >](map.raw, ffi_key, &mut ffi_value) };
+                    let mut ffi_value = MaybeUninit::uninit();
+                    let found = unsafe { [< proto2_rust_thunk_Map_ $key_t _ $t _get >](map.as_raw(Private), ffi_key, ffi_value.as_mut_ptr()) };
+
                     if !found {
                         return None;
                     }
-                    Some($from_ffi_value(ffi_value))
+                    // SAFETY: if `found` is true, then the `ffi_value` was written to by `get`.
+                    Some($from_ffi_value(unsafe { ffi_value.assume_init() }))
                 }
 
-                fn map_remove(map: Mut<'_, Map<$key_t, Self>>, key: View<'_, $key_t>) -> bool {
+                fn map_remove(mut map: Mut<'_, Map<$key_t, Self>>, key: View<'_, $key_t>) -> bool {
                     let ffi_key = $to_ffi_key(key);
-                    let mut ffi_value = $to_ffi_value($zero_val);
-                    unsafe { [< __pb_rust_Map_ $key_t _ $t _remove >](map.inner.raw, ffi_key, &mut ffi_value) }
+                    let mut ffi_value = MaybeUninit::uninit();
+                    unsafe { [< proto2_rust_thunk_Map_ $key_t _ $t _remove >](map.as_raw(Private), ffi_key, ffi_value.as_mut_ptr()) }
+                }
+
+                fn map_iter(map: View<'_, Map<$key_t, Self>>) -> MapIter<'_, $key_t, Self> {
+                    // SAFETY:
+                    // - The backing map for `map.as_raw` is valid for at least '_.
+                    // - A View that is live for '_ guarantees the backing map is unmodified for '_.
+                    // - The `iter` function produces an iterator that is valid for the key
+                    //   and value types, and live for at least '_.
+                    unsafe {
+                        MapIter::from_raw(
+                            Private,
+                            [< proto2_rust_thunk_Map_ $key_t _ $t _iter >](map.as_raw(Private))
+                        )
+                    }
+                }
+
+                fn map_iter_next<'a>(iter: &mut MapIter<'a, $key_t, Self>) -> Option<(View<'a, $key_t>, View<'a, Self>)> {
+                    // SAFETY:
+                    // - The `MapIter` API forbids the backing map from being mutated for 'a,
+                    //   and guarantees that it's the correct key and value types.
+                    // - The thunk is safe to call as long as the iterator isn't at the end.
+                    // - The thunk always writes to key and value fields and does not read.
+                    // - The thunk does not increment the iterator.
+                    unsafe {
+                        iter.as_raw_mut(Private).next_unchecked::<$key_t, Self, _, _>(
+                            Private,
+                            [< proto2_rust_thunk_Map_ $key_t _ $t _iter_get >],
+                            $from_ffi_key,
+                            $from_ffi_value,
+                        )
+                    }
                 }
             }
          )* }
@@ -468,8 +811,12 @@ fn ptrlen_to_str<'msg>(val: PtrAndLen) -> &'msg ProtoStr {
     unsafe { ProtoStr::from_utf8_unchecked(val.as_ref()) }
 }
 
-fn bytes_to_ptrlen(val: &[u8]) -> PtrAndLen {
-    val.into()
+fn protostr_into_cppstdstring(val: ProtoString) -> CppStdString {
+    val.into_inner(Private).into_raw(Private)
+}
+
+fn protobytes_into_cppstdstring(val: ProtoBytes) -> CppStdString {
+    val.into_inner(Private).into_raw(Private)
 }
 
 // Warning: this function is unsound on its own! `val.as_ref()` must be safe to
@@ -479,19 +826,20 @@ fn ptrlen_to_bytes<'msg>(val: PtrAndLen) -> &'msg [u8] {
 }
 
 macro_rules! impl_ProxiedInMapValue_for_key_types {
-    ($($t:ty, $ffi_t:ty, $to_ffi_key:expr;)*) => {
+    ($($t:ty, $ffi_t:ty, $to_ffi_key:expr, $from_ffi_key:expr;)*) => {
         paste! {
             $(
-                impl_ProxiedInMapValue_for_non_generated_value_types!($t, $ffi_t, $to_ffi_key, for
-                    f32, f32, identity, identity, 0f32;
-                    f64, f64, identity, identity, 0f64;
-                    i32, i32, identity, identity, 0i32;
-                    u32, u32, identity, identity, 0u32;
-                    i64, i64, identity, identity, 0i64;
-                    u64, u64, identity, identity, 0u64;
-                    bool, bool, identity, identity, false;
-                    ProtoStr, PtrAndLen, str_to_ptrlen, ptrlen_to_str, "";
-                    Bytes, PtrAndLen, bytes_to_ptrlen, ptrlen_to_bytes, b"";
+                impl_ProxiedInMapValue_for_non_generated_value_types!(
+                    $t, $ffi_t, $to_ffi_key, $from_ffi_key, for
+                    f32, f32, f32, identity, identity;
+                    f64, f64, f64, identity, identity;
+                    i32, i32, i32, identity, identity;
+                    u32, u32, u32, identity, identity;
+                    i64, i64, i64, identity, identity;
+                    u64, u64, u64, identity, identity;
+                    bool, bool, bool, identity, identity;
+                    ProtoString, PtrAndLen, CppStdString, protostr_into_cppstdstring, ptrlen_to_str;
+                    ProtoBytes, PtrAndLen, CppStdString, protobytes_into_cppstdstring, ptrlen_to_bytes;
                 );
             )*
         }
@@ -499,19 +847,18 @@ macro_rules! impl_ProxiedInMapValue_for_key_types {
 }
 
 impl_ProxiedInMapValue_for_key_types!(
-    i32, i32, identity;
-    u32, u32, identity;
-    i64, i64, identity;
-    u64, u64, identity;
-    bool, bool, identity;
-    ProtoStr, PtrAndLen, str_to_ptrlen;
+    i32, i32, identity, identity;
+    u32, u32, identity, identity;
+    i64, i64, identity, identity;
+    u64, u64, identity, identity;
+    bool, bool, identity, identity;
+    ProtoString, PtrAndLen, str_to_ptrlen, ptrlen_to_str;
 );
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use googletest::prelude::*;
-    use std::boxed::Box;
 
     // We need to allocate the byte array so SerializedData can own it and
     // deallocate it in its drop. This function makes it easier to do so for our
@@ -526,5 +873,11 @@ mod tests {
         let (ptr, len) = allocate_byte_array(b"Hello world");
         let serialized_data = SerializedData { data: NonNull::new(ptr).unwrap(), len };
         assert_that!(&*serialized_data, eq(b"Hello world"));
+    }
+
+    #[test]
+    fn test_empty_string() {
+        let empty_str: String = RustStringRawParts { data: std::ptr::null(), len: 0 }.into();
+        assert_that!(empty_str, eq(""));
     }
 }

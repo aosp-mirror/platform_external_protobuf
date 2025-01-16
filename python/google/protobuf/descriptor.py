@@ -708,6 +708,9 @@ class FieldDescriptor(DescriptorBase):
     if (
         self._GetFeatures().message_encoding
         == _FEATURESET_MESSAGE_ENCODING_DELIMITED
+        and self.message_type
+        and not self.message_type.GetOptions().map_entry
+        and not self.containing_type.GetOptions().map_entry
     ):
       return FieldDescriptor.TYPE_GROUP
     return self._type
@@ -745,8 +748,11 @@ class FieldDescriptor(DescriptorBase):
     """
     if self.label == FieldDescriptor.LABEL_REPEATED:
       return False
-    if (self.cpp_type == FieldDescriptor.CPPTYPE_MESSAGE or
-        self.containing_oneof):
+    if (
+        self.cpp_type == FieldDescriptor.CPPTYPE_MESSAGE
+        or self.is_extension
+        or self.containing_oneof
+    ):
       return True
 
     return (

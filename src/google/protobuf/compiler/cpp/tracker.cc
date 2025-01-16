@@ -148,14 +148,14 @@ std::vector<Sub> MakeTrackerCalls(const Descriptor* message,
   return GenerateTrackerCalls(
       opts, message, absl::nullopt,
       {
-          Call("serialize", "OnSerialize"),
-          Call("deserialize", "OnDeserialize"),
+          Call("serialize", "OnSerialize").This("&this_"),
+          Call("deserialize", "OnDeserialize").This("_this"),
           // TODO: Ideally annotate_reflection should not exist and we
           // need to annotate all reflective calls on our own, however, as this
           // is a cause for side effects, i.e. reading values dynamically, we
           // want the users know that dynamic access can happen.
           Call("reflection", "OnGetMetadata").This(absl::nullopt),
-          Call("bytesize", "OnByteSize"),
+          Call("bytesize", "OnByteSize").This("&this_"),
           Call("mergefrom", "OnMergeFrom").This("_this").Arg("&from"),
           Call("unknown_fields", "OnUnknownFields"),
           Call("mutable_unknown_fields", "OnMutableUnknownFields"),
@@ -214,7 +214,8 @@ Getters RepeatedFieldGetters(const FieldDescriptor* field,
 
 Getters StringFieldGetters(const FieldDescriptor* field, const Options& opts) {
   std::string member = FieldMemberName(field, ShouldSplit(field, opts));
-  bool is_std_string = field->options().ctype() == FieldOptions::STRING;
+  bool is_std_string =
+      field->cpp_string_type() == FieldDescriptor::CppStringType::kString;
 
   Getters getters;
   if (is_std_string && !field->default_value_string().empty()) {
@@ -234,7 +235,8 @@ Getters StringOneofGetters(const FieldDescriptor* field,
   ABSL_CHECK(oneof != nullptr);
 
   std::string member = FieldMemberName(field, ShouldSplit(field, opts));
-  bool is_std_string = field->options().ctype() == FieldOptions::STRING;
+  bool is_std_string =
+      field->cpp_string_type() == FieldDescriptor::CppStringType::kString;
 
   std::string field_ptr = member;
   if (is_std_string) {
@@ -251,8 +253,8 @@ Getters StringOneofGetters(const FieldDescriptor* field,
   }
 
   Getters getters;
-  if (field->default_value_string().empty() ||
-      field->options().ctype() == FieldOptions::STRING_PIECE) {
+  if (field->default_value_string().empty()
+  ) {
     getters.base = absl::Substitute("$0 ? $1 : nullptr", has, field_ptr);
   } else {
     getters.base =

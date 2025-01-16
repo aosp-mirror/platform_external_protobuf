@@ -27,6 +27,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/descriptor_database.h"
 #include "google/protobuf/port.h"
 
 // Must be included last.
@@ -193,6 +194,11 @@ class PROTOC_EXPORT CommandLineInterface {
   void SetVersionInfo(const std::string& text) { version_info_ = text; }
 
 
+  // Configure protoc to act as if we're in opensource.
+  void set_opensource_runtime(bool opensource) {
+    opensource_runtime_ = opensource;
+  }
+
  private:
   // -----------------------------------------------------------------
 
@@ -294,8 +300,8 @@ class PROTOC_EXPORT CommandLineInterface {
   bool WriteDescriptorSet(
       const std::vector<const FileDescriptor*>& parsed_files);
 
-  // Implements the --experimental_edition_defaults_out option.
-  bool WriteExperimentalEditionDefaults(const DescriptorPool& pool);
+  // Implements the --edition_defaults_out option.
+  bool WriteEditionDefaults(const DescriptorPool& pool);
 
   // Implements the --dependency_out option
   bool GenerateDependencyManifestFile(
@@ -335,6 +341,7 @@ class PROTOC_EXPORT CommandLineInterface {
       const TransitiveDependencyOptions& options =
           TransitiveDependencyOptions());
 
+
   // -----------------------------------------------------------------
 
   // The name of the executable as invoked (i.e. argv[0]).
@@ -361,7 +368,8 @@ class PROTOC_EXPORT CommandLineInterface {
   //   protoc --foo_out=outputdir --foo_opt=enable_bar ...
   // Then there will be an entry ("--foo_out", "enable_bar") in this map.
   absl::flat_hash_map<std::string, std::string> generator_parameters_;
-  // Similar to generator_parameters_, but stores the parameters for plugins.
+  // Similar to generator_parameters_, stores the parameters for plugins but the
+  // key is the actual plugin name e.g. "protoc-gen-foo".
   absl::flat_hash_map<std::string, std::string> plugin_parameters_;
 
   // See AllowPlugins().  If this is empty, plugins aren't allowed.
@@ -434,9 +442,9 @@ class PROTOC_EXPORT CommandLineInterface {
   // FileDescriptorSet should be written.  Otherwise, empty.
   std::string descriptor_set_out_name_;
 
-  std::string experimental_edition_defaults_out_name_;
-  Edition experimental_edition_defaults_minimum_;
-  Edition experimental_edition_defaults_maximum_;
+  std::string edition_defaults_out_name_;
+  Edition edition_defaults_minimum_;
+  Edition edition_defaults_maximum_;
 
   // If --dependency_out was given, this is the path to the file where the
   // dependency file will be written. Otherwise, empty.
@@ -463,6 +471,9 @@ class PROTOC_EXPORT CommandLineInterface {
 
   // When using --encode, this will be passed to SetSerializationDeterministic.
   bool deterministic_output_ = false;
+
+  bool opensource_runtime_ = google::protobuf::internal::IsOss();
+
 };
 
 }  // namespace compiler

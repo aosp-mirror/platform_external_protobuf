@@ -5,16 +5,18 @@
 // license that can be found in the LICENSE file or at
 // https://developers.google.com/open-source/licenses/bsd
 
-#import "GPBTestUtilities.h"
-
 #import <objc/runtime.h>
 
+#import "GPBArray.h"
 #import "GPBArray_PackagePrivate.h"
 #import "GPBDescriptor.h"
 #import "GPBDictionary_PackagePrivate.h"
 #import "GPBMessage_PackagePrivate.h"
+#import "GPBTestUtilities.h"
+#import "GPBUnknownField.h"
 #import "GPBUnknownFieldSet_PackagePrivate.h"
 #import "GPBUnknownField_PackagePrivate.h"
+#import "GPBUnknownFields.h"
 #import "objectivec/Tests/Unittest.pbobjc.h"
 #import "objectivec/Tests/UnittestImport.pbobjc.h"
 #import "objectivec/Tests/UnittestObjc.pbobjc.h"
@@ -491,6 +493,8 @@
   TestAllTypes *message = [TestAllTypes message];
   [self setAllFields:message repeatedCount:kGPBDefaultRepeatCount];
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   GPBUnknownFieldSet *unknownFields = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField *field = [[[GPBUnknownField alloc] initWithNumber:2] autorelease];
   [field addVarint:2];
@@ -500,6 +504,12 @@
   [unknownFields addField:field];
 
   [message setUnknownFields:unknownFields];
+#pragma clang diagnostic pop
+
+  GPBUnknownFields *ufs = [[[GPBUnknownFields alloc] init] autorelease];
+  [ufs addFieldNumber:1234 fixed32:1234];
+  [ufs addFieldNumber:2345 varint:54321];
+  XCTAssertTrue([message mergeUnknownFields:ufs extensionRegistry:nil error:NULL]);
 
   NSString *description = [message description];
   XCTAssertGreaterThan([description length], 0U);
@@ -969,6 +979,9 @@
 }
 
 - (void)testAutocreatedUnknownFields {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
   // Doing anything with (except reading) unknown fields should cause the
   // submessage to become visible.
   TestAllTypes *message = [TestAllTypes message];
@@ -985,6 +998,25 @@
   XCTAssertFalse([message hasOptionalNestedMessage]);
   [message.optionalNestedMessage setUnknownFields:unknownFields];
   XCTAssertTrue([message hasOptionalNestedMessage]);
+
+  message.optionalNestedMessage = nil;
+  XCTAssertFalse([message hasOptionalNestedMessage]);
+  GPBUnknownFields *ufs = [[[GPBUnknownFields alloc] init] autorelease];
+  [ufs addFieldNumber:1 varint:1];
+  XCTAssertTrue([message.optionalNestedMessage mergeUnknownFields:ufs
+                                                extensionRegistry:nil
+                                                            error:NULL]);
+  XCTAssertTrue([message hasOptionalNestedMessage]);
+
+  message.optionalNestedMessage = nil;
+  XCTAssertFalse([message hasOptionalNestedMessage]);
+  [ufs clear];  // Also make sure merging zero length forces it to become visible.
+  XCTAssertTrue([message.optionalNestedMessage mergeUnknownFields:ufs
+                                                extensionRegistry:nil
+                                                            error:NULL]);
+  XCTAssertTrue([message hasOptionalNestedMessage]);
+
+#pragma clang diagnostic pop
 }
 
 - (void)testSetAutocreatedSubmessageToSelf {
@@ -1481,6 +1513,21 @@
   XCTAssertFalse([msg hasExtension:[UnittestRoot repeatedNestedEnumExtension]]);
   XCTAssertFalse([msg hasExtension:[UnittestRoot repeatedForeignEnumExtension]]);
 
+  GPBUnknownFields *ufs = [[[GPBUnknownFields alloc] initFromMessage:msg] autorelease];
+  XCTAssertEqual(ufs.count, 3);
+  uint64_t varint;
+  XCTAssertTrue([ufs getFirst:[UnittestRoot optionalNestedEnumExtension].fieldNumber
+                       varint:&varint]);
+  XCTAssertEqual(varint, 10);
+  XCTAssertTrue([ufs getFirst:[UnittestRoot repeatedNestedEnumExtension].fieldNumber
+                       varint:&varint]);
+  XCTAssertEqual(varint, 11);
+  XCTAssertTrue([ufs getFirst:[UnittestRoot repeatedForeignEnumExtension].fieldNumber
+                       varint:&varint]);
+  XCTAssertEqual(varint, 12);
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   GPBUnknownFieldSet *unknownFields = msg.unknownFields;
   GPBUnknownField *field =
       [unknownFields getField:[UnittestRoot optionalNestedEnumExtension].fieldNumber];
@@ -1495,6 +1542,7 @@
   XCTAssertNotNil(field);
   XCTAssertEqual(field.varintList.count, 1);
   XCTAssertEqual([field.varintList valueAtIndex:0], 12);
+#pragma clang diagnostic pop
 
   // Unknown and known, the known come though an unknown go to unknown fields.
 
@@ -1523,6 +1571,20 @@
   expected = @[ @4, @6 ];
   XCTAssertEqualObjects([msg getExtension:[UnittestRoot repeatedForeignEnumExtension]], expected);
 
+  ufs = [[[GPBUnknownFields alloc] initFromMessage:msg] autorelease];
+  XCTAssertEqual(ufs.count, 3);
+  XCTAssertTrue([ufs getFirst:[UnittestRoot optionalNestedEnumExtension].fieldNumber
+                       varint:&varint]);
+  XCTAssertEqual(varint, 10);
+  XCTAssertTrue([ufs getFirst:[UnittestRoot repeatedNestedEnumExtension].fieldNumber
+                       varint:&varint]);
+  XCTAssertEqual(varint, 11);
+  XCTAssertTrue([ufs getFirst:[UnittestRoot repeatedForeignEnumExtension].fieldNumber
+                       varint:&varint]);
+  XCTAssertEqual(varint, 12);
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   unknownFields = msg.unknownFields;
   field = [unknownFields getField:[UnittestRoot optionalNestedEnumExtension].fieldNumber];
   XCTAssertNotNil(field);
@@ -1536,6 +1598,7 @@
   XCTAssertNotNil(field);
   XCTAssertEqual(field.varintList.count, 1);
   XCTAssertEqual([field.varintList valueAtIndex:0], 12);
+#pragma clang diagnostic pop
 }
 
 - (void)testDefaultingExtensionMessages {
@@ -1836,26 +1899,45 @@
 }
 
 - (void)testGenerateAndParseUnknownMessage {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   GPBUnknownFieldSet *unknowns = [[[GPBUnknownFieldSet alloc] init] autorelease];
   [unknowns mergeVarintField:123 value:456];
   GPBMessage *message = [GPBMessage message];
   [message setUnknownFields:unknowns];
+#pragma clang diagnostic pop
+  GPBUnknownFields *ufs = [[[GPBUnknownFields alloc] init] autorelease];
+  [ufs addFieldNumber:1234 varint:5678];
+  XCTAssertTrue([message mergeUnknownFields:ufs extensionRegistry:nil error:NULL]);
   NSData *data = [message data];
   GPBMessage *message2 = [GPBMessage parseFromData:data extensionRegistry:nil error:NULL];
   XCTAssertEqualObjects(message, message2);
 }
 
 - (void)testDelimitedWriteAndParseMultipleMessages {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   GPBUnknownFieldSet *unknowns1 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   [unknowns1 mergeVarintField:123 value:456];
   GPBMessage *message1 = [GPBMessage message];
   [message1 setUnknownFields:unknowns1];
+#pragma clang diagnostic pop
+  GPBUnknownFields *ufs1 = [[[GPBUnknownFields alloc] init] autorelease];
+  [ufs1 addFieldNumber:1234 varint:5678];
+  XCTAssertTrue([message1 mergeUnknownFields:ufs1 extensionRegistry:nil error:NULL]);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   GPBUnknownFieldSet *unknowns2 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   [unknowns2 mergeVarintField:789 value:987];
   [unknowns2 mergeVarintField:654 value:321];
   GPBMessage *message2 = [GPBMessage message];
   [message2 setUnknownFields:unknowns2];
+#pragma clang diagnostic pop
+  GPBUnknownFields *ufs2 = [[[GPBUnknownFields alloc] init] autorelease];
+  [ufs2 addFieldNumber:2345 fixed32:6789];
+  [ufs2 addFieldNumber:3456 fixed32:7890];
+  XCTAssertTrue([message2 mergeUnknownFields:ufs2 extensionRegistry:nil error:NULL]);
 
   NSMutableData *delimitedData = [NSMutableData data];
   [delimitedData appendData:[message1 delimitedData]];
@@ -2020,6 +2102,57 @@
   XCTAssertEqual([msgPrime.mumbleArray valueAtIndex:2], EnumTestMsg_MyEnum_Two);
   XCTAssertEqual([msgPrime.mumbleArray valueAtIndex:3], EnumTestMsg_MyEnum_NegOne);
   XCTAssertEqual([msgPrime.mumbleArray valueAtIndex:4], EnumTestMsg_MyEnum_NegTwo);
+}
+
+- (void)testCloseEnumsValuesOutOfRange {
+  // The unknown values should all make it into the unknown fields.
+  EnumTestMsg *msg1 = [EnumTestMsg message];
+  msg1.bar = EnumTestMsg_MyEnum_NegTwo;
+  msg1.baz = EnumTestMsg_MyEnum_Two;
+  [msg1.mumbleArray addValue:EnumTestMsg_MyEnum_Two];
+  [msg1.mumbleArray addValue:EnumTestMsg_MyEnum_NegTwo];
+
+  NSData *data = [msg1 data];
+  XCTAssertNotNil(data);
+
+  EnumTestMsgPrime *msg2 = [EnumTestMsgPrime parseFromData:data error:NULL];
+  XCTAssertNotNil(msg2);
+  XCTAssertEqualObjects(data, [msg2 data]);
+  XCTAssertFalse(msg2.hasBar);
+  XCTAssertFalse(msg2.hasBaz);
+  XCTAssertEqual(msg2.mumbleArray_Count, 0U);
+
+  GPBUnknownFields *ufs = [[[GPBUnknownFields alloc] initFromMessage:msg2] autorelease];
+  XCTAssertEqual(ufs.count, 4U);
+  uint64_t varint;
+  XCTAssertTrue([ufs getFirst:EnumTestMsg_FieldNumber_Bar varint:&varint]);
+  XCTAssertEqual(varint, (uint64_t)EnumTestMsg_MyEnum_NegTwo);
+  XCTAssertTrue([ufs getFirst:EnumTestMsg_FieldNumber_Baz varint:&varint]);
+  XCTAssertEqual(varint, (uint64_t)EnumTestMsg_MyEnum_Two);
+  NSArray<GPBUnknownField *> *fields = [ufs fields:EnumTestMsg_FieldNumber_MumbleArray];
+  XCTAssertEqual(fields.count, 2U);
+  XCTAssertEqual(fields[0].varint, (uint64_t)EnumTestMsg_MyEnum_Two);
+  XCTAssertEqual(fields[1].varint, (uint64_t)EnumTestMsg_MyEnum_NegTwo);
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  GPBUnknownFieldSet *unknownFields = msg2.unknownFields;
+  XCTAssertNotNil(unknownFields);
+  XCTAssertEqual(unknownFields.countOfFields, 3U);
+  XCTAssertTrue([unknownFields hasField:EnumTestMsg_FieldNumber_Bar]);
+  XCTAssertTrue([unknownFields hasField:EnumTestMsg_FieldNumber_Baz]);
+  XCTAssertTrue([unknownFields hasField:EnumTestMsg_FieldNumber_MumbleArray]);
+  GPBUnknownField *field = [unknownFields getField:EnumTestMsg_FieldNumber_Bar];
+  XCTAssertEqual(field.varintList.count, 1U);
+  XCTAssertEqual([field.varintList valueAtIndex:0], (uint64_t)EnumTestMsg_MyEnum_NegTwo);
+  field = [unknownFields getField:EnumTestMsg_FieldNumber_Baz];
+  XCTAssertEqual(field.varintList.count, 1U);
+  XCTAssertEqual([field.varintList valueAtIndex:0], (uint64_t)EnumTestMsg_MyEnum_Two);
+  field = [unknownFields getField:EnumTestMsg_FieldNumber_MumbleArray];
+  XCTAssertEqual(field.varintList.count, 2U);
+  XCTAssertEqual([field.varintList valueAtIndex:0], (uint64_t)EnumTestMsg_MyEnum_Two);
+  XCTAssertEqual([field.varintList valueAtIndex:1], (uint64_t)EnumTestMsg_MyEnum_NegTwo);
+#pragma clang diagnostic pop
 }
 
 - (void)testReservedWordNaming {
