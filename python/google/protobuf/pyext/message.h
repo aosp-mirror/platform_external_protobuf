@@ -19,6 +19,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "absl/strings/string_view.h"
+
 namespace google {
 namespace protobuf {
 
@@ -98,9 +100,6 @@ typedef struct CMessage : public ContainerBase {
   // This avoid the creation of similar maps in each of those containers.
   typedef std::unordered_map<const Message*, CMessage*> SubMessagesMap;
   SubMessagesMap* child_submessages;
-
-  // A reference to PyUnknownFields.
-  PyObject* unknown_field_set;
 
   // Implements the "weakref" protocol for this object.
   PyObject* weakreflist;
@@ -316,7 +315,7 @@ bool CheckAndSetString(
     bool append,
     int index);
 PyObject* ToStringObject(const FieldDescriptor* descriptor,
-                         const std::string& value);
+                         absl::string_view value);
 
 // Check if the passed field descriptor belongs to the given message.
 // If not, return false and set a Python exception (a KeyError)

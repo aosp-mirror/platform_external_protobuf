@@ -1,10 +1,11 @@
 load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
-load("@rules_java//java:defs.bzl", "java_proto_library")
 load("@rules_jvm_external//:kt_defs.bzl", "kt_jvm_export")
-load("@rules_pkg//:mappings.bzl", "pkg_files", "strip_prefix")
-load("@rules_proto//proto:defs.bzl", "proto_library")
-load("//:protobuf_version.bzl", "PROTOBUF_JAVA_VERSION")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("//:protobuf.bzl", "internal_gen_kt_protos")
+load("//:protobuf_version.bzl", "PROTOBUF_JAVA_VERSION")
+load("//bazel:java_proto_library.bzl", "java_proto_library")
+load("//bazel:proto_library.bzl", "proto_library")
+load("//build_defs:kotlin_opts.bzl", "protobuf_versioned_kt_jvm_library")
 
 exports_files([
     "src/test/kotlin/com/google/protobuf/Proto3Test.kt",
@@ -50,6 +51,24 @@ kt_jvm_library(
     deps = ["//java/core"],
 )
 
+protobuf_versioned_kt_jvm_library(
+    name = "kotlin_bundle",
+    automatic_module_name = "com.google.protobuf",
+    bundle_description = "Kotlin core Protocol Buffers library. Protocol " +
+                         "Buffers are a way of encoding structured data in an" +
+                         "efficient yet extensible format.",
+    bundle_name = "Protocol Buffers [Kotlin-Core]",
+    bundle_symbolic_name = "com.google.protobuf",
+    visibility = ["//visibility:public"],
+    exports = [
+        ":bytestring_lib",
+        ":full_extensions",
+        ":only_for_use_in_proto_generated_code_its_generator_and_tests",
+        ":shared_runtime",
+        ":well_known_protos_kotlin",
+    ],
+)
+
 kt_jvm_export(
     name = "kotlin_mvn",
     deploy_env = [
@@ -59,17 +78,14 @@ kt_jvm_export(
     maven_coordinates = "com.google.protobuf:protobuf-kotlin:%s" % PROTOBUF_JAVA_VERSION,
     pom_template = "//java/kotlin:pom_template.xml",
     resources = [
+        "//:java_features_proto",
         "//:well_known_type_protos",
         "//java/core:java_features_proto",
         "//src/google/protobuf:descriptor_proto_srcs",
     ],
     tags = ["manual"],
     runtime_deps = [
-        ":bytestring_lib",
-        ":full_extensions",
-        ":only_for_use_in_proto_generated_code_its_generator_and_tests",
-        ":shared_runtime",
-        ":well_known_protos_kotlin",
+        ":kotlin_bundle",
     ],
 )
 
@@ -315,6 +331,7 @@ internal_gen_kt_protos(
         "//:duration_proto",
         "//:empty_proto",
         "//:field_mask_proto",
+        "//:java_features_proto",
         "//:source_context_proto",
         "//:struct_proto",
         "//:timestamp_proto",

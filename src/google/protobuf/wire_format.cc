@@ -560,7 +560,7 @@ bool WireFormat::ParseAndMergeField(
       }
 
       case FieldDescriptor::TYPE_BYTES: {
-        if (internal::cpp::EffectiveStringCType(field) == FieldOptions::CORD) {
+        if (field->cpp_string_type() == FieldDescriptor::CppStringType::kCord) {
           absl::Cord value;
           if (!WireFormatLite::ReadBytes(input, &value)) return false;
           message_reflection->SetString(message, field, value);
@@ -633,7 +633,7 @@ bool WireFormat::ParseAndMergeMessageSetItem(io::CodedInputStream* input,
 }
 
 struct WireFormat::MessageSetParser {
-  const char* _InternalParse(const char* ptr, internal::ParseContext* ctx) {
+  const char* ParseElement(const char* ptr, internal::ParseContext* ctx) {
     // Parse a MessageSetItem
     auto metadata = reflection->MutableInternalMetadata(msg);
     enum class State { kNoTag, kHasType, kHasPayload, kDone };
@@ -739,7 +739,8 @@ struct WireFormat::MessageSetParser {
       }
       if (tag == WireFormatLite::kMessageSetItemStartTag) {
         // A message set item starts
-        ptr = ctx->ParseGroup(this, ptr, tag);
+        ptr = ctx->ParseGroupInlined(
+            ptr, tag, [&](const char* ptr) { return ParseElement(ptr, ctx); });
       } else {
         // Parse other fields as normal extensions.
         int field_number = WireFormatLite::GetTagFieldNumber(tag);
@@ -764,6 +765,44 @@ struct WireFormat::MessageSetParser {
   const Descriptor* descriptor;
   const Reflection* reflection;
 };
+
+static const char* HandleMessage(Message* msg, const char* ptr,
+                                 internal::ParseContext* ctx, uint64_t tag,
+                                 const Reflection* reflection,
+                                 const FieldDescriptor* field) {
+  Message* sub_message;
+  if (field->is_repeated()) {
+    sub_message = reflection->AddMessage(msg, field, ctx->data().factory);
+  } else {
+    sub_message = reflection->MutableMessage(msg, field, ctx->data().factory);
+  }
+
+  if (WireFormatLite::GetTagWireType(tag) ==
+      WireFormatLite::WIRETYPE_START_GROUP) {
+    return ctx->ParseGroup(sub_message, ptr, tag);
+  } else {
+    ABSL_DCHECK(WireFormatLite::GetTagWireType(tag) ==
+                WireFormatLite::WIRETYPE_LENGTH_DELIMITED);
+  }
+
+  ptr = ctx->ParseMessage(sub_message, ptr);
+
+  // For map entries, if the value is an unknown enum we have to push it
+  // into the unknown field set and remove it from the list.
+  if (ptr != nullptr && field->is_map()) {
+    auto* value_field = field->message_type()->map_value();
+    auto* enum_type = value_field->enum_type();
+    if (enum_type != nullptr &&
+        !internal::cpp::HasPreservingUnknownEnumSemantics(value_field) &&
+        enum_type->FindValueByNumber(sub_message->GetReflection()->GetEnumValue(
+            *sub_message, value_field)) == nullptr) {
+      reflection->MutableUnknownFields(msg)->AddLengthDelimited(
+          field->number(), sub_message->SerializeAsString());
+      reflection->RemoveLast(msg, field);
+    }
+  }
+  return ptr;
+}
 
 const char* WireFormat::_InternalParse(Message* msg, const char* ptr,
                                        internal::ParseContext* ctx) {
@@ -964,7 +1003,7 @@ const char* WireFormat::_InternalParseAndMergeField(
     case FieldDescriptor::TYPE_BYTES: {
       int size = ReadSize(&ptr);
       if (ptr == nullptr) return nullptr;
-      if (internal::cpp::EffectiveStringCType(field) == FieldOptions::CORD) {
+      if (field->cpp_string_type() == FieldDescriptor::CppStringType::kCord) {
         absl::Cord value;
         ptr = ctx->ReadCord(ptr, size, &value);
         if (ptr == nullptr) return nullptr;
@@ -994,46 +1033,9 @@ const char* WireFormat::_InternalParseAndMergeField(
       return ptr;
     }
 
-    case FieldDescriptor::TYPE_GROUP: {
-      Message* sub_message;
-      if (field->is_repeated()) {
-        sub_message = reflection->AddMessage(msg, field, ctx->data().factory);
-      } else {
-        sub_message =
-            reflection->MutableMessage(msg, field, ctx->data().factory);
-      }
-
-      return ctx->ParseGroup(sub_message, ptr, tag);
-    }
-
-    case FieldDescriptor::TYPE_MESSAGE: {
-      Message* sub_message;
-      if (field->is_repeated()) {
-        sub_message = reflection->AddMessage(msg, field, ctx->data().factory);
-      } else {
-        sub_message =
-            reflection->MutableMessage(msg, field, ctx->data().factory);
-      }
-      ptr = ctx->ParseMessage(sub_message, ptr);
-
-      // For map entries, if the value is an unknown enum we have to push it
-      // into the unknown field set and remove it from the list.
-      if (ptr != nullptr && field->is_map()) {
-        auto* value_field = field->message_type()->map_value();
-        auto* enum_type = value_field->enum_type();
-        if (enum_type != nullptr &&
-            !internal::cpp::HasPreservingUnknownEnumSemantics(value_field) &&
-            enum_type->FindValueByNumber(
-                sub_message->GetReflection()->GetEnumValue(
-                    *sub_message, value_field)) == nullptr) {
-          reflection->MutableUnknownFields(msg)->AddLengthDelimited(
-              field->number(), sub_message->SerializeAsString());
-          reflection->RemoveLast(msg, field);
-        }
-      }
-
-      return ptr;
-    }
+    case FieldDescriptor::TYPE_MESSAGE:
+    case FieldDescriptor::TYPE_GROUP:
+      return HandleMessage(msg, ptr, ctx, tag, reflection, field);
   }
 
   // GCC 8 complains about control reaching end of non-void function here.
@@ -1423,7 +1425,7 @@ uint8_t* WireFormat::InternalSerializeField(const FieldDescriptor* field,
       }
 
       case FieldDescriptor::TYPE_BYTES: {
-        if (internal::cpp::EffectiveStringCType(field) == FieldOptions::CORD) {
+        if (field->cpp_string_type() == FieldDescriptor::CppStringType::kCord) {
           absl::Cord value = message_reflection->GetCord(message, field);
           target = stream->WriteString(field->number(), value, target);
           break;
@@ -1724,7 +1726,7 @@ size_t WireFormat::FieldDataOnlyByteSize(const FieldDescriptor* field,
     // instead of copying.
     case FieldDescriptor::TYPE_STRING:
     case FieldDescriptor::TYPE_BYTES: {
-      if (internal::cpp::EffectiveStringCType(field) == FieldOptions::CORD) {
+      if (field->cpp_string_type() == FieldDescriptor::CppStringType::kCord) {
         for (size_t j = 0; j < count; j++) {
           absl::Cord value = message_reflection->GetCord(message, field);
           data_size += WireFormatLite::StringSize(value);
@@ -1757,8 +1759,9 @@ size_t WireFormat::MessageSetItemByteSize(const FieldDescriptor* field,
   our_size += io::CodedOutputStream::VarintSize32(field->number());
 
   // message
-  const Message& sub_message = message_reflection->GetMessage(message, field);
-  size_t message_size = sub_message.ByteSizeLong();
+  size_t message_size;
+    const Message& sub_message = message_reflection->GetMessage(message, field);
+    message_size = sub_message.ByteSizeLong();
 
   our_size += io::CodedOutputStream::VarintSize32(message_size);
   our_size += message_size;

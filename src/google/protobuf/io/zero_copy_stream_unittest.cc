@@ -45,7 +45,6 @@
 #include "google/protobuf/stubs/common.h"
 #include "google/protobuf/testing/file.h"
 #include "google/protobuf/testing/file.h"
-#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
 #include "absl/log/absl_check.h"
 #include "absl/log/absl_log.h"
@@ -57,12 +56,14 @@
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/io_win32.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/test_util.h"
 #include "google/protobuf/test_util2.h"
 
 #if HAVE_ZLIB
 #include "google/protobuf/io/gzip_stream.h"
 #endif
 
+#include "google/protobuf/test_util.h"
 
 // Must be included last.
 #include "google/protobuf/port_def.inc"
@@ -558,10 +559,9 @@ std::string IoTest::Uncompress(const std::string& data) {
 TEST_F(IoTest, CompressionOptions) {
   // Some ad-hoc testing of compression options.
 
-  std::string golden_filename =
-      TestUtil::GetTestDataPath("google/protobuf/testdata/golden_message");
-  std::string golden;
-  ABSL_CHECK_OK(File::GetContents(golden_filename, &golden, true));
+  protobuf_unittest::TestAllTypes message;
+  TestUtil::SetAllFields(&message);
+  std::string golden = message.SerializeAsString();
 
   GzipOutputStream::Options options;
   std::string gzip_compressed = Compress(golden, options);
@@ -1403,7 +1403,7 @@ TEST_F(IoTest, CordOutputBufferEndsAtSizeHint) {
 // To test files, we create a temporary file, write, read, truncate, repeat.
 TEST_F(IoTest, FileIo) {
   std::string filename =
-      absl::StrCat(TestTempDir(), "/zero_copy_stream_test_file");
+      absl::StrCat(::testing::TempDir(), "/zero_copy_stream_test_file");
 
   for (int i = 0; i < kBlockSizeCount; i++) {
     for (int j = 0; j < kBlockSizeCount; j++) {
@@ -1501,7 +1501,7 @@ TEST_F(IoTest, BlockingFileIoWithTimeout) {
 #if HAVE_ZLIB
 TEST_F(IoTest, GzipFileIo) {
   std::string filename =
-      absl::StrCat(TestTempDir(), "/zero_copy_stream_test_file");
+      absl::StrCat(::testing::TempDir(), "/zero_copy_stream_test_file");
 
   for (int i = 0; i < kBlockSizeCount; i++) {
     for (int j = 0; j < kBlockSizeCount; j++) {
@@ -1738,14 +1738,14 @@ TEST_F(IoTest, LimitingInputStreamByteCount) {
 
 // Check that a zero-size array doesn't confuse the code.
 TEST(ZeroSizeArray, Input) {
-  ArrayInputStream input(NULL, 0);
+  ArrayInputStream input(nullptr, 0);
   const void* data;
   int size;
   EXPECT_FALSE(input.Next(&data, &size));
 }
 
 TEST(ZeroSizeArray, Output) {
-  ArrayOutputStream output(NULL, 0);
+  ArrayOutputStream output(nullptr, 0);
   void* data;
   int size;
   EXPECT_FALSE(output.Next(&data, &size));
@@ -1755,3 +1755,5 @@ TEST(ZeroSizeArray, Output) {
 }  // namespace io
 }  // namespace protobuf
 }  // namespace google
+
+#include "google/protobuf/port_undef.inc"

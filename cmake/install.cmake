@@ -1,7 +1,10 @@
 include(GNUInstallDirs)
 
 foreach(_target IN LISTS protobuf_ABSL_USED_TARGETS)
-  string(REPLACE :: _ _modified_target ${_target})
+  # shared abseil on windows breaks the absl::foo -> absl_foo replacement logic -
+  # preempt this by a more specific replace (harmless if it doesn't apply); see GH-15883
+  string(REPLACE "absl::abseil_dll" "abseil_dll" _modified_target ${_target})
+  string(REPLACE :: _ _modified_target ${_modified_target})
   list(APPEND _pc_targets ${_modified_target})
 endforeach()
 list(APPEND _pc_targets "utf8_range")
@@ -26,12 +29,11 @@ set(_protobuf_libraries libprotobuf-lite libprotobuf)
 if (protobuf_BUILD_LIBPROTOC)
     list(APPEND _protobuf_libraries libprotoc)
 endif (protobuf_BUILD_LIBPROTOC)
+if (protobuf_BUILD_LIBUPB)
+  list(APPEND _protobuf_libraries libupb)
+endif ()
 
 foreach(_library ${_protobuf_libraries})
-  set_property(TARGET ${_library}
-    PROPERTY INTERFACE_INCLUDE_DIRECTORIES
-    $<BUILD_INTERFACE:${protobuf_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   if (UNIX AND NOT APPLE)
     set_property(TARGET ${_library}
       PROPERTY INSTALL_RPATH "$ORIGIN")
@@ -50,16 +52,27 @@ endforeach()
 return()
 
 if (protobuf_BUILD_PROTOC_BINARIES)
+  set(_protobuf_binaries protoc)
   install(TARGETS protoc EXPORT protobuf-targets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT protoc
     BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT protoc)
-  if (UNIX AND NOT APPLE)
-    set_property(TARGET protoc
-      PROPERTY INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
-  elseif (APPLE)
-    set_property(TARGET protoc
-      PROPERTY INSTALL_RPATH "@loader_path/../lib")
-  endif()
+  if (protobuf_BUILD_LIBUPB)
+    foreach (generator upb upbdefs upb_minitable)
+      list(APPEND _protobuf_binaries protoc-gen-${generator})
+      install(TARGETS protoc-gen-${generator} EXPORT protobuf-targets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT upb-generators
+        BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT upb-generators)
+    endforeach ()
+  endif ()
+  foreach (binary IN LISTS _protobuf_binaries)
+    if (UNIX AND NOT APPLE)
+      set_property(TARGET ${binary}
+        PROPERTY INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+    elseif (APPLE)
+      set_property(TARGET ${binary}
+        PROPERTY INSTALL_RPATH "@loader_path/../lib")
+    endif ()
+  endforeach ()
 endif (protobuf_BUILD_PROTOC_BINARIES)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/protobuf.pc ${CMAKE_CURRENT_BINARY_DIR}/protobuf-lite.pc DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
@@ -74,6 +87,17 @@ set(protobuf_HEADERS
   ${plugin_proto_proto_srcs}
   ${java_features_proto_proto_srcs}
 )
+if (protobuf_BUILD_LIBUPB)
+  list(APPEND protobuf_HEADERS ${libupb_hdrs})
+  # Manually install the bootstrap headers
+  install(
+    FILES
+      ${protobuf_SOURCE_DIR}/upb/reflection/cmake/google/protobuf/descriptor.upb.h
+      ${protobuf_SOURCE_DIR}/upb/reflection/cmake/google/protobuf/descriptor.upb_minitable.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/google/protobuf
+    COMPONENT protobuf-headers
+  )
+endif ()
 foreach(_header ${protobuf_HEADERS})
   string(FIND ${_header} "${protobuf_SOURCE_DIR}/src" _find_src)
   string(FIND ${_header} "${protobuf_SOURCE_DIR}" _find_nosrc)
@@ -102,15 +126,9 @@ set(_install_cmakedir_desc "Directory relative to CMAKE_INSTALL to install the c
 set(_build_cmakedir_desc "Directory relative to CMAKE_CURRENT_BINARY_DIR for cmake configuration files")
 set(_exampledir_desc "Directory relative to CMAKE_INSTALL_DATA to install examples")
 set(_protobuf_subdir_desc "Subdirectory in which to install cmake configuration files")
-if(NOT MSVC)
-  set(protobuf_CMAKE_SUBDIR "cmake/protobuf" CACHE STRING "${_protobuf_subdir_desc}")
-  set(CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/${protobuf_CMAKE_SUBDIR}" CACHE STRING "${_install_cmakedir_desc}")
-  set(CMAKE_INSTALL_EXAMPLEDIR "${CMAKE_INSTALL_DATADIR}/protobuf/examples" CACHE STRING "${_exampledir_desc}")
-else()
-  set(protobuf_CMAKE_SUBDIR "cmake" CACHE STRING "${_protobuf_subdir_desc}")
-  set(CMAKE_INSTALL_CMAKEDIR "cmake" CACHE STRING "${_cmakedir_desc}")
-  set(CMAKE_INSTALL_EXAMPLEDIR "examples" CACHE STRING "${_exampledir_desc}")
-endif()
+set(protobuf_CMAKE_SUBDIR "cmake/protobuf" CACHE STRING "${_protobuf_subdir_desc}")
+set(CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/${protobuf_CMAKE_SUBDIR}" CACHE STRING "${_install_cmakedir_desc}")
+set(CMAKE_INSTALL_EXAMPLEDIR "${CMAKE_INSTALL_DATADIR}/protobuf/examples" CACHE STRING "${_exampledir_desc}")
 set(CMAKE_BUILD_CMAKEDIR "${CMAKE_CURRENT_BINARY_DIR}/${protobuf_CMAKE_SUBDIR}" CACHE STRING "${_build_cmakedir_desc}")
 mark_as_advanced(protobuf_CMAKE_SUBDIR)
 mark_as_advanced(CMAKE_BUILD_CMAKEDIR)

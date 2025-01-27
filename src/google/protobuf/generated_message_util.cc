@@ -28,16 +28,16 @@
 // Must be included last
 #include "google/protobuf/port_def.inc"
 
+#ifndef PROTOBUF_PRAGMA_INIT_SEG_DONE
 PROTOBUF_PRAGMA_INIT_SEG
+#define PROTOBUF_PRAGMA_INIT_SEG_DONE
+#endif
 
 
 namespace google {
 namespace protobuf {
 namespace internal {
 
-void DestroyMessage(const void* message) {
-  static_cast<const MessageLite*>(message)->~MessageLite();
-}
 void DestroyString(const void* s) {
   static_cast<const std::string*>(s)->~basic_string();
 }
@@ -69,7 +69,8 @@ extern const char __start_pb_defaults;
 extern const char __stop_pb_defaults;
 }
 static void InitWeakDefaults() {
-  StrongPointer(&dummy_weak_default);  // force link the dummy entry.
+  // force link the dummy entry.
+  StrongPointer<DummyWeakDefault*, &dummy_weak_default>();
   // We don't know the size of each object, but we know the layout of the tail.
   // It contains a WeakDescriptorDefaultTail object.
   // As such, we iterate the section backwards.

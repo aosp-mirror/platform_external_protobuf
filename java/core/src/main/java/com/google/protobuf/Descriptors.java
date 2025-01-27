@@ -76,7 +76,13 @@ public final class Descriptors {
   @SuppressWarnings("NonFinalStaticField")
   private static volatile FeatureSetDefaults javaEditionDefaults = null;
 
-  private static FeatureSet getEditionDefaults(Edition edition) {
+  /** Sets the default feature mappings used during the build. Exposed for tests. */
+  static void setTestJavaEditionDefaults(FeatureSetDefaults defaults) {
+    javaEditionDefaults = defaults;
+  }
+
+  /** Gets the default feature mappings used during the build. */
+  static FeatureSetDefaults getJavaEditionDefaults() {
     // Force explicit initialization before synchronized block which can trigger initialization in
     // `JavaFeaturesProto.registerAllExtensions()` and `FeatureSetdefaults.parseFrom()` calls.
     // Otherwise, this can result in deadlock if another threads holds the static init block's
@@ -88,19 +94,23 @@ public final class Descriptors {
         if (javaEditionDefaults == null) {
           try {
             ExtensionRegistry registry = ExtensionRegistry.newInstance();
-            registry.add(JavaFeaturesProto.java);
-            javaEditionDefaults =
+            registry.add(JavaFeaturesProto.java_);
+            setTestJavaEditionDefaults(
                 FeatureSetDefaults.parseFrom(
                     JavaEditionDefaults.PROTOBUF_INTERNAL_JAVA_EDITION_DEFAULTS.getBytes(
                         Internal.ISO_8859_1),
-                    registry);
+                    registry));
           } catch (Exception e) {
             throw new AssertionError(e);
           }
         }
       }
     }
+    return javaEditionDefaults;
+  }
 
+  static FeatureSet getEditionDefaults(Edition edition) {
+    FeatureSetDefaults javaEditionDefaults = getJavaEditionDefaults();
     if (edition.getNumber() < javaEditionDefaults.getMinimumEdition().getNumber()) {
       throw new IllegalArgumentException(
           "Edition "
@@ -117,18 +127,18 @@ public final class Descriptors {
               + javaEditionDefaults.getMaximumEdition()
               + "!");
     }
-    FeatureSet found = null;
+    FeatureSetEditionDefault found = null;
     for (FeatureSetEditionDefault editionDefault : javaEditionDefaults.getDefaultsList()) {
       if (editionDefault.getEdition().getNumber() > edition.getNumber()) {
         break;
       }
-      found = editionDefault.getFeatures();
+      found = editionDefault;
     }
     if (found == null) {
       throw new IllegalArgumentException(
           "Edition " + edition + " does not have a valid default FeatureSet!");
     }
-    return found;
+    return found.getFixedFeatures().toBuilder().mergeFrom(found.getOverridableFeatures()).build();
   }
 
   private static FeatureSet internFeatures(FeatureSet features) {
@@ -669,7 +679,7 @@ public final class Descriptors {
       if (getEdition() == Edition.EDITION_PROTO2) {
         if (proto.getOptions().getJavaStringCheckUtf8()) {
           features.setExtension(
-              JavaFeaturesProto.java,
+              JavaFeaturesProto.java_,
               JavaFeatures.newBuilder()
                   .setUtf8Validation(JavaFeatures.Utf8Validation.VERIFY)
                   .build());
@@ -1122,16 +1132,17 @@ public final class Descriptors {
         enumType.resolveAllFeatures();
       }
 
+      // Oneofs must be resolved before any children oneof fields.
+      for (OneofDescriptor oneof : oneofs) {
+        oneof.resolveAllFeatures();
+      }
+
       for (FieldDescriptor field : fields) {
         field.resolveAllFeatures();
       }
 
       for (FieldDescriptor extension : extensions) {
         extension.resolveAllFeatures();
-      }
-
-      for (OneofDescriptor oneof : oneofs) {
-        oneof.resolveAllFeatures();
       }
     }
 
@@ -1265,7 +1276,7 @@ public final class Descriptors {
      * FieldDescriptorProto.Type} maps to exactly one Java type.
      */
     public JavaType getJavaType() {
-      return type.getJavaType();
+      return getType().getJavaType();
     }
 
     /** For internal use only. */
@@ -1286,8 +1297,10 @@ public final class Descriptors {
       // since these are used before feature resolution when parsing java feature set defaults
       // (custom options) into unknown fields.
       if (type == Type.MESSAGE
+          && !(messageType != null && messageType.toProto().getOptions().getMapEntry())
+          && !(containingType != null && containingType.toProto().getOptions().getMapEntry())
           && this.features != null
-          && this.features.getMessageEncoding() == FeatureSet.MessageEncoding.DELIMITED) {
+          && getFeatures().getMessageEncoding() == FeatureSet.MessageEncoding.DELIMITED) {
         return Type.GROUP;
       }
       return type;
@@ -1296,25 +1309,25 @@ public final class Descriptors {
     /** For internal use only. */
     @Override
     public WireFormat.FieldType getLiteType() {
-      return table[type.ordinal()];
+      return table[getType().ordinal()];
     }
 
     /** For internal use only. */
     public boolean needsUtf8Check() {
-      if (type != Type.STRING) {
+      if (getType() != Type.STRING) {
         return false;
       }
       if (getContainingType().toProto().getOptions().getMapEntry()) {
         // Always enforce strict UTF-8 checking for map fields.
         return true;
       }
-      if (this.features
-          .getExtension(JavaFeaturesProto.java)
+      if (getFeatures()
+          .getExtension(JavaFeaturesProto.java_)
           .getUtf8Validation()
           .equals(JavaFeatures.Utf8Validation.VERIFY)) {
         return true;
       }
-      return this.features.getUtf8Validation().equals(FeatureSet.Utf8Validation.VERIFY);
+      return getFeatures().getUtf8Validation().equals(FeatureSet.Utf8Validation.VERIFY);
     }
 
     public boolean isMapField() {
@@ -1330,14 +1343,14 @@ public final class Descriptors {
 
     /** Is this field declared required? */
     public boolean isRequired() {
-      return this.features.getFieldPresence()
+      return getFeatures().getFieldPresence()
           == DescriptorProtos.FeatureSet.FieldPresence.LEGACY_REQUIRED;
     }
 
     /** Is this field declared optional? */
     public boolean isOptional() {
       return proto.getLabel() == FieldDescriptorProto.Label.LABEL_OPTIONAL
-          && this.features.getFieldPresence()
+          && getFeatures().getFieldPresence()
               != DescriptorProtos.FeatureSet.FieldPresence.LEGACY_REQUIRED;
     }
 
@@ -1356,7 +1369,7 @@ public final class Descriptors {
       if (!isPackable()) {
         return false;
       }
-      return this.features
+      return getFeatures()
           .getRepeatedFieldEncoding()
           .equals(FeatureSet.RepeatedFieldEncoding.PACKED);
     }
@@ -1451,10 +1464,41 @@ public final class Descriptors {
       if (isRepeated()) {
         return false;
       }
-      return getType() == Type.MESSAGE
+      return isProto3Optional
+          || getType() == Type.MESSAGE
           || getType() == Type.GROUP
+          || isExtension()
           || getContainingOneof() != null
-          || this.features.getFieldPresence() != DescriptorProtos.FeatureSet.FieldPresence.IMPLICIT;
+          || getFeatures().getFieldPresence() != DescriptorProtos.FeatureSet.FieldPresence.IMPLICIT;
+    }
+
+    /**
+     * Returns true if this field is structured like the synthetic field of a proto2 group. This
+     * allows us to expand our treatment of delimited fields without breaking proto2 files that have
+     * been upgraded to editions.
+     */
+    boolean isGroupLike() {
+      if (getType() != Type.GROUP) {
+        // Groups are always tag-delimited.
+        return false;
+      }
+
+      if (!getMessageType().getName().toLowerCase().equals(getName())) {
+        // Group fields always are always the lowercase type name.
+        return false;
+      }
+
+      if (getMessageType().getFile() != getFile()) {
+        // Groups could only be defined in the same file they're used.
+        return false;
+      }
+
+      // Group messages are always defined in the same scope as the field.  File level extensions
+      // will compare NULL == NULL here, which is why the file comparison above is necessary to
+      // ensure both come from the same file.
+      return isExtension()
+          ? getMessageType().getContainingType() == getExtensionScope()
+          : getMessageType().getContainingType() == getContainingType();
     }
 
     /**
@@ -1535,7 +1579,7 @@ public final class Descriptors {
       }
 
       return getType() == Type.ENUM
-          && (this.features.getExtension(JavaFeaturesProto.java).getLegacyClosedEnum()
+          && (getFeatures().getExtension(JavaFeaturesProto.java_).getLegacyClosedEnum()
               || enumType.isClosed());
     }
 
@@ -1710,6 +1754,7 @@ public final class Descriptors {
           extensionScope = parent;
         } else {
           extensionScope = null;
+          this.parent = file;
         }
 
         if (proto.hasOneofIndex()) {
@@ -1733,6 +1778,7 @@ public final class Descriptors {
           }
           containingOneof = parent.getOneofs().get(proto.getOneofIndex());
           containingOneof.fieldCount++;
+          this.parent = containingOneof;
         } else {
           containingOneof = null;
         }
@@ -1855,7 +1901,9 @@ public final class Descriptors {
           }
         }
 
-        if (getJavaType() == JavaType.MESSAGE) {
+        // Use raw type since inferred type considers messageType which may not be fully cross
+        // linked yet.
+        if (type.getJavaType() == JavaType.MESSAGE) {
           if (!(typeDescriptor instanceof Descriptor)) {
             throw new DescriptorValidationException(
                 this, '\"' + proto.getTypeName() + "\" is not a message type.");
@@ -1865,7 +1913,7 @@ public final class Descriptors {
           if (proto.hasDefaultValue()) {
             throw new DescriptorValidationException(this, "Messages can't have default values.");
           }
-        } else if (getJavaType() == JavaType.ENUM) {
+        } else if (type.getJavaType() == JavaType.ENUM) {
           if (!(typeDescriptor instanceof EnumDescriptor)) {
             throw new DescriptorValidationException(
                 this, '\"' + proto.getTypeName() + "\" is not an enum type.");
@@ -1875,7 +1923,7 @@ public final class Descriptors {
           throw new DescriptorValidationException(this, "Field with primitive type has type_name.");
         }
       } else {
-        if (getJavaType() == JavaType.MESSAGE || getJavaType() == JavaType.ENUM) {
+        if (type.getJavaType() == JavaType.MESSAGE || type.getJavaType() == JavaType.ENUM) {
           throw new DescriptorValidationException(
               this, "Field with message or enum type missing type_name.");
         }
@@ -1896,7 +1944,7 @@ public final class Descriptors {
         }
 
         try {
-          switch (getType()) {
+          switch (type) {
             case INT32:
             case SINT32:
             case SFIXED32:
@@ -1971,7 +2019,7 @@ public final class Descriptors {
         if (isRepeated()) {
           defaultValue = Collections.emptyList();
         } else {
-          switch (getJavaType()) {
+          switch (type.getJavaType()) {
             case ENUM:
               // We guarantee elsewhere that an enum type always has at least
               // one possible value.
@@ -1981,7 +2029,7 @@ public final class Descriptors {
               defaultValue = null;
               break;
             default:
-              defaultValue = getJavaType().defaultDefault;
+              defaultValue = type.getJavaType().defaultDefault;
               break;
           }
         }
@@ -2071,7 +2119,7 @@ public final class Descriptors {
      * handling quirks.
      */
     public boolean isClosed() {
-      return this.features.getEnumType() == DescriptorProtos.FeatureSet.EnumType.CLOSED;
+      return getFeatures().getEnumType() == DescriptorProtos.FeatureSet.EnumType.CLOSED;
     }
 
     /** If this is a nested type, get the outer descriptor, otherwise null. */
@@ -2744,6 +2792,34 @@ public final class Descriptors {
         validateFeatures();
         return;
       }
+
+      // Java features from a custom pool (i.e. buildFrom) may end up in unknown fields or
+      // use a different descriptor from the generated pool used by the Java runtime.
+      boolean hasPossibleCustomJavaFeature = false;
+      for (FieldDescriptor f : unresolvedFeatures.getExtensionFields().keySet()) {
+        if (f.getNumber() == JavaFeaturesProto.java_.getNumber()
+            && f != JavaFeaturesProto.java_.getDescriptor()) {
+          hasPossibleCustomJavaFeature = true;
+          continue;
+        }
+      }
+      boolean hasPossibleUnknownJavaFeature =
+          !unresolvedFeatures.getUnknownFields().isEmpty()
+              && unresolvedFeatures
+                  .getUnknownFields()
+                  .hasField(JavaFeaturesProto.java_.getNumber());
+      if (hasPossibleCustomJavaFeature || hasPossibleUnknownJavaFeature) {
+        ExtensionRegistry registry = ExtensionRegistry.newInstance();
+        registry.add(JavaFeaturesProto.java_);
+        ByteString bytes = unresolvedFeatures.toByteString();
+        try {
+          unresolvedFeatures = FeatureSet.parseFrom(bytes, registry);
+        } catch (InvalidProtocolBufferException e) {
+          throw new DescriptorValidationException(
+              this, "Failed to parse features with Java feature extension registry.", e);
+        }
+      }
+      
       FeatureSet.Builder features;
       if (this.parent == null) {
         Edition edition = getFile().getEdition();
@@ -2766,6 +2842,17 @@ public final class Descriptors {
     }
 
     void validateFeatures() throws DescriptorValidationException {}
+
+    FeatureSet getFeatures() {
+      // TODO: Remove lazy resolution of unresolved features for legacy syntax for
+      // compatibility with older <4.26.x gencode in the next breaking release.
+      if (this.features == null
+          && (getFile().getEdition() == Edition.EDITION_PROTO2
+              || getFile().getEdition() == Edition.EDITION_PROTO3)) {
+        getFile().resolveAllFeaturesImmutable();
+      }
+      return this.features;
+    }
 
     GenericDescriptor parent;
     volatile FeatureSet features;
