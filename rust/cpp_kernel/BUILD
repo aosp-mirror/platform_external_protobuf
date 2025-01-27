@@ -4,8 +4,19 @@ load("@rules_rust//rust:defs.bzl", "rust_library")
 
 cc_library(
     name = "cpp_api",
-    srcs = ["cpp_api.cc"],
-    hdrs = ["cpp_api.h"],
+    srcs = [
+        "debug.cc",
+        "map.cc",
+        "repeated.cc",
+        "strings.cc",
+    ],
+    hdrs = [
+        "debug.h",
+        "map.h",
+        "rust_alloc_for_cpp_api.h",
+        "serialized_data.h",
+        "strings.h",
+    ],
     visibility = [
         "//rust:__subpackages__",
         "//src/google/protobuf:__subpackages__",
@@ -14,7 +25,8 @@ cc_library(
         ":rust_alloc_for_cpp_api",  # buildcleaner: keep
         "//src/google/protobuf",
         "//src/google/protobuf:protobuf_lite",
-        "@com_google_absl//absl/strings:string_view",
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/log:absl_log",
     ],
 )
 

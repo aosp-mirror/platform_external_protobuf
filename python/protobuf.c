@@ -216,7 +216,7 @@ typedef struct {
 // memory to the OS.  Without this call, we appear to leak memory, at least
 // as measured in RSS.
 //
-// We opt not to use this instead of PyMalloc (which would also solve the
+// We opt to use this instead of PyMalloc (which would also solve the
 // problem) because the latter requires the GIL to be held.  This would make
 // our messages unsafe to share with other languages that could free at
 // unpredictable
@@ -240,7 +240,7 @@ static void* upb_trim_allocfunc(upb_alloc* alloc, void* ptr, size_t oldsize,
   }
 }
 static upb_alloc trim_alloc = {&upb_trim_allocfunc};
-static const upb_alloc* global_alloc = &trim_alloc;
+static upb_alloc* global_alloc = &trim_alloc;
 // end:github_only
 
 static upb_Arena* PyUpb_NewArena(void) {
@@ -320,6 +320,31 @@ PyTypeObject* PyUpb_AddClassWithBases(PyObject* m, PyType_Spec* spec,
     Py_XDECREF(type);
     return NULL;
   }
+  return (PyTypeObject*)type;
+}
+
+PyTypeObject* PyUpb_AddClassWithRegister(PyObject* m, PyType_Spec* spec,
+                                         PyObject* virtual_base,
+                                         const char** methods) {
+  PyObject* type = PyType_FromSpec(spec);
+  PyObject* ret1 = PyObject_CallMethod(virtual_base, "register", "O", type);
+  if (!ret1) {
+    Py_XDECREF(type);
+    return NULL;
+  }
+  for (size_t i = 0; methods[i] != NULL; i++) {
+    PyObject* method = PyObject_GetAttrString(virtual_base, methods[i]);
+    if (!method) {
+      Py_XDECREF(type);
+      return NULL;
+    }
+    int ret2 = PyObject_SetAttrString(type, methods[i], method);
+    if (ret2 < 0) {
+      Py_XDECREF(type);
+      return NULL;
+    }
+  }
+
   return (PyTypeObject*)type;
 }
 

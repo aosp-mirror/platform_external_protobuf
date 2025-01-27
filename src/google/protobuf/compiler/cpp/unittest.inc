@@ -40,8 +40,8 @@
 #include "google/protobuf/compiler/cpp/helpers.h"
 #include "google/protobuf/unittest_no_generic_services.pb.h"
 #include "google/protobuf/descriptor.pb.h"
-#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include "absl/base/casts.h"
 #include "absl/strings/substitute.h"
 #include "google/protobuf/arena.h"
@@ -65,6 +65,8 @@ namespace cpp {
 
 // Can't use an anonymous namespace here due to brokenness of Tru64 compiler.
 namespace cpp_unittest {
+
+using ::testing::UnorderedElementsAre;
 
 
 void DoNothing() {}
@@ -425,6 +427,7 @@ TEST(GENERATED_MESSAGE_TEST_NAME, SwapWithOther) {
   message1.set_optional_string("abc");
   message1.mutable_optional_nested_message()->set_bb(1);
   message1.set_optional_nested_enum(UNITTEST::TestAllTypes::FOO);
+  message1.set_optional_bytes_cord("bytes cord");
   message1.add_repeated_int32(1);
   message1.add_repeated_int32(2);
   message1.add_repeated_string("a");
@@ -438,6 +441,7 @@ TEST(GENERATED_MESSAGE_TEST_NAME, SwapWithOther) {
   message2.set_optional_string("def");
   message2.mutable_optional_nested_message()->set_bb(2);
   message2.set_optional_nested_enum(UNITTEST::TestAllTypes::BAR);
+  message2.set_optional_bytes_cord("bytes cord");
   message2.add_repeated_int32(3);
   message2.add_repeated_string("c");
   message2.add_repeated_nested_message()->set_bb(9);
@@ -449,6 +453,7 @@ TEST(GENERATED_MESSAGE_TEST_NAME, SwapWithOther) {
   EXPECT_EQ("def", message1.optional_string());
   EXPECT_EQ(2, message1.optional_nested_message().bb());
   EXPECT_EQ(UNITTEST::TestAllTypes::BAR, message1.optional_nested_enum());
+  EXPECT_EQ(absl::Cord("bytes cord"), message1.optional_bytes_cord());
   ASSERT_EQ(1, message1.repeated_int32_size());
   EXPECT_EQ(3, message1.repeated_int32(0));
   ASSERT_EQ(1, message1.repeated_string_size());
@@ -462,6 +467,7 @@ TEST(GENERATED_MESSAGE_TEST_NAME, SwapWithOther) {
   EXPECT_EQ("abc", message2.optional_string());
   EXPECT_EQ(1, message2.optional_nested_message().bb());
   EXPECT_EQ(UNITTEST::TestAllTypes::FOO, message2.optional_nested_enum());
+  EXPECT_EQ(absl::Cord("bytes cord"), message2.optional_bytes_cord());
   ASSERT_EQ(2, message2.repeated_int32_size());
   EXPECT_EQ(1, message2.repeated_int32(0));
   EXPECT_EQ(2, message2.repeated_int32(1));
@@ -552,10 +558,11 @@ TEST(GENERATED_MESSAGE_TEST_NAME, CopyConstructor) {
   }
 }
 
+#ifndef PROTOBUF_TEST_NO_DESCRIPTORS
 TEST(GENERATED_MESSAGE_TEST_NAME, CopyConstructorWithArenas) {
   Arena arena;
   UNITTEST::TestAllTypes* message1 =
-      Arena::CreateMessage<UNITTEST::TestAllTypes>(&arena);
+      Arena::Create<UNITTEST::TestAllTypes>(&arena);
   TestUtil::SetAllFields(message1);
 
   UNITTEST::TestAllTypes message2_stack(*message1);
@@ -572,7 +579,6 @@ TEST(GENERATED_MESSAGE_TEST_NAME, CopyConstructorWithArenas) {
   TestUtil::ExpectAllFieldsSet(*message2_heap);
 }
 
-#ifndef PROTOBUF_TEST_NO_DESCRIPTORS
 TEST(GENERATED_MESSAGE_TEST_NAME, UpcastCopyFrom) {
   // Test the CopyFrom method that takes in the generic const Message&
   // parameter.
@@ -848,7 +854,7 @@ TEST(GENERATED_MESSAGE_TEST_NAME, TestEmbedOptimizedForSize) {
 TEST(GENERATED_MESSAGE_TEST_NAME, TestSpaceUsed) {
   // Allocate explicitly on the heap to prevent arena creation.
   std::unique_ptr<UNITTEST::TestAllTypes> message1(
-    Arena::CreateMessage<UNITTEST::TestAllTypes>(nullptr));
+      Arena::Create<UNITTEST::TestAllTypes>(nullptr));
   // sizeof provides a lower bound on SpaceUsedLong().
   EXPECT_LE(sizeof(UNITTEST::TestAllTypes), message1->SpaceUsedLong());
   const size_t empty_message_size = message1->SpaceUsedLong();
@@ -889,7 +895,7 @@ TEST(GENERATED_MESSAGE_TEST_NAME, TestSpaceUsed) {
 TEST(GENERATED_MESSAGE_TEST_NAME, TestOneofSpaceUsed) {
   // Allocate explicitly on the heap to prevent arena creation.
   std::unique_ptr<UNITTEST::TestOneof2> message1(
-    Arena::CreateMessage<UNITTEST::TestOneof2>(nullptr));
+      Arena::Create<UNITTEST::TestOneof2>(nullptr));
   EXPECT_LE(sizeof(UNITTEST::TestOneof2), message1->SpaceUsedLong());
 
   const size_t empty_message_size = message1->SpaceUsedLong();
@@ -1022,8 +1028,8 @@ TEST(GENERATED_ENUM_TEST_NAME, MinAndMax) {
   EXPECT_EQ(4, UNITTEST::TestAllTypes::NestedEnum_ARRAYSIZE);
 
   EXPECT_EQ(UNITTEST::FOREIGN_FOO, UNITTEST::ForeignEnum_MIN);
-  EXPECT_EQ(UNITTEST::FOREIGN_BAX, UNITTEST::ForeignEnum_MAX);
-  EXPECT_EQ(33, UNITTEST::ForeignEnum_ARRAYSIZE);
+  EXPECT_EQ(UNITTEST::FOREIGN_LARGE, UNITTEST::ForeignEnum_MAX);
+  EXPECT_EQ(123457, UNITTEST::ForeignEnum_ARRAYSIZE);
 
   EXPECT_EQ(1, UNITTEST::TestEnumWithDupValue_MIN);
   EXPECT_EQ(3, UNITTEST::TestEnumWithDupValue_MAX);
@@ -1310,17 +1316,17 @@ TEST_F(GENERATED_SERVICE_TEST_NAME, CallMethod) {
 TEST_F(GENERATED_SERVICE_TEST_NAME, DISABLED_CallMethodTypeFailure) {
   // Verify death if we call Foo() with Bar's message types.
 
-#if PROTOBUF_RTTI && GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet
+#if GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet
   EXPECT_DEBUG_DEATH(
-    mock_service_.CallMethod(foo_, &mock_controller_,
-                             &foo_request_, &bar_response_, done_.get()),
-    "dynamic_cast");
+      mock_service_.CallMethod(foo_, &mock_controller_, &foo_request_,
+                               &bar_response_, done_.get()),
+      "DynamicCastMessage");
 
   mock_service_.Reset();
   EXPECT_DEBUG_DEATH(
-    mock_service_.CallMethod(foo_, &mock_controller_,
-                             &bar_request_, &foo_response_, done_.get()),
-    "dynamic_cast");
+      mock_service_.CallMethod(foo_, &mock_controller_, &bar_request_,
+                               &foo_response_, done_.get()),
+      "DynamicCastMessage");
 #endif  // GTEST_HAS_DEATH_TEST
 }
 
@@ -1595,8 +1601,7 @@ TEST_F(OneofTest, SetAllocatedString) {
 TEST_F(OneofTest, ArenaSetAllocatedString) {
   // Check that set_allocated_foo() works for strings.
   Arena arena;
-  UNITTEST::TestOneof2* message =
-      Arena::CreateMessage<UNITTEST::TestOneof2>(&arena);
+  UNITTEST::TestOneof2* message = Arena::Create<UNITTEST::TestOneof2>(&arena);
 
   EXPECT_FALSE(message->has_foo_string());
   const std::string kHello("hello");
@@ -2081,19 +2086,18 @@ TEST(HELPERS_TEST_NAME, TestSCC) {
   UNITTEST::TestMutualRecursionA a;
   MessageSCCAnalyzer scc_analyzer((Options()));
   const SCC* scc = scc_analyzer.GetSCC(a.GetDescriptor());
-  std::vector<std::string> names;
+  std::vector<absl::string_view> names;
   names.reserve(scc->descriptors.size());
   for (int i = 0; i < scc->descriptors.size(); i++) {
     names.push_back(scc->descriptors[i]->full_name());
   }
-  std::string package = a.GetDescriptor()->file()->package();
-  ASSERT_EQ(names.size(), 4);
-  std::sort(names.begin(), names.end());
-  EXPECT_EQ(names[0], absl::StrCat(package, ".TestMutualRecursionA"));
-  EXPECT_EQ(names[1], absl::StrCat(package, ".TestMutualRecursionA.SubGroup"));
-  EXPECT_EQ(names[2],
-            absl::StrCat(package, ".TestMutualRecursionA.SubMessage"));
-  EXPECT_EQ(names[3], absl::StrCat(package, ".TestMutualRecursionB"));
+  const absl::string_view package = a.GetDescriptor()->file()->package();
+  EXPECT_THAT(names,
+              UnorderedElementsAre(
+                  absl::StrCat(package, ".TestMutualRecursionA"),
+                  absl::StrCat(package, ".TestMutualRecursionA.SubGroup"),
+                  absl::StrCat(package, ".TestMutualRecursionA.SubMessage"),
+                  absl::StrCat(package, ".TestMutualRecursionB")));
 
   MessageAnalysis result = scc_analyzer.GetSCCAnalysis(scc);
   EXPECT_EQ(result.is_recursive, true);

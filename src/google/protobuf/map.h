@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
@@ -32,6 +33,7 @@
 #include "absl/base/attributes.h"
 #include "absl/container/btree_map.h"
 #include "absl/hash/hash.h"
+#include "absl/log/absl_check.h"
 #include "absl/meta/type_traits.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
@@ -226,10 +228,7 @@ struct TransparentSupport {
 // that is convertible to absl::string_view.
 template <>
 struct TransparentSupport<std::string> {
-  // If the element is not convertible to absl::string_view, try to convert to
-  // std::string first, and then fallback to support for converting from
-  // std::string_view. The ranked overload pattern is used to specify our
-  // order of preference.
+  // Use go/ranked-overloads for dispatching.
   struct Rank0 {};
   struct Rank1 : Rank0 {};
   struct Rank2 : Rank1 {};
@@ -495,10 +494,46 @@ class UntypedMapIterator {
     }
   }
 
+  // Conversion to and from a typed iterator child class is used by FFI.
+  template <class Iter>
+  static UntypedMapIterator FromTyped(Iter it) {
+    static_assert(
+#if defined(__cpp_lib_is_layout_compatible) && \
+    __cpp_lib_is_layout_compatible >= 201907L
+        std::is_layout_compatible_v<Iter, UntypedMapIterator>,
+#else
+        sizeof(it) == sizeof(UntypedMapIterator),
+#endif
+        "Map iterator must not have extra state that the base class"
+        "does not define.");
+    return static_cast<UntypedMapIterator>(it);
+  }
+
+  template <class Iter>
+  Iter ToTyped() const {
+    return Iter(*this);
+  }
   NodeBase* node_;
   const UntypedMapBase* m_;
   map_index_t bucket_index_;
 };
+
+// These properties are depended upon by Rust FFI.
+static_assert(std::is_trivially_copyable<UntypedMapIterator>::value,
+              "UntypedMapIterator must be trivially copyable.");
+static_assert(std::is_trivially_destructible<UntypedMapIterator>::value,
+              "UntypedMapIterator must be trivially destructible.");
+static_assert(std::is_standard_layout<UntypedMapIterator>::value,
+              "UntypedMapIterator must be standard layout.");
+static_assert(offsetof(UntypedMapIterator, node_) == 0,
+              "node_ must be the first field of UntypedMapIterator.");
+static_assert(sizeof(UntypedMapIterator) ==
+                  sizeof(void*) * 2 +
+                      std::max(sizeof(uint32_t), alignof(void*)),
+              "UntypedMapIterator does not have the expected size for FFI");
+static_assert(
+    alignof(UntypedMapIterator) == std::max(alignof(void*), alignof(uint32_t)),
+    "UntypedMapIterator does not have the expected alignment for FFI");
 
 // Base class for all Map instantiations.
 // This class holds all the data and provides the basic functionality shared
@@ -525,7 +560,7 @@ class PROTOBUF_EXPORT UntypedMapBase {
 
  protected:
   // 16 bytes is the minimum useful size for the array cache in the arena.
-  enum { kMinTableSize = 16 / sizeof(void*) };
+  enum : map_index_t { kMinTableSize = 16 / sizeof(void*) };
 
  public:
   Arena* arena() const { return this->alloc_.arena(); }
@@ -610,9 +645,7 @@ class PROTOBUF_EXPORT UntypedMapBase {
   // Return a power of two no less than max(kMinTableSize, n).
   // Assumes either n < kMinTableSize or n is a power of two.
   map_index_t TableSize(map_index_t n) {
-    return n < static_cast<map_index_t>(kMinTableSize)
-               ? static_cast<map_index_t>(kMinTableSize)
-               : n;
+    return n < kMinTableSize ? kMinTableSize : n;
   }
 
   template <typename T>
@@ -662,7 +695,7 @@ class PROTOBUF_EXPORT UntypedMapBase {
   }
 
   TableEntryPtr* CreateEmptyTable(map_index_t n) {
-    ABSL_DCHECK_GE(n, map_index_t{kMinTableSize});
+    ABSL_DCHECK_GE(n, kMinTableSize);
     ABSL_DCHECK_EQ(n & (n - 1), 0u);
     TableEntryPtr* result = AllocFor<TableEntryPtr>(alloc_).allocate(n);
     memset(result, 0, n * sizeof(result[0]));
@@ -937,13 +970,13 @@ class KeyMapBase : public UntypedMapBase {
   KeyNode* InsertOrReplaceNode(KeyNode* node) {
     KeyNode* to_erase = nullptr;
     auto p = this->FindHelper(node->key());
+    map_index_t b = p.bucket;
     if (p.node != nullptr) {
       erase_no_destroy(p.bucket, static_cast<KeyNode*>(p.node));
       to_erase = static_cast<KeyNode*>(p.node);
     } else if (ResizeIfLoadIsOutOfRange(num_elements_ + 1)) {
-      p = FindHelper(node->key());
+      b = BucketNumber(node->key());  // bucket_number
     }
-    const map_index_t b = p.bucket;  // bucket number
     InsertUnique(b, node);
     ++num_elements_;
     return to_erase;
@@ -1280,6 +1313,7 @@ class Map : private internal::KeyMapBase<internal::KeyForBase<Key>> {
     using BaseIt::BaseIt;
     explicit const_iterator(const BaseIt& base) : BaseIt(base) {}
     friend class Map;
+    friend class internal::UntypedMapIterator;
     friend class internal::TypeDefinedMapFieldBase<Key, T>;
   };
 
@@ -1581,15 +1615,15 @@ class Map : private internal::KeyMapBase<internal::KeyForBase<Key>> {
   template <typename K, typename... Args>
   std::pair<iterator, bool> TryEmplaceInternal(K&& k, Args&&... args) {
     auto p = this->FindHelper(TS::ToView(k));
+    internal::map_index_t b = p.bucket;
     // Case 1: key was already present.
     if (p.node != nullptr)
       return std::make_pair(
           iterator(static_cast<Node*>(p.node), this, p.bucket), false);
     // Case 2: insert.
     if (this->ResizeIfLoadIsOutOfRange(this->num_elements_ + 1)) {
-      p = this->FindHelper(TS::ToView(k));
+      b = this->BucketNumber(TS::ToView(k));
     }
-    const auto b = p.bucket;  // bucket number
     // If K is not key_type, make the conversion to key_type explicit.
     using TypeToInit = typename std::conditional<
         std::is_same<typename std::decay<K>::type, key_type>::value, K&&,

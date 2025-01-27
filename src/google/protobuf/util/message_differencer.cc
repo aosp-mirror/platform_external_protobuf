@@ -300,7 +300,7 @@ bool MessageDifferencer::ApproximatelyEquivalent(const Message& message1,
 // ===========================================================================
 
 MessageDifferencer::MessageDifferencer()
-    : reporter_(NULL),
+    : reporter_(nullptr),
       message_field_comparison_(EQUAL),
       scope_(FULL),
       repeated_field_comparison_(AS_LIST),
@@ -319,14 +319,14 @@ MessageDifferencer::~MessageDifferencer() {
 }
 
 void MessageDifferencer::set_field_comparator(FieldComparator* comparator) {
-  ABSL_CHECK(comparator) << "Field comparator can't be NULL.";
+  ABSL_CHECK(comparator) << "Field comparator can't be nullptr.";
   field_comparator_kind_ = kFCBase;
   field_comparator_.base = comparator;
 }
 
 void MessageDifferencer::set_field_comparator(
     DefaultFieldComparator* comparator) {
-  ABSL_CHECK(comparator) << "Field comparator can't be NULL.";
+  ABSL_CHECK(comparator) << "Field comparator can't be nullptr.";
   field_comparator_kind_ = kFCDefault;
   field_comparator_.default_impl = comparator;
 }
@@ -1913,6 +1913,29 @@ bool MessageDifferencer::MatchRepeatedFieldIndices(
 
   match_list1->assign(count1, -1);
   match_list2->assign(count2, -1);
+
+  // In the special case where both repeated fields have exactly one element,
+  // return without calling the comparator.  This optimization prevents the
+  // pathological case of deeply nested repeated fields of size 1 from taking
+  // exponential-time to compare.
+  //
+  // In the case where reporter_ is set, we need to do the compare here to
+  // properly distinguish a modify from an add+delete.  The code below will not
+  // pass the reporter along in recursive calls to nested repeated fields, so
+  // the inner call will have the opportunity to perform this optimization and
+  // avoid exponential-time behavior.
+  //
+  // In the case where key_comparator is set, we need to do the compare here to
+  // fulfill the interface contract that keys will be compared even if the user
+  // asked to ignore that field.  The code will only compare the key fields
+  // which (hopefully) do not contain further repeated fields.
+  if (count1 == 1 && count2 == 1 && reporter_ == nullptr &&
+      key_comparator == nullptr) {
+    match_list1->at(0) = 0;
+    match_list2->at(0) = 0;
+    return true;
+  }
+
   // Ensure that we don't report differences during the matching process. Since
   // field comparators could potentially use this message differencer object to
   // perform further comparisons, turn off reporting here and re-enable it

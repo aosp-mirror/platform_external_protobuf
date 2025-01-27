@@ -48,6 +48,7 @@ TEST(FileTest, TopologicallyOrderedDescriptors) {
       "TestUnpackedTypes",
       "TestUnpackedExtensions",
       "TestReservedFields",
+      "TestRequiredOpenEnum",
       "TestRequiredOneof.NestedMessage",
       "TestRequiredNoMaskMulti",
       "TestRequiredEnumNoMask",
@@ -111,6 +112,7 @@ TEST(FileTest, TopologicallyOrderedDescriptors) {
       "RedactedFields.MapUnredactedStringEntry",
       "RedactedFields.MapRedactedStringEntry",
       "OptionalGroup_extension",
+      "OpenEnumMessage",
       "OneString",
       "OneBytes",
       "MoreString",
@@ -217,3 +219,5 @@ TEST(FileTest, TopologicallyOrderedDescriptors) {
 }  // namespace compiler
 }  // namespace protobuf
 }  // namespace google
+
+#include "google/protobuf/port_undef.inc"
