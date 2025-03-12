@@ -479,6 +479,7 @@ java_library_static {
         "//apex_available:platform",
         "com.android.tethering",
         "com.android.wifi",
+        "com.android.neuralnetworks",
     ],
 }
 
